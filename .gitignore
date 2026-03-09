@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+.streamlit/secrets.toml
+video/node_modules/
+video/out/
+video/public/audio/
+*.mp4
+*.wav
+.venv/
+venv/
