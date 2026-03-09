@@ -8,6 +8,9 @@ warnings.filterwarnings("ignore")
 
 import streamlit as st
 import yfinance as yf
+import requests as _requests
+_YF_SESSION = _requests.Session()
+_YF_SESSION.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"})
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
@@ -483,7 +486,7 @@ def fetch_data(ticker: str) -> dict:
         "is_etf": False, "quote_type": "EQUITY",
     }
     try:
-        obj = yf.Ticker(ticker)
+        obj = yf.Ticker(ticker, session=_YF_SESSION)
         try:
             info = obj.info or {}
         except Exception:
@@ -1204,7 +1207,7 @@ def build_peers(ticker: str, self_info: dict | None = None, extra_peers: tuple =
     peers = all_peers
 
     def _one(sym: str) -> tuple[str, dict]:
-        try: return sym, yf.Ticker(sym).info or {}
+        try: return sym, yf.Ticker(sym, session=_YF_SESSION).info or {}
         except: return sym, {}
 
     with ThreadPoolExecutor(max_workers=6) as ex:
@@ -1380,7 +1383,7 @@ def fmt_fin_val(v) -> str:
 @st.cache_data(ttl=300, show_spinner=False)
 def build_news(ticker: str) -> None:
     try:
-        articles = yf.Ticker(ticker).news or []
+        articles = yf.Ticker(ticker, session=_YF_SESSION).news or []
     except Exception:
         articles = []
     if not articles:
@@ -1443,7 +1446,7 @@ def build_news(ticker: str) -> None:
 # ── Financials Tab ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_financials(ticker: str) -> tuple:
-    obj = yf.Ticker(ticker)
+    obj = yf.Ticker(ticker, session=_YF_SESSION)
     try:   inc = obj.financials
     except: inc = None
     try:   bal = obj.balance_sheet
@@ -1486,7 +1489,7 @@ def build_financials(ticker: str) -> None:
 # ── Earnings Tab ───────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_earnings(ticker: str):
-    obj = yf.Ticker(ticker)
+    obj = yf.Ticker(ticker, session=_YF_SESSION)
     # Try get_earnings_dates (requires lxml, installed)
     try:
         df = obj.get_earnings_dates(limit=12)
@@ -1590,7 +1593,7 @@ def build_earnings(ticker: str, info: dict) -> None:
 # ── Insiders Tab ───────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_insiders(ticker: str):
-    try:   return yf.Ticker(ticker).insider_transactions
+    try:   return yf.Ticker(ticker, session=_YF_SESSION).insider_transactions
     except: return None
 
 
