@@ -8,9 +8,6 @@ warnings.filterwarnings("ignore")
 
 import streamlit as st
 import yfinance as yf
-import requests as _requests
-_YF_SESSION = _requests.Session()
-_YF_SESSION.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"})
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
@@ -313,9 +310,20 @@ OVERLAY_INDS  = {"Bollinger Bands", "VWAP"}
 SUBPLOT_INDS  = ["RSI", "MACD", "Stochastic", "OBV", "ATR"]
 ALL_INDS      = ["Bollinger Bands", "VWAP", "RSI", "MACD", "Stochastic", "OBV", "ATR"]
 
+# ── Best Pick Universe ────────────────────────────────────────────────────────
+BEST_PICK_UNIVERSE = [
+    "AAPL","MSFT","NVDA","AMZN","META","TSLA","GOOG","AVGO",
+    "LLY","JPM","V","MA","UNH","XOM","PLTR","AMD","CRM","COST",
+    "NFLX","ORCL","NOW","ISRG","GS","BX","COIN","SQ","MELI","SE",
+]
+
+# ── Eden Color Palette ────────────────────────────────────────────────────────
+EDEN_COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6",
+               "#06b6d4","#f97316","#84cc16","#ec4899","#14b8a6"]
+
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
-def inject_css() -> None:
+def inject_css(account_label: str = "&#128100; Sandbox Mode", is_logged_in: bool = False) -> None:
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -436,8 +444,132 @@ def inject_css() -> None:
     .peers-add{display:flex;gap:10px;align-items:center;margin-top:16px;
                padding:14px 18px;background:rgba(99,102,241,.04);
                border:1px dashed rgba(99,102,241,.25);border-radius:12px}
+
+    /* ── 3-Dots Settings Menu ─────────────────────────────────────────── */
+    #eden-dots-btn{position:fixed;top:14px;right:14px;z-index:99999;
+        width:38px;height:38px;border-radius:50%;
+        background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
+        border:1.5px solid rgba(99,102,241,.3);cursor:pointer;
+        font-size:22px;font-weight:900;display:flex;align-items:center;
+        justify-content:center;box-shadow:0 3px 14px rgba(0,0,0,.12);
+        color:#6366f1;user-select:none;line-height:1;transition:box-shadow .18s}
+    #eden-dots-btn:hover{box-shadow:0 5px 18px rgba(99,102,241,.28)}
+    #eden-menu-backdrop{display:none;position:fixed;inset:0;z-index:99996}
+    html:has(#eden-menu-chk:checked) #eden-menu-backdrop{display:block}
+    #eden-panel{position:fixed;top:58px;right:14px;z-index:99998;
+        background:#fff;border-radius:16px;padding:8px 0;
+        border:1px solid rgba(99,102,241,.18);
+        box-shadow:0 8px 32px rgba(0,0,0,.13);min-width:210px;
+        opacity:0;transform:scale(.95) translateY(-6px);
+        pointer-events:none;transition:opacity .18s,transform .18s}
+    html:has(#eden-menu-chk:checked) #eden-panel{
+        opacity:1;transform:scale(1) translateY(0);pointer-events:auto}
+    .eden-panel-title{font-size:10px;font-weight:700;color:#9ca3af;
+        letter-spacing:1.2px;text-transform:uppercase;padding:6px 16px 10px}
+    .eden-panel-item{display:flex;align-items:center;justify-content:space-between;
+        padding:10px 16px;cursor:pointer;font-size:13px;color:#1a1a2e;
+        font-weight:500;transition:background .12s;gap:10px}
+    .eden-panel-item:hover{background:rgba(99,102,241,.06)}
+    .eden-panel-sep{height:1px;background:rgba(99,102,241,.1);margin:4px 0}
+    .eden-toggle{width:34px;height:20px;background:#d1d5db;border-radius:10px;
+        position:relative;transition:background .2s;flex-shrink:0}
+    .eden-toggle-knob{position:absolute;top:3px;left:3px;width:14px;height:14px;
+        background:#fff;border-radius:50%;transition:transform .2s;
+        box-shadow:0 1px 4px rgba(0,0,0,.2)}
+    html:has(#eden-dark-chk:checked) .eden-toggle{background:#6366f1}
+    html:has(#eden-dark-chk:checked) .eden-toggle-knob{transform:translateX(14px)}
+
+    /* ── Dark Mode (pure CSS via :has) ────────────────────────────────── */
+    html:has(#eden-dark-chk:checked) body,
+    html:has(#eden-dark-chk:checked) .stApp,
+    html:has(#eden-dark-chk:checked) .block-container,
+    html:has(#eden-dark-chk:checked) .stMainBlockContainer,
+    html:has(#eden-dark-chk:checked) [class*="css"]{background-color:#0f0f1a!important;color:#e2e2f0!important}
+    html:has(#eden-dark-chk:checked) [data-testid="stSidebar"]{background:linear-gradient(180deg,#1a1a2e 0%,#16162a 100%)!important;border-right-color:rgba(99,102,241,.25)!important}
+    html:has(#eden-dark-chk:checked) .metric-card,
+    html:has(#eden-dark-chk:checked) .analyst-card{background:rgba(26,26,46,.85)!important;border-color:rgba(99,102,241,.3)!important}
+    html:has(#eden-dark-chk:checked) .metric-value,
+    html:has(#eden-dark-chk:checked) .ticker-symbol,
+    html:has(#eden-dark-chk:checked) .eden-brand,
+    html:has(#eden-dark-chk:checked) .analyst-val,
+    html:has(#eden-dark-chk:checked) .report-section-title,
+    html:has(#eden-dark-chk:checked) .rpt-value,
+    html:has(#eden-dark-chk:checked) .rpt-name,
+    html:has(#eden-dark-chk:checked) .hero h1,
+    html:has(#eden-dark-chk:checked) .earn-next,
+    html:has(#eden-dark-chk:checked) .ceo-summary p,
+    html:has(#eden-dark-chk:checked) .thesis-item{color:#e2e2f0!important}
+    html:has(#eden-dark-chk:checked) .metric-label,
+    html:has(#eden-dark-chk:checked) .analyst-lbl{color:#a78bfa!important}
+    html:has(#eden-dark-chk:checked) .exec-card{background:#1a1a2e!important;border-color:rgba(99,102,241,.25)!important}
+    html:has(#eden-dark-chk:checked) .ceo-summary{background:linear-gradient(90deg,rgba(99,102,241,.1),transparent)!important}
+    html:has(#eden-dark-chk:checked) .report-section-title{border-bottom-color:rgba(99,102,241,.2)!important}
+    html:has(#eden-dark-chk:checked) .rpt-row{border-bottom-color:rgba(255,255,255,.06)!important}
+    html:has(#eden-dark-chk:checked) .verdict-box{background:linear-gradient(135deg,#1e1e3a,#1a1a2e)!important;border-color:rgba(99,102,241,.3)!important}
+    html:has(#eden-dark-chk:checked) .price-bar-track{background:#2d2d4e!important}
+    html:has(#eden-dark-chk:checked) .company-full,
+    html:has(#eden-dark-chk:checked) .analyst-sub,
+    html:has(#eden-dark-chk:checked) .news-meta,
+    html:has(#eden-dark-chk:checked) .verdict-meta{color:#9ca3af!important}
+    html:has(#eden-dark-chk:checked) [data-testid="stTabs"] [role="tab"]{color:#9ca3af!important}
+    html:has(#eden-dark-chk:checked) [data-testid="stTabs"] [role="tab"][aria-selected="true"]{color:#a78bfa!important}
+    html:has(#eden-dark-chk:checked) .peers-add{background:rgba(99,102,241,.08)!important;border-color:rgba(99,102,241,.35)!important}
+    html:has(#eden-dark-chk:checked) #eden-panel{background:#1a1a2e!important;border-color:rgba(99,102,241,.3)!important}
+    html:has(#eden-dark-chk:checked) .eden-panel-item{color:#e2e2f0!important}
+    html:has(#eden-dark-chk:checked) #eden-dots-btn{background:rgba(26,26,46,.92)!important;border-color:rgba(167,139,250,.5)!important}
     </style>
     """, unsafe_allow_html=True)
+
+    # HTML only — no <script> (Streamlit would render script content as visible text)
+    _auth_href = "/_stauth/logout" if is_logged_in else "https://accounts.google.com"
+    _auth_label = (
+        f'&#128682; Sign Out ({account_label.replace("&#128100; ", "")})' if is_logged_in
+        else '&#128100; Sign in with Google'
+    )
+    _auth_color = "#ef4444" if is_logged_in else "#6366f1"
+    st.markdown(f"""
+    <input type="checkbox" id="eden-menu-chk" style="position:fixed;opacity:0;pointer-events:none;top:-9999px">
+    <input type="checkbox" id="eden-dark-chk" style="position:fixed;opacity:0;pointer-events:none;top:-9999px">
+    <label for="eden-menu-chk" id="eden-menu-backdrop"></label>
+    <label for="eden-menu-chk" id="eden-dots-btn" title="Settings">&#8942;</label>
+    <div id="eden-panel">
+      <div class="eden-panel-title">Settings</div>
+      <label for="eden-dark-chk" class="eden-panel-item">
+        <span>&#127769; Dark Mode</span>
+        <div class="eden-toggle"><div class="eden-toggle-knob"></div></div>
+      </label>
+      <div class="eden-panel-sep"></div>
+      <a href="{_auth_href}" class="eden-panel-item"
+         style="text-decoration:none;cursor:pointer;color:{_auth_color};display:flex;align-items:center;">
+        <span>{_auth_label}</span>
+      </a>
+      <div class="eden-panel-sep"></div>
+      <div class="eden-panel-item" style="color:#6b7280;font-size:11px;cursor:default">
+        <span>Eden Sovereign v1.0</span>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # JavaScript via components (executes in iframe, accesses parent DOM for localStorage)
+    st.components.v1.html("""
+    <script>
+    (function(){
+        function tryInit() {
+            var doc = window.parent.document;
+            var darkChk = doc.getElementById('eden-dark-chk');
+            if (!darkChk) { setTimeout(tryInit, 100); return; }
+            if (darkChk._lsBound) return;
+            darkChk._lsBound = true;
+            var saved = window.parent.localStorage.getItem('eden-dark') === '1';
+            darkChk.checked = saved;
+            darkChk.addEventListener('change', function() {
+                window.parent.localStorage.setItem('eden-dark', this.checked ? '1' : '0');
+            });
+        }
+        tryInit();
+    })();
+    </script>
+    """, height=0)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -479,6 +611,7 @@ def fetch_data(ticker: str) -> dict:
         "peg_ratio": float("nan"), "gross_margins": float("nan"),
         "fcf": float("nan"), "revenue_cagr": 0.0,
         "fcf_yield": float("nan"), "sector": "N/A", "dividend_yield": 0.0,
+        "week52_high": float("nan"), "week52_low": float("nan"),
         "analyst_target_mean": float("nan"), "analyst_target_high": float("nan"),
         "analyst_target_low": float("nan"), "analyst_target_median": float("nan"),
         "n_analysts": 0, "rec_mean": float("nan"), "rec_key": "N/A",
@@ -486,29 +619,105 @@ def fetch_data(ticker: str) -> dict:
         "is_etf": False, "quote_type": "EQUITY",
     }
     try:
-        obj = yf.Ticker(ticker, session=_YF_SESSION)
+        obj = yf.Ticker(ticker)
         try:
             info = obj.info or {}
         except Exception:
             info = {}
         out["info"] = info
 
+        # ── fast_info (always works — cached separately by yfinance) ──────────
+        try:
+            fi = obj.fast_info
+        except Exception:
+            fi = {}
+
+        def _fi(key, fallback=None):
+            """Read from fast_info safely (dict-like or attribute-like)."""
+            try:
+                v = fi[key] if hasattr(fi, "__getitem__") else getattr(fi, key, None)
+                return v if v not in (None, float("nan")) else fallback
+            except Exception:
+                return fallback
+
         out["company_name"]  = info.get("longName") or info.get("shortName") or ticker
-        qt = info.get("quoteType", "EQUITY").upper()
+        qt = info.get("quoteType") or str(_fi("quoteType", "EQUITY"))
+        qt = qt.upper() if qt else "EQUITY"
         out["quote_type"] = qt
         out["is_etf"]     = qt in ("ETF", "MUTUALFUND", "INDEX")
-        # Price: try several fields in order
+
+        # Price: info → fast_info → history (filled later)
         _price = (info.get("currentPrice") or info.get("regularMarketPrice")
-                  or info.get("navPrice") or info.get("ask") or info.get("bid"))
+                  or info.get("navPrice") or info.get("ask") or info.get("bid")
+                  or _fi("last_price"))
         out["current_price"] = float(_safe(_price, float("nan")))
-        out["prev_close"]    = float(_safe(info.get("previousClose") or info.get("regularMarketPreviousClose"), float("nan")))
-        out["mkt_cap"]       = float(_safe(info.get("marketCap"), 0.0))
+
+        _prev = (info.get("previousClose") or info.get("regularMarketPreviousClose")
+                 or _fi("previous_close") or _fi("regular_market_previous_close"))
+        out["prev_close"] = float(_safe(_prev, float("nan")))
+
+        # Market cap: info → fast_info
+        _mc = info.get("marketCap") or _fi("market_cap")
+        out["mkt_cap"] = float(_safe(_mc, 0.0))
+
         out["pe_ratio"]      = float(_safe(info.get("trailingPE"), float("nan")))
         out["forward_pe"]    = float(_safe(info.get("forwardPE"), float("nan")))
         out["gross_margins"] = float(_safe(info.get("grossMargins"), float("nan")))
         out["fcf"]           = float(_safe(info.get("freeCashflow"), float("nan")))
+
+        # ── P/E fallback: compute from price ÷ EPS if trailingPE missing ─────
+        if _isnan(out["pe_ratio"]):
+            try:
+                _eps = info.get("trailingEps") or info.get("epsTrailingTwelveMonths")
+                _px  = out["current_price"]
+                if _eps and not _isnan(float(_eps)) and float(_eps) > 0 and not _isnan(_px) and _px > 0:
+                    out["pe_ratio"] = float(_px) / float(_eps)
+            except Exception:
+                pass
+
+        # ── FCF fallback: Operating Cash Flow − CapEx from cashflow statement ─
+        if _isnan(out["fcf"]):
+            try:
+                _cf = obj.cashflow
+                if _cf is not None and not _cf.empty:
+                    _ocf, _capex = None, None
+                    for _lbl in ["Operating Cash Flow", "Total Cash From Operating Activities"]:
+                        if _lbl in _cf.index:
+                            _ocf = float(_cf.loc[_lbl].dropna().iloc[0])
+                            break
+                    for _lbl in ["Capital Expenditure", "Capital Expenditures"]:
+                        if _lbl in _cf.index:
+                            _capex = float(_cf.loc[_lbl].dropna().iloc[0])
+                            break
+                    if _ocf is not None:
+                        # CapEx is usually stored as negative in yfinance
+                        _capex_val = _capex if _capex is not None else 0.0
+                        out["fcf"] = _ocf + _capex_val  # + because capex is negative
+            except Exception:
+                pass
+        # Fallback: compute gross_margins from income statement if missing
+        if _isnan(out["gross_margins"]):
+            try:
+                _is = obj.income_stmt
+                if _is is not None and not _is.empty:
+                    for _gp_lbl in ["Gross Profit"]:
+                        for _tr_lbl in ["Total Revenue", "Revenue"]:
+                            if _gp_lbl in _is.index and _tr_lbl in _is.index:
+                                _gp = _is.loc[_gp_lbl].dropna()
+                                _tr = _is.loc[_tr_lbl].dropna()
+                                if not _gp.empty and not _tr.empty and float(_tr.iloc[0]) > 0:
+                                    out["gross_margins"] = float(_gp.iloc[0]) / float(_tr.iloc[0])
+                                break
+            except Exception:
+                pass
         out["sector"]        = info.get("sector") or "N/A"
         out["dividend_yield"]= float(_safe(info.get("dividendYield"), 0.0))
+
+        # 52-week range: info → fast_info (snake_case keys)
+        _52h = info.get("fiftyTwoWeekHigh") or _fi("year_high")
+        _52l = info.get("fiftyTwoWeekLow")  or _fi("year_low")
+        out["week52_high"] = float(_safe(_52h, float("nan")))
+        out["week52_low"]  = float(_safe(_52l, float("nan")))
 
         # ── PEG ratio: try 4 sources ──────────────────────────────────────
         peg = _safe(info.get("pegRatio"), None)
@@ -541,20 +750,44 @@ def fetch_data(ticker: str) -> dict:
         if out["mkt_cap"] > 0 and not _isnan(out["fcf"]):
             out["fcf_yield"] = out["fcf"] / out["mkt_cap"]
 
-        # ── Revenue CAGR ───────────────────────────────────────────────────
+        # ── Revenue CAGR (require ≥3 data points for reliability) ─────────
         try:
             fin = obj.financials
             if fin is not None and not fin.empty:
                 for lbl in ["Total Revenue", "Revenue"]:
                     if lbl in fin.index:
                         rev = fin.loc[lbl].dropna().sort_index()
-                        if len(rev) >= 2:
+                        if len(rev) >= 3:
                             oldest, latest, n = float(rev.iloc[0]), float(rev.iloc[-1]), len(rev)-1
                             if oldest > 0 and latest > 0:
                                 out["revenue_cagr"] = float((latest/oldest)**(1.0/n) - 1.0)
+                        elif len(rev) == 2:
+                            oldest, latest = float(rev.iloc[0]), float(rev.iloc[-1])
+                            if oldest > 0 and latest > 0:
+                                g = (latest / oldest) - 1.0
+                                out["revenue_cagr"] = float(g * 0.6)
                         break
         except Exception:
             pass
+
+        # ── Revenue CAGR fallback: quarterly financials if annual still 0 ──
+        if out["revenue_cagr"] == 0.0:
+            try:
+                qfin = obj.quarterly_financials
+                if qfin is not None and not qfin.empty:
+                    for lbl in ["Total Revenue", "Revenue"]:
+                        if lbl in qfin.index:
+                            qrev = qfin.loc[lbl].dropna().sort_index()
+                            if len(qrev) >= 4:
+                                # Annualized: sum last 4Q vs sum prior 4Q
+                                _recent = float(qrev.iloc[-4:].sum())
+                                _prior  = float(qrev.iloc[-8:-4].sum()) if len(qrev) >= 8 else float(qrev.iloc[:4].sum())
+                                if _prior > 0 and _recent > 0:
+                                    g = (_recent / _prior) - 1.0
+                                    out["revenue_cagr"] = float(g * 0.7)  # discount vs annual
+                            break
+            except Exception:
+                pass
 
         # ── Historical prices ──────────────────────────────────────────────
         try:
@@ -694,13 +927,25 @@ def compute_score(data: dict, tech: dict, horizon: str) -> int:
     price   = np.float64(_safe(data["current_price"], 100.0))
     rsi     = np.float64(tech["rsi"])
     macd    = np.float64(tech["macd_hist"])
-    ma50v   = np.float64(_safe(tech["ma50"], float(price)))
+
+    # MA50: if missing, give neutral 5/10 (not full 10/10)
+    _ma50_raw = tech.get("ma50")
+    _ma50_missing = _ma50_raw is None or _isnan(float(_ma50_raw))
+    ma50v = np.float64(float(price) if _ma50_missing else float(_ma50_raw))
+
     pe      = np.float64(data["pe_ratio"])
     peg     = np.float64(data["peg_ratio"])
-    margins = np.float64(_safe(data["gross_margins"], 0.25))
+
+    # margins/fcf: NaN if missing — never assume a default value
+    _margins_raw = data["gross_margins"]
+    _margins_missing = _isnan(float(_safe(_margins_raw, float("nan"))))
+    margins = np.float64(float(_safe(_margins_raw, 0.0)))
+
     cagr    = np.float64(data["revenue_cagr"])
-    fcfy    = np.float64(_safe(data["fcf_yield"], 0.02))
-    mktcap  = np.float64(data["mkt_cap"])
+
+    _fcfy_raw = data["fcf_yield"]
+    _fcfy_missing = _isnan(float(_safe(_fcfy_raw, float("nan"))))
+    fcfy    = np.float64(float(_safe(_fcfy_raw, 0.0)))
 
     total = np.float64(0.0)
 
@@ -710,58 +955,195 @@ def compute_score(data: dict, tech: dict, horizon: str) -> int:
         if float(rsi) > 75.0: rsi_score = np.float64(max(0.0, float(rsi_score)-8.0))
         if float(rsi) < 25.0: rsi_score = np.float64(max(0.0, float(rsi_score)-5.0))
 
-        # MACD (max 20) — centered at 10
-        denom      = np.float64(max(abs(float(price)*0.002), 1e-9))
+        # MACD (max 20) — normalize by 1% of price to handle all price levels
+        denom      = np.float64(max(abs(float(price)*0.01), 1e-9))
         macd_norm  = np.float64(np.clip(float(macd)/float(denom), -1.0, 1.0))
         macd_score = np.float64(10.0 + macd_norm*10.0)
 
-        # MA50 trend (max 10)
-        if float(price) >= float(ma50v):
+        # MA50 trend (max 10) — neutral 5 if MA50 unavailable
+        if _ma50_missing:
+            ma_score = np.float64(5.0)
+        elif float(price) >= float(ma50v):
             ma_score = np.float64(10.0)
         else:
             below = (float(ma50v)-float(price))/max(float(ma50v),1e-9)
             ma_score = np.float64(max(0.0, 10.0 - below*120.0))
 
-        # P/E (max 15)
+        # P/E (max 15) — neutral 4 if missing (below average, not free points)
         if _isnan(float(pe)) or float(pe) <= 0:
-            pe_score = np.float64(7.5)
+            pe_score = np.float64(4.0)
         elif float(pe) < 20:   pe_score = np.float64(15.0)
         elif float(pe) < 35:   pe_score = np.float64(15.0-(float(pe)-20.0)/15.0*7.0)
         elif float(pe) < 60:   pe_score = np.float64(8.0-(float(pe)-35.0)/25.0*5.0)
         else:                  pe_score = np.float64(3.0)
 
-        # PEG (max 10)
+        # PEG (max 10) — neutral 3 if missing
         if _isnan(float(peg)) or float(peg) <= 0:
-            peg_score = np.float64(5.0)
+            peg_score = np.float64(3.0)
         else:
             peg_score = np.float64(np.clip((3.0-float(peg))/3.0*10.0, 0.0, 10.0))
 
-        # CAGR bonus (max 10)
-        cagr_bonus = np.float64(np.clip(float(cagr)/0.30*10.0, 0.0, 10.0))
+        # CAGR bonus (max 10, penalty for negative CAGR)
+        _cagr_clipped = float(np.clip(float(cagr), -0.30, 0.30))
+        cagr_bonus = np.float64(_cagr_clipped / 0.30 * 10.0)
+        cagr_bonus = np.float64(np.clip(float(cagr_bonus), -5.0, 10.0))
 
         total = rsi_score + macd_score + ma_score + pe_score + peg_score + cagr_bonus
-        if mktcap > MEGA_CAP_THRESHOLD:
-            total = np.float64(max(float(total), 45.0))
+        # No mega-cap floor guarantee — let each stock earn its score
 
     else:  # 1Y Strategic
-        cagr_score   = np.float64(np.clip(float(cagr)/0.30*25.0, 0.0, 25.0))
+        # CAGR (max 25, penalty for negative CAGR down to -8)
+        _cagr_clipped = float(np.clip(float(cagr), -0.30, 0.30))
+        cagr_score = np.float64(np.clip(_cagr_clipped / 0.30 * 25.0, -8.0, 25.0))
 
+        # PEG (max 20) — neutral 5 if missing (not 8)
         if _isnan(float(peg)) or float(peg) <= 0:
-            peg_score = np.float64(8.0)
+            peg_score = np.float64(5.0)
         else:
             peg_score = np.float64(np.clip((3.0-float(peg))/3.0*20.0, 0.0, 20.0))
-            if float(peg) < 1.5: peg_score = np.float64(min(20.0, float(peg_score)+3.0))
+            # No extra PEG double bonus — peg_score already rewards low PEG
 
-        fcf_score    = np.float64(np.clip(float(fcfy)/0.08*20.0, 0.0, 20.0))
-        margin_score = np.float64(np.clip(float(margins)/0.40*15.0, 0.0, 15.0))
-        if float(margins) > 0.40: margin_score = np.float64(15.0)
+        # FCF yield (max 20) — 0 if missing (not free points)
+        if _fcfy_missing:
+            fcf_score = np.float64(0.0)
+        else:
+            fcf_score = np.float64(np.clip(float(fcfy)/0.08*20.0, 0.0, 20.0))
+
+        # Gross margins (max 15) — 0 if missing
+        if _margins_missing:
+            margin_score = np.float64(0.0)
+        else:
+            margin_score = np.float64(np.clip(float(margins)/0.40*15.0, 0.0, 15.0))
 
         tech_score   = np.float64(np.clip((float(rsi)-20.0)/60.0*20.0, 0.0, 20.0))
         total = cagr_score + peg_score + fcf_score + margin_score + tech_score
-        if mktcap > MEGA_CAP_THRESHOLD:
-            total = np.float64(max(float(total), 50.0))
+        # No mega-cap floor guarantee
 
     return int(np.clip(float(total), 1.0, 100.0))
+
+
+# ── Portfolio & Best Pick helpers ─────────────────────────────────────────────
+@st.cache_data(ttl=300, show_spinner=False)
+def get_usd_ils() -> float:
+    try:
+        rate = yf.Ticker("ILS=X").fast_info.get("lastPrice")
+        return float(rate) if rate else 3.7
+    except Exception:
+        return 3.7
+
+
+@st.cache_data(ttl=180, show_spinner=False)
+def fetch_portfolio_prices(tickers: tuple) -> dict:
+    def _fetch_one(t):
+        try:
+            fi = yf.Ticker(t).fast_info
+            price = fi.get("lastPrice") or fi.get("previousClose") or 0
+            return t, float(price)
+        except Exception:
+            return t, 0.0
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        results = list(ex.map(_fetch_one, tickers))
+    return dict(results)
+
+
+def portfolio_ai_analysis(holdings: list, usd_ils: float) -> str:
+    if not holdings:
+        return "התיק ריק."
+    total_val = sum(h["value_usd"] for h in holdings)
+    if total_val <= 0:
+        return "לא ניתן לחשב ניתוח — ערך התיק הוא אפס."
+    sector_vals: dict = {}
+    for h in holdings:
+        sec = h.get("sector", "Unknown")
+        sector_vals[sec] = sector_vals.get(sec, 0) + h["value_usd"]
+    top_sector = max(sector_vals, key=lambda k: sector_vals[k])
+    top_pct = sector_vals[top_sector] / total_val * 100
+    scores = [h.get("score", 50) for h in holdings]
+    avg_score = sum(scores) / len(scores)
+    low_score_stocks = [h["ticker"] for h in holdings if h.get("score", 50) < 40]
+    total_ils = total_val * usd_ils
+    lines = [
+        f"**שווי תיק כולל:** ${total_val:,.0f} | ₪{total_ils:,.0f}",
+        f"**ציון ממוצע:** {avg_score:.0f}/100",
+    ]
+    if top_pct > 50:
+        lines.append(f"⚠️ **ריכוז גבוה בסקטור {top_sector}** ({top_pct:.0f}%) — שקול גיוון.")
+    else:
+        lines.append(f"✅ **פיזור סקטורי סביר** — {top_sector} מהווה {top_pct:.0f}% מהתיק.")
+    if avg_score >= 70:
+        lines.append("✅ **ציון ממוצע גבוה** — התיק מאוזן היטב.")
+    elif avg_score >= 50:
+        lines.append("⚠️ **ציון ממוצע בינוני** — ישנן הזדמנויות לשיפור.")
+    else:
+        lines.append("🔴 **ציון ממוצע נמוך** — כדאי לבחון מחדש את ההרכב.")
+    if low_score_stocks:
+        lines.append(f"🔴 **מניות עם ציון נמוך (<40):** {', '.join(low_score_stocks)} — שקול לבחון מחדש.")
+    return "\n\n".join(lines)
+
+
+# Crypto/mining tickers to exclude from best-pick scanner
+_CRYPTO_MINING_EXCLUDE = {
+    "RIOT","MARA","HUT","CLSK","BTBT","IREN","WULF","HIVE","CIFR","BITF",
+    "CORZ","ARBK","DMGI","SDIG","GFAI","BSRT","GRIID","MIGI","NXGL","BTCS",
+    "BFAR","CBIT","SLNH",
+}
+
+@st.cache_data(ttl=600, show_spinner=False)
+def find_best_pick(horizon: str) -> list:
+    """Scans all tickers and returns list of (ticker, score) sorted descending.
+    Only includes stocks with sufficient fundamental data quality.
+    """
+    def _score_one(t):
+        try:
+            # Skip known crypto/mining tickers
+            if t in _CRYPTO_MINING_EXCLUDE:
+                return t, 0
+            d = fetch_data(t)
+            if d["hist"].empty or d.get("is_etf"):
+                return t, 0
+            # ── Data quality gates ────────────────────────────────────────
+            # 1. Require meaningful market cap (≥ $1B)
+            if d["mkt_cap"] < 1_000_000_000:
+                return t, 0
+            # 2. Price ≥ $1 (exclude penny stocks and unknown-price stocks)
+            _cp = d.get("current_price", 0) or 0
+            if _isnan(float(_cp)) or float(_cp) < 1.0:
+                return t, 0
+            # 3. Require ≥ 60 trading days of history
+            if len(d["hist"]) < 60:
+                return t, 0
+            # 3b. Require average daily volume ≥ 100K (liquidity filter)
+            _avg_vol = d["hist"]["Volume"].tail(30).mean() if "Volume" in d["hist"].columns else 0
+            if _avg_vol < 100_000:
+                return t, 0
+            # 4. Must be actual equity, not crypto/commodity ETF
+            if d.get("quote_type") not in ("EQUITY", None, ""):
+                return t, 0
+            # 5. Require at least ONE valid fundamental metric
+            has_pe     = not _isnan(d["pe_ratio"]) and d["pe_ratio"] > 0
+            has_cagr   = d["revenue_cagr"] > 0.01
+            has_margin = not _isnan(d["gross_margins"]) and d["gross_margins"] > 0
+            if not (has_pe or has_cagr or has_margin):
+                return t, 0
+            # ── Score ─────────────────────────────────────────────────────
+            tech = compute_technicals(d["hist"])
+            s = compute_score(d, tech, horizon)
+            # 6. Scale penalty for missing fundamentals
+            missing = sum([not has_pe, not has_cagr, not has_margin])
+            if missing == 1:
+                s = max(0, s - 5)    # 1 missing → -5 pts
+            elif missing == 2:
+                s = max(0, s - 15)   # 2 missing → -15 pts
+            # 7. Penalize negative revenue CAGR stocks
+            if d["revenue_cagr"] < -0.05:
+                s = max(0, s - 8)
+            return t, s
+        except Exception:
+            return t, 0
+    with ThreadPoolExecutor(max_workers=50) as ex:
+        results = list(ex.map(_score_one, TICKER_LIST))
+    results.sort(key=lambda x: x[1], reverse=True)
+    return results
 
 
 # ── Candlestick + Indicators Chart ────────────────────────────────────────────
@@ -1207,7 +1589,7 @@ def build_peers(ticker: str, self_info: dict | None = None, extra_peers: tuple =
     peers = all_peers
 
     def _one(sym: str) -> tuple[str, dict]:
-        try: return sym, yf.Ticker(sym, session=_YF_SESSION).info or {}
+        try: return sym, yf.Ticker(sym).info or {}
         except: return sym, {}
 
     with ThreadPoolExecutor(max_workers=6) as ex:
@@ -1247,7 +1629,8 @@ def render_metric_cards(data: dict, tech: dict) -> None:
     pct_cls  = "positive" if not _isnan(pct) and pct>=0 else "negative"
     pct_sign = "+" if not _isnan(pct) and pct>=0 else ""
     pe  = data["pe_ratio"]; peg = data["peg_ratio"]; mc = data["mkt_cap"]
-    ma50v = tech["ma50"]
+    w52h = data.get("week52_high", float("nan"))
+    w52l = data.get("week52_low",  float("nan"))
     peg_sub_cls = ("positive" if not _isnan(float(peg)) and float(peg)<1.5
                    else "negative" if not _isnan(float(peg)) and float(peg)>2.5 else "neutral")
     peg_sub = ("Attractive" if not _isnan(float(peg)) and float(peg)<1.5
@@ -1261,9 +1644,9 @@ def render_metric_cards(data: dict, tech: dict) -> None:
         <div class="metric-sub {pct_cls}">{f'{pct_sign}{pct:.2f}%' if not _isnan(pct) else 'N/A'}</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">MA 50</div>
-        <div class="metric-value">{fmt_price(float(ma50v)) if not _isnan(float(ma50v)) else "N/A"}</div>
-        <div class="metric-sub neutral">50-Day Average</div>
+        <div class="metric-label">52-Week Range</div>
+        <div class="metric-value" style="font-size:15px;">{fmt_price(float(w52h)) if not _isnan(float(w52h)) else "N/A"}</div>
+        <div class="metric-sub neutral">Low: {fmt_price(float(w52l)) if not _isnan(float(w52l)) else "N/A"}</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">P/E Ratio</div>
@@ -1383,7 +1766,7 @@ def fmt_fin_val(v) -> str:
 @st.cache_data(ttl=300, show_spinner=False)
 def build_news(ticker: str) -> None:
     try:
-        articles = yf.Ticker(ticker, session=_YF_SESSION).news or []
+        articles = yf.Ticker(ticker).news or []
     except Exception:
         articles = []
     if not articles:
@@ -1446,7 +1829,7 @@ def build_news(ticker: str) -> None:
 # ── Financials Tab ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_financials(ticker: str) -> tuple:
-    obj = yf.Ticker(ticker, session=_YF_SESSION)
+    obj = yf.Ticker(ticker)
     try:   inc = obj.financials
     except: inc = None
     try:   bal = obj.balance_sheet
@@ -1489,7 +1872,7 @@ def build_financials(ticker: str) -> None:
 # ── Earnings Tab ───────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_earnings(ticker: str):
-    obj = yf.Ticker(ticker, session=_YF_SESSION)
+    obj = yf.Ticker(ticker)
     # Try get_earnings_dates (requires lxml, installed)
     try:
         df = obj.get_earnings_dates(limit=12)
@@ -1593,7 +1976,7 @@ def build_earnings(ticker: str, info: dict) -> None:
 # ── Insiders Tab ───────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_insiders(ticker: str):
-    try:   return yf.Ticker(ticker, session=_YF_SESSION).insider_transactions
+    try:   return yf.Ticker(ticker).insider_transactions
     except: return None
 
 
@@ -2178,8 +2561,7 @@ def _logo_candidates(ticker: str, info: dict) -> list:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def _logo_url(ticker: str, logo_hint: str, website: str) -> str:
-    """Verify logo URLs and return first one that is a real image (>= 80×80 px).
-    Cached per ticker for 1 hour to avoid repeated HTTP calls."""
+    """Verify logo URLs — returns first real image (pixel content check)."""
     import requests
     from io import BytesIO
     try:
@@ -2188,36 +2570,63 @@ def _logo_url(ticker: str, logo_hint: str, website: str) -> str:
     except ImportError:
         _pil_ok = False
 
-    # Build candidate list inline (can't call _logo_candidates inside cache_data easily)
+    _KNOWN = {
+        "AAPL": "apple.com", "MSFT": "microsoft.com", "GOOGL": "google.com",
+        "GOOG": "google.com", "AMZN": "amazon.com", "META": "meta.com",
+        "TSLA": "tesla.com", "NVDA": "nvidia.com", "NFLX": "netflix.com",
+        "IREN": "iren.com", "MSTR": "microstrategy.com", "COIN": "coinbase.com",
+        "RIOT": "riotplatforms.com", "MARA": "marathondh.com",
+    }
+
+    domain = ""
+    if website:
+        domain = website.replace("https://", "").replace("http://", "").split("/")[0]
+        if domain.startswith("www."):
+            domain = domain[4:]
+    if not domain:
+        domain = _KNOWN.get(ticker.upper(), "")
+
     candidates: list = []
     if logo_hint and not logo_hint.startswith("data:"):
         candidates.append(logo_hint)
     candidates.append(f"https://financialmodelingprep.com/image-stock/{ticker}.png")
     candidates.append(f"https://assets.parqet.com/logos/symbol/{ticker}?format=png")
-    if website:
-        domain = website.replace("https://", "").replace("http://", "").split("/")[0]
-        if domain.startswith("www."):
-            domain = domain[4:]
-        if domain:
-            candidates.append(f"https://logo.clearbit.com/{domain}")
+    candidates.append(f"https://storage.googleapis.com/iex/api/logos/{ticker}.png")
+    if domain:
+        candidates.append(f"https://logo.clearbit.com/{domain}")
 
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     for url in candidates:
         try:
-            r = requests.get(url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
+            r = requests.get(url, timeout=6, headers=headers)
             if r.status_code != 200:
                 continue
             content = r.content
-            # Byte-size gate: real logos are almost always > 5 KB
-            if len(content) < 5000:
+            if len(content) < 200:
                 continue
             if _pil_ok:
-                img = _PIL.open(BytesIO(content))
-                w, h = img.size
-                if w < 128 or h < 128:    # reject anything smaller than 128×128
+                try:
+                    img = _PIL.open(BytesIO(content)).convert("RGBA")
+                    import numpy as _np
+                    arr = _np.array(img)
+                    mask = ~(((arr[:,:,0] > 230) & (arr[:,:,1] > 230) & (arr[:,:,2] > 230)) |
+                             (arr[:,:,3] < 30))
+                    rows = _np.any(mask, axis=1)
+                    cols = _np.any(mask, axis=0)
+                    if not rows.any() or not cols.any():
+                        continue
+                    content_h = int(rows.sum())
+                    content_w = int(cols.sum())
+                    if content_w < 24 or content_h < 24:
+                        continue
+                    total_px = img.size[0] * img.size[1]
+                    content_px = content_w * content_h
+                    if content_px / total_px < 0.08:
+                        continue
+                except Exception:
                     continue
             else:
-                # Pillow not available — use a stricter byte threshold as proxy
-                if len(content) < 15000:
+                if len(content) < 500:
                     continue
             return url
         except Exception:
@@ -2413,32 +2822,66 @@ def render_stock_video(ticker: str, data: dict, tech: dict, score: int, hist: pd
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main() -> None:
-    inject_css()
+    # ── Google Login (graceful fallback) ───────────────────────────────────
+    try:
+        _user = st.experimental_user
+        _user_email = _user.get("email", "") if _user else ""
+        _user_name  = _user.get("name", "")  if _user else ""
+    except Exception:
+        _user = None
+        _user_email = ""
+        _user_name  = ""
+
+    _account_label = (
+        f"&#128100; {_user_email}" if _user_email else "&#128100; Sandbox Mode"
+    )
+    inject_css(account_label=_account_label, is_logged_in=bool(_user_email))
+
+    # ── session_state defaults ─────────────────────────────────────────────
+    st.session_state.setdefault("active_ticker", "AAPL")
+    st.session_state.setdefault("portfolio", [])
+    st.session_state.setdefault("run_best_pick", False)
+    st.session_state.setdefault("best_pick_results", [])
+
+    # Apply pending ticker change BEFORE the selectbox widget is instantiated
+    if st.session_state.get("pending_ticker"):
+        _pt = st.session_state.pop("pending_ticker")
+        if _pt in TICKER_LIST:
+            st.session_state["ticker_selectbox"] = _pt
+            st.session_state["active_ticker"] = _pt
 
     # ── Sidebar ────────────────────────────────────────────────────────────
     with st.sidebar:
         st.markdown(EDEN_LOGO, unsafe_allow_html=True)
 
         st.markdown("**Stock Search**")
+        _ticker_idx = TICKER_LIST.index(st.session_state["active_ticker"]) \
+            if st.session_state["active_ticker"] in TICKER_LIST \
+            else (TICKER_LIST.index("AAPL") if "AAPL" in TICKER_LIST else 0)
         ticker = st.selectbox(
             "Search ticker",
             options=TICKER_LIST,
-            index=TICKER_LIST.index("AAPL") if "AAPL" in TICKER_LIST else 0,
+            index=_ticker_idx,
             label_visibility="collapsed",
-            placeholder="Type to search (e.g. NVD → NVDA)...")
+            placeholder="Type to search (e.g. NVD → NVDA)",
+            key="ticker_selectbox")
+        st.session_state["active_ticker"] = ticker
 
         st.markdown("---")
         st.markdown("**Analysis Horizon**")
         horizon = st.radio(
             "Horizon", ["30D Tactical", "1Y Strategic"],
-            index=0, label_visibility="collapsed")
+            index=0, label_visibility="collapsed",
+            key="horizon_radio")
 
         st.markdown("**Moving Averages**")
         col1, col2 = st.columns(2)
         with col1:
-            ma1 = st.number_input("MA 1", min_value=0, max_value=200, value=50, help="0 = hidden")
+            ma1 = st.number_input("MA 1", min_value=0, max_value=200, value=50,
+                                  help="0 = hidden", key="ma1_input")
         with col2:
-            ma2 = st.number_input("MA 2", min_value=0, max_value=200, value=200, help="0 = hidden")
+            ma2 = st.number_input("MA 2", min_value=0, max_value=200, value=200,
+                                  help="0 = hidden", key="ma2_input")
 
         st.markdown("**Indicators**")
         selected_indicators = st.multiselect(
@@ -2446,7 +2889,49 @@ def main() -> None:
             options=ALL_INDS,
             default=[],
             label_visibility="collapsed",
-            placeholder="Add indicators...")
+            placeholder="Add indicators...",
+            key="indicators_multi")
+
+        st.markdown("---")
+
+        # ── Best Pick ──────────────────────────────────────────────────────
+        if st.button("⚡ Best Pick Now", use_container_width=True, type="primary",
+                     key="best_pick_btn"):
+            st.session_state["run_best_pick"] = True
+            st.session_state["best_pick_results"] = []
+
+        if st.session_state["run_best_pick"]:
+            with st.status("Scouting the market for Alpha...", expanded=True) as _bp_status:
+                st.write(f"Scanning {len(TICKER_LIST)} stocks — may take ~30s first time...")
+                _bp_results = find_best_pick(horizon)
+                st.session_state["best_pick_results"] = _bp_results
+                st.session_state["run_best_pick"] = False
+                _bp_status.update(label="Done! Best picks ready.", state="complete")
+
+        if st.session_state["best_pick_results"]:
+            _top5 = st.session_state["best_pick_results"][:5]
+            st.markdown("**Top picks:**")
+            for _rank, (_t, _s) in enumerate(_top5, 1):
+                if _s >= 80:   _rc, _rl = "#10b981", "STRONG BUY"
+                elif _s >= 65: _rc, _rl = "#f59e0b", "BUY"
+                elif _s >= 45: _rc, _rl = "#f97316", "HOLD"
+                else:          _rc, _rl = "#ef4444", "SELL"
+                _medal = "🥇" if _rank == 1 else ("🥈" if _rank == 2 else ("🥉" if _rank == 3 else f"{_rank}."))
+                st.markdown(
+                    f'<div style="background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.12);'
+                    f'border-radius:10px;padding:7px 10px;margin:4px 0">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center">'
+                    f'<span style="font-size:13px">{_medal} <b>{_t}</b></span>'
+                    f'<span style="font-size:11px;font-family:monospace;color:#6366f1;font-weight:700">{_s}</span>'
+                    f'</div>'
+                    f'<div style="font-size:10px;font-weight:700;color:{_rc};margin-top:2px">{_rl}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True)
+            if st.button(f"Analyze {_top5[0][0]} Now", use_container_width=True,
+                         key="analyze_best_btn"):
+                st.session_state["pending_ticker"] = _top5[0][0]
+                st.session_state["best_pick_results"] = []
+                st.rerun()
 
         st.markdown("---")
         st.caption("⚠️ For educational purposes only. Not financial advice.")
@@ -2492,15 +2977,21 @@ def main() -> None:
     if not is_etf:
         render_analyst_card(data)
 
-    # ── Tabs (no Forecast) ──────────────────────────────────────────────────
+    # ── Tabs ────────────────────────────────────────────────────────────────
     _video_enabled = _node_available()
     _tab_names = ["📈 Chart", "📋 Report", "🔎 Peers", "📰 News", "📊 Financials",
                   "📅 Earnings", "👔 Insiders"]
     if _video_enabled:
         _tab_names.append("🎬 Video")
+    _tab_names.append("💼 Portfolio")
     _tabs = st.tabs(_tab_names)
     tab_chart, tab_rep, tab_peers, tab_news, tab_fin, tab_earn, tab_ins = _tabs[:7]
-    tab_slides = _tabs[7] if _video_enabled else None
+    if _video_enabled:
+        tab_slides = _tabs[7]
+        tab_portfolio = _tabs[8]
+    else:
+        tab_slides = None
+        tab_portfolio = _tabs[7]
 
     with tab_chart:
         if len(hist) < 5:
@@ -2616,7 +3107,6 @@ def main() -> None:
         else:
             build_insiders(ticker)
 
-
     if tab_slides is not None:
         with tab_slides:
             if is_etf:
@@ -2664,6 +3154,106 @@ def main() -> None:
                         st.video(mp4_path)
                     except Exception:
                         st.warning("Video file not found. Generate again.")
+
+    # ── Portfolio Tab (far right) ────────────────────────────────────────────
+    with tab_portfolio:
+        st.markdown("### 💼 Portfolio Builder")
+        usd_ils = get_usd_ils()
+
+        # Add stock row
+        _pc1, _pc2, _pc3, _pc4 = st.columns([2, 1, 1.5, 1])
+        with _pc1:
+            _port_ticker = st.selectbox("מניה", options=TICKER_LIST,
+                                        label_visibility="collapsed",
+                                        key="port_ticker_sel",
+                                        placeholder="בחר מניה...")
+        with _pc2:
+            _port_qty = st.number_input("כמות", min_value=0.01, value=1.0,
+                                        step=1.0, label_visibility="collapsed",
+                                        key="port_qty")
+        with _pc3:
+            _port_buy = st.number_input("מחיר קנייה $", min_value=0.01, value=100.0,
+                                        step=1.0, label_visibility="collapsed",
+                                        key="port_buy")
+        with _pc4:
+            if st.button("+ הוסף", use_container_width=True, key="port_add"):
+                _existing = [h["ticker"] for h in st.session_state["portfolio"]]
+                if _port_ticker not in _existing:
+                    st.session_state["portfolio"].append({
+                        "ticker": _port_ticker,
+                        "quantity": _port_qty,
+                        "buy_price": _port_buy,
+                    })
+                    st.rerun()
+                else:
+                    st.warning(f"{_port_ticker} כבר בתיק.")
+
+        if st.button("&#9851; Reset Portfolio", use_container_width=False, key="port_reset"):
+            st.session_state["portfolio"] = []
+            st.rerun()
+
+        _portfolio = st.session_state["portfolio"]
+
+        if not _portfolio:
+            st.info("התיק ריק — הוסף מניות למעלה.")
+        else:
+            _tickers_tuple = tuple(h["ticker"] for h in _portfolio)
+            with st.spinner("מעדכן מחירים..."):
+                _prices = fetch_portfolio_prices(_tickers_tuple)
+
+            _rows = []
+            _ai_holdings = []
+            for _h in _portfolio:
+                _t = _h["ticker"]
+                _cur = _prices.get(_t, 0.0)
+                _qty = _h["quantity"]
+                _buy = _h["buy_price"]
+                _val_usd = _cur * _qty
+                _val_ils = _val_usd * usd_ils
+                _pl = (_cur - _buy) * _qty
+                _pl_pct = ((_cur / _buy) - 1) * 100 if _buy else 0
+                _rows.append({
+                    "Ticker": _t,
+                    "Qty": _qty,
+                    "Buy $": f"${_buy:,.2f}",
+                    "Current $": f"${_cur:,.2f}" if _cur else "N/A",
+                    "Value ($)": f"${_val_usd:,.0f}",
+                    "Value (₪)": f"₪{_val_ils:,.0f}",
+                    "P&L $": f"{'+'if _pl>=0 else ''}{_pl:,.0f}",
+                    "P&L %": f"{'+'if _pl_pct>=0 else ''}{_pl_pct:.1f}%",
+                })
+                try:
+                    _d = fetch_data(_t)
+                    _sc = compute_score(_d, compute_technicals(_d["hist"]), horizon) if not _d["hist"].empty else 50
+                    _sector = _d.get("sector", "Unknown")
+                except Exception:
+                    _sc = 50
+                    _sector = "Unknown"
+                _ai_holdings.append({
+                    "ticker": _t, "sector": _sector, "qty": _qty,
+                    "value_usd": _val_usd, "score": _sc,
+                })
+
+            st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
+
+            _pie_labels = [r["Ticker"] for r in _rows]
+            _pie_vals   = [_prices.get(h["ticker"], 0) * h["quantity"] for h in _portfolio]
+            if any(v > 0 for v in _pie_vals):
+                _pie_fig = go.Figure(go.Pie(
+                    labels=_pie_labels, values=_pie_vals,
+                    marker_colors=EDEN_COLORS[:len(_pie_labels)],
+                    hole=0.45, textinfo="label+percent", textfont_size=13,
+                ))
+                _pie_fig.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    showlegend=False, margin=dict(t=20, b=20, l=20, r=20), height=320,
+                )
+                st.plotly_chart(_pie_fig, config={"displayModeBar": False},
+                                use_container_width=True)
+
+            st.markdown("---")
+            st.markdown("#### &#129302; ניתוח תיק")
+            st.markdown(portfolio_ai_analysis(_ai_holdings, usd_ils))
 
 
 if __name__ == "__main__":
