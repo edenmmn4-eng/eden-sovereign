@@ -1,0 +1,23 @@
+{
+  "name": "eden-sovereign-video",
+  "version": "1.0.0",
+  "description": "Eden Sovereign Stock Video Generator",
+  "scripts": {
+    "start": "npx remotion studio",
+    "build": "npx remotion render StockVideo --props=public/data.json --output=out/stock.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.290",
+    "@remotion/paths": "4.0.290",
+    "remotion": "4.0.290",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.4.5"
+  },
+  "remotion": {
+    "entryPoint": "src/index.ts"
+  }
+}

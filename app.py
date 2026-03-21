@@ -6,11 +6,10 @@ Institutional-grade equity research terminal.
 import warnings
 warnings.filterwarnings("ignore")
 
+import json
+import os
 import streamlit as st
 import yfinance as yf
-import requests as _requests
-_YF_SESSION = _requests.Session()
-_YF_SESSION.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"})
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
@@ -313,9 +312,20 @@ OVERLAY_INDS  = {"Bollinger Bands", "VWAP"}
 SUBPLOT_INDS  = ["RSI", "MACD", "Stochastic", "OBV", "ATR"]
 ALL_INDS      = ["Bollinger Bands", "VWAP", "RSI", "MACD", "Stochastic", "OBV", "ATR"]
 
+# ── Best Pick Universe ────────────────────────────────────────────────────────
+BEST_PICK_UNIVERSE = [
+    "AAPL","MSFT","NVDA","AMZN","META","TSLA","GOOG","AVGO",
+    "LLY","JPM","V","MA","UNH","XOM","PLTR","AMD","CRM","COST",
+    "NFLX","ORCL","NOW","ISRG","GS","BX","COIN","SQ","MELI","SE",
+]
+
+# ── Eden Color Palette ────────────────────────────────────────────────────────
+EDEN_COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6",
+               "#06b6d4","#f97316","#84cc16","#ec4899","#14b8a6"]
+
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
-def inject_css() -> None:
+def inject_css(account_label: str = "&#128100; Sandbox Mode", is_logged_in: bool = False) -> None:
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -436,8 +446,132 @@ def inject_css() -> None:
     .peers-add{display:flex;gap:10px;align-items:center;margin-top:16px;
                padding:14px 18px;background:rgba(99,102,241,.04);
                border:1px dashed rgba(99,102,241,.25);border-radius:12px}
+
+    /* ── 3-Dots Settings Menu ─────────────────────────────────────────── */
+    #eden-dots-btn{position:fixed;top:14px;right:14px;z-index:99999;
+        width:38px;height:38px;border-radius:50%;
+        background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
+        border:1.5px solid rgba(99,102,241,.3);cursor:pointer;
+        font-size:22px;font-weight:900;display:flex;align-items:center;
+        justify-content:center;box-shadow:0 3px 14px rgba(0,0,0,.12);
+        color:#6366f1;user-select:none;line-height:1;transition:box-shadow .18s}
+    #eden-dots-btn:hover{box-shadow:0 5px 18px rgba(99,102,241,.28)}
+    #eden-menu-backdrop{display:none;position:fixed;inset:0;z-index:99996}
+    html:has(#eden-menu-chk:checked) #eden-menu-backdrop{display:block}
+    #eden-panel{position:fixed;top:58px;right:14px;z-index:99998;
+        background:#fff;border-radius:16px;padding:8px 0;
+        border:1px solid rgba(99,102,241,.18);
+        box-shadow:0 8px 32px rgba(0,0,0,.13);min-width:210px;
+        opacity:0;transform:scale(.95) translateY(-6px);
+        pointer-events:none;transition:opacity .18s,transform .18s}
+    html:has(#eden-menu-chk:checked) #eden-panel{
+        opacity:1;transform:scale(1) translateY(0);pointer-events:auto}
+    .eden-panel-title{font-size:10px;font-weight:700;color:#9ca3af;
+        letter-spacing:1.2px;text-transform:uppercase;padding:6px 16px 10px}
+    .eden-panel-item{display:flex;align-items:center;justify-content:space-between;
+        padding:10px 16px;cursor:pointer;font-size:13px;color:#1a1a2e;
+        font-weight:500;transition:background .12s;gap:10px}
+    .eden-panel-item:hover{background:rgba(99,102,241,.06)}
+    .eden-panel-sep{height:1px;background:rgba(99,102,241,.1);margin:4px 0}
+    .eden-toggle{width:34px;height:20px;background:#d1d5db;border-radius:10px;
+        position:relative;transition:background .2s;flex-shrink:0}
+    .eden-toggle-knob{position:absolute;top:3px;left:3px;width:14px;height:14px;
+        background:#fff;border-radius:50%;transition:transform .2s;
+        box-shadow:0 1px 4px rgba(0,0,0,.2)}
+    html:has(#eden-dark-chk:checked) .eden-toggle{background:#6366f1}
+    html:has(#eden-dark-chk:checked) .eden-toggle-knob{transform:translateX(14px)}
+
+    /* ── Dark Mode (pure CSS via :has) ────────────────────────────────── */
+    html:has(#eden-dark-chk:checked) body,
+    html:has(#eden-dark-chk:checked) .stApp,
+    html:has(#eden-dark-chk:checked) .block-container,
+    html:has(#eden-dark-chk:checked) .stMainBlockContainer,
+    html:has(#eden-dark-chk:checked) [class*="css"]{background-color:#0f0f1a!important;color:#e2e2f0!important}
+    html:has(#eden-dark-chk:checked) [data-testid="stSidebar"]{background:linear-gradient(180deg,#1a1a2e 0%,#16162a 100%)!important;border-right-color:rgba(99,102,241,.25)!important}
+    html:has(#eden-dark-chk:checked) .metric-card,
+    html:has(#eden-dark-chk:checked) .analyst-card{background:rgba(26,26,46,.85)!important;border-color:rgba(99,102,241,.3)!important}
+    html:has(#eden-dark-chk:checked) .metric-value,
+    html:has(#eden-dark-chk:checked) .ticker-symbol,
+    html:has(#eden-dark-chk:checked) .eden-brand,
+    html:has(#eden-dark-chk:checked) .analyst-val,
+    html:has(#eden-dark-chk:checked) .report-section-title,
+    html:has(#eden-dark-chk:checked) .rpt-value,
+    html:has(#eden-dark-chk:checked) .rpt-name,
+    html:has(#eden-dark-chk:checked) .hero h1,
+    html:has(#eden-dark-chk:checked) .earn-next,
+    html:has(#eden-dark-chk:checked) .ceo-summary p,
+    html:has(#eden-dark-chk:checked) .thesis-item{color:#e2e2f0!important}
+    html:has(#eden-dark-chk:checked) .metric-label,
+    html:has(#eden-dark-chk:checked) .analyst-lbl{color:#a78bfa!important}
+    html:has(#eden-dark-chk:checked) .exec-card{background:#1a1a2e!important;border-color:rgba(99,102,241,.25)!important}
+    html:has(#eden-dark-chk:checked) .ceo-summary{background:linear-gradient(90deg,rgba(99,102,241,.1),transparent)!important}
+    html:has(#eden-dark-chk:checked) .report-section-title{border-bottom-color:rgba(99,102,241,.2)!important}
+    html:has(#eden-dark-chk:checked) .rpt-row{border-bottom-color:rgba(255,255,255,.06)!important}
+    html:has(#eden-dark-chk:checked) .verdict-box{background:linear-gradient(135deg,#1e1e3a,#1a1a2e)!important;border-color:rgba(99,102,241,.3)!important}
+    html:has(#eden-dark-chk:checked) .price-bar-track{background:#2d2d4e!important}
+    html:has(#eden-dark-chk:checked) .company-full,
+    html:has(#eden-dark-chk:checked) .analyst-sub,
+    html:has(#eden-dark-chk:checked) .news-meta,
+    html:has(#eden-dark-chk:checked) .verdict-meta{color:#9ca3af!important}
+    html:has(#eden-dark-chk:checked) [data-testid="stTabs"] [role="tab"]{color:#9ca3af!important}
+    html:has(#eden-dark-chk:checked) [data-testid="stTabs"] [role="tab"][aria-selected="true"]{color:#a78bfa!important}
+    html:has(#eden-dark-chk:checked) .peers-add{background:rgba(99,102,241,.08)!important;border-color:rgba(99,102,241,.35)!important}
+    html:has(#eden-dark-chk:checked) #eden-panel{background:#1a1a2e!important;border-color:rgba(99,102,241,.3)!important}
+    html:has(#eden-dark-chk:checked) .eden-panel-item{color:#e2e2f0!important}
+    html:has(#eden-dark-chk:checked) #eden-dots-btn{background:rgba(26,26,46,.92)!important;border-color:rgba(167,139,250,.5)!important}
     </style>
     """, unsafe_allow_html=True)
+
+    # HTML only — no <script> (Streamlit would render script content as visible text)
+    _auth_href = "/_stauth/logout" if is_logged_in else "https://accounts.google.com"
+    _auth_label = (
+        f'&#128682; Sign Out ({account_label.replace("&#128100; ", "")})' if is_logged_in
+        else '&#128100; Sign in with Google'
+    )
+    _auth_color = "#ef4444" if is_logged_in else "#6366f1"
+    st.markdown(f"""
+    <input type="checkbox" id="eden-menu-chk" style="position:fixed;opacity:0;pointer-events:none;top:-9999px">
+    <input type="checkbox" id="eden-dark-chk" style="position:fixed;opacity:0;pointer-events:none;top:-9999px">
+    <label for="eden-menu-chk" id="eden-menu-backdrop"></label>
+    <label for="eden-menu-chk" id="eden-dots-btn" title="Settings">&#8942;</label>
+    <div id="eden-panel">
+      <div class="eden-panel-title">Settings</div>
+      <label for="eden-dark-chk" class="eden-panel-item">
+        <span>&#127769; Dark Mode</span>
+        <div class="eden-toggle"><div class="eden-toggle-knob"></div></div>
+      </label>
+      <div class="eden-panel-sep"></div>
+      <a href="{_auth_href}" class="eden-panel-item"
+         style="text-decoration:none;cursor:pointer;color:{_auth_color};display:flex;align-items:center;">
+        <span>{_auth_label}</span>
+      </a>
+      <div class="eden-panel-sep"></div>
+      <div class="eden-panel-item" style="color:#6b7280;font-size:11px;cursor:default">
+        <span>Eden Sovereign v1.0</span>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # JavaScript via components (executes in iframe, accesses parent DOM for localStorage)
+    st.components.v1.html("""
+    <script>
+    (function(){
+        function tryInit() {
+            var doc = window.parent.document;
+            var darkChk = doc.getElementById('eden-dark-chk');
+            if (!darkChk) { setTimeout(tryInit, 100); return; }
+            if (darkChk._lsBound) return;
+            darkChk._lsBound = true;
+            var saved = window.parent.localStorage.getItem('eden-dark') === '1';
+            darkChk.checked = saved;
+            darkChk.addEventListener('change', function() {
+                window.parent.localStorage.setItem('eden-dark', this.checked ? '1' : '0');
+            });
+        }
+        tryInit();
+    })();
+    </script>
+    """, height=0)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -469,7 +603,7 @@ def fmt_price(v: float) -> str:
 
 
 # ── Data Fetching ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=180, show_spinner=False)
 def fetch_data(ticker: str) -> dict:
     out: dict = {
         "ticker": ticker, "info": {}, "hist": pd.DataFrame(),
@@ -479,99 +613,395 @@ def fetch_data(ticker: str) -> dict:
         "peg_ratio": float("nan"), "gross_margins": float("nan"),
         "fcf": float("nan"), "revenue_cagr": 0.0,
         "fcf_yield": float("nan"), "sector": "N/A", "dividend_yield": 0.0,
+        "week52_high": float("nan"), "week52_low": float("nan"),
         "analyst_target_mean": float("nan"), "analyst_target_high": float("nan"),
         "analyst_target_low": float("nan"), "analyst_target_median": float("nan"),
         "n_analysts": 0, "rec_mean": float("nan"), "rec_key": "N/A",
         "error": None,
         "is_etf": False, "quote_type": "EQUITY",
     }
+    import time as _time
     try:
-        obj = yf.Ticker(ticker, session=_YF_SESSION)
-        try:
-            info = obj.info or {}
-        except Exception:
-            info = {}
+        obj = yf.Ticker(ticker)
+        # ── obj.info with retry on rate-limit ────────────────────────────────
+        info = {}
+        for _attempt in range(3):
+            try:
+                info = obj.info or {}
+                break
+            except Exception as _e:
+                _emsg = str(_e).lower()
+                if ("too many requests" in _emsg or "rate limit" in _emsg or "429" in _emsg) \
+                        and _attempt < 2:
+                    _time.sleep(3 * (2 ** _attempt))  # 3s → 6s → 12s
+                    continue
+                break  # non-rate-limit error — give up
         out["info"] = info
 
+        # ── fast_info (always works — cached separately by yfinance) ──────────
+        try:
+            fi = obj.fast_info
+        except Exception:
+            fi = {}
+
+        def _fi(key, fallback=None):
+            """Read from fast_info safely (dict-like or attribute-like)."""
+            try:
+                v = fi[key] if hasattr(fi, "__getitem__") else getattr(fi, key, None)
+                return v if v not in (None, float("nan")) else fallback
+            except Exception:
+                return fallback
+
         out["company_name"]  = info.get("longName") or info.get("shortName") or ticker
-        qt = info.get("quoteType", "EQUITY").upper()
+        qt = info.get("quoteType") or str(_fi("quoteType", "EQUITY"))
+        qt = qt.upper() if qt else "EQUITY"
         out["quote_type"] = qt
         out["is_etf"]     = qt in ("ETF", "MUTUALFUND", "INDEX")
-        # Price: try several fields in order
+
+        # Price: info → fast_info → history (filled later)
         _price = (info.get("currentPrice") or info.get("regularMarketPrice")
-                  or info.get("navPrice") or info.get("ask") or info.get("bid"))
+                  or info.get("navPrice") or info.get("ask") or info.get("bid")
+                  or _fi("last_price"))
         out["current_price"] = float(_safe(_price, float("nan")))
-        out["prev_close"]    = float(_safe(info.get("previousClose") or info.get("regularMarketPreviousClose"), float("nan")))
-        out["mkt_cap"]       = float(_safe(info.get("marketCap"), 0.0))
+
+        _prev = (info.get("previousClose") or info.get("regularMarketPreviousClose")
+                 or _fi("previous_close") or _fi("regular_market_previous_close"))
+        out["prev_close"] = float(_safe(_prev, float("nan")))
+
+        # Market cap: info → fast_info
+        _mc = info.get("marketCap") or _fi("market_cap")
+        out["mkt_cap"] = float(_safe(_mc, 0.0))
+
         out["pe_ratio"]      = float(_safe(info.get("trailingPE"), float("nan")))
         out["forward_pe"]    = float(_safe(info.get("forwardPE"), float("nan")))
         out["gross_margins"] = float(_safe(info.get("grossMargins"), float("nan")))
         out["fcf"]           = float(_safe(info.get("freeCashflow"), float("nan")))
-        out["sector"]        = info.get("sector") or "N/A"
-        out["dividend_yield"]= float(_safe(info.get("dividendYield"), 0.0))
 
-        # ── PEG ratio: try 4 sources ──────────────────────────────────────
-        peg = _safe(info.get("pegRatio"), None)
-        if peg is None or _isnan(float(peg)):
-            peg = _safe(info.get("trailingPegRatio"), None)
-        if peg is None or _isnan(float(peg)):
-            # Calculate: P/E ÷ (earningsGrowth × 100)
-            pe  = info.get("trailingPE")
-            eg  = info.get("earningsGrowth")
-            if pe and eg and float(pe) > 0 and float(eg) > 0:
-                peg = float(pe) / (float(eg) * 100.0)
-        if peg is None or _isnan(float(peg)):
-            # Calculate: forwardPE ÷ (earningsQuarterlyGrowth × 100)
-            fpe = info.get("forwardPE")
-            eqg = info.get("earningsQuarterlyGrowth")
-            if fpe and eqg and float(fpe) > 0 and float(eqg) > 0:
-                peg = float(fpe) / (float(eqg) * 100.0)
-        out["peg_ratio"] = float(_safe(peg, float("nan")))
+        # ── Fetch all financial statements ONCE with retry ─────────────────
+        # Prevents duplicate calls and cascading rate-limits
+        def _stmt_fetch(primary: str, fallback: str | None = None):
+            for _a in range(3):
+                try:
+                    _v = getattr(obj, primary, None)
+                    if _v is not None and not (hasattr(_v, "empty") and _v.empty):
+                        return _v
+                    if fallback:
+                        _v2 = getattr(obj, fallback, None)
+                        if _v2 is not None and not (hasattr(_v2, "empty") and _v2.empty):
+                            return _v2
+                    return _v  # even if empty, stop retrying
+                except Exception as _se:
+                    _sm = str(_se).lower()
+                    if ("too many requests" in _sm or "429" in _sm or "rate limit" in _sm) \
+                            and _a < 2:
+                        _time.sleep(3 * (2 ** _a))
+                        continue
+                    return None
+            return None
 
-        # ── Analyst data ───────────────────────────────────────────────────
-        out["analyst_target_mean"]   = float(_safe(info.get("targetMeanPrice"), float("nan")))
-        out["analyst_target_high"]   = float(_safe(info.get("targetHighPrice"), float("nan")))
-        out["analyst_target_low"]    = float(_safe(info.get("targetLowPrice"), float("nan")))
-        out["analyst_target_median"] = float(_safe(info.get("targetMedianPrice"), float("nan")))
-        out["n_analysts"]            = int(_safe(info.get("numberOfAnalystOpinions"), 0))
-        out["rec_mean"]              = float(_safe(info.get("recommendationMean"), float("nan")))
-        out["rec_key"]               = info.get("recommendationKey") or "N/A"
+        _ann_income = _stmt_fetch("income_stmt", "financials")       # annual income stmt
+        _q_income   = _stmt_fetch("quarterly_income_stmt", "quarterly_financials")
+        _cf_stmt    = _stmt_fetch("cashflow", "cash_flow")            # annual cash flow
+        _ann_fin    = _ann_income  # same data; reuse
+
+        # ── P/E fallback: multiple sources ───────────────────────────────────
+        if _isnan(out["pe_ratio"]):
+            try:
+                # Source 2: trailingEps / epsTrailingTwelveMonths from info
+                _eps = info.get("trailingEps") or info.get("epsTrailingTwelveMonths")
+                _px  = out["current_price"]
+                if _eps and not _isnan(float(_eps)) and float(_eps) != 0 \
+                        and not _isnan(_px) and _px > 0:
+                    out["pe_ratio"] = float(_px) / float(_eps)
+            except Exception:
+                pass
+        if _isnan(out["pe_ratio"]):
+            try:
+                # Source 3: TTM EPS from quarterly income stmt (sum last 4 quarters)
+                if _q_income is not None and not _q_income.empty:
+                    for _lbl in ["Basic EPS", "Diluted EPS"]:
+                        if _lbl in _q_income.index:
+                            _eps_s = _q_income.loc[_lbl].dropna().sort_index(ascending=False)
+                            if len(_eps_s) >= 4:
+                                _ttm_eps = float(_eps_s.iloc[:4].sum())
+                                _px = out["current_price"]
+                                if _ttm_eps != 0 and not _isnan(_px) and _px > 0:
+                                    out["pe_ratio"] = float(_px) / _ttm_eps
+                            break
+            except Exception:
+                pass
+        if _isnan(out["pe_ratio"]):
+            try:
+                # Source 4: Market Cap ÷ Net Income
+                _ni  = info.get("netIncomeToCommon") or info.get("netIncome")
+                _mc4 = out["mkt_cap"]
+                if _ni and not _isnan(float(_ni)) and float(_ni) > 0 and _mc4 > 0:
+                    out["pe_ratio"] = _mc4 / float(_ni)
+            except Exception:
+                pass
+        if _isnan(out["pe_ratio"]):
+            try:
+                # Source 5: annual income statement EPS or Net Income ÷ shares
+                if _ann_income is not None and not _ann_income.empty:
+                    for _lbl5 in ["Basic EPS", "Diluted EPS", "Net Income"]:
+                        if _lbl5 in _ann_income.index:
+                            _v5 = _ann_income.loc[_lbl5].dropna().sort_index(ascending=False)
+                            if not _v5.empty:
+                                _val5 = float(_v5.iloc[0])
+                                _px5  = out["current_price"]
+                                if _lbl5.endswith("EPS") and _val5 != 0 \
+                                        and not _isnan(_px5) and _px5 > 0:
+                                    out["pe_ratio"] = _px5 / _val5
+                                    break
+                                elif _lbl5 == "Net Income" and _val5 > 0:
+                                    _shr = info.get("sharesOutstanding") \
+                                           or info.get("impliedSharesOutstanding")
+                                    if _shr and float(_shr) > 0 \
+                                            and not _isnan(_px5) and _px5 > 0:
+                                        out["pe_ratio"] = _px5 / (_val5 / float(_shr))
+                                        break
+            except Exception:
+                pass
+
+        # ── Forward P/E fallback ───────────────────────────────────────────
+        if _isnan(out["forward_pe"]):
+            try:
+                _feps = info.get("forwardEps")
+                _px   = out["current_price"]
+                if _feps and not _isnan(float(_feps)) and float(_feps) > 0 \
+                        and not _isnan(_px) and _px > 0:
+                    out["forward_pe"] = float(_px) / float(_feps)
+            except Exception:
+                pass
+
+        # ── FCF fallback: Operating Cash Flow − CapEx ─────────────────────
+        if _isnan(out["fcf"]):
+            try:
+                if _cf_stmt is not None and not _cf_stmt.empty:
+                    _ocf, _capex = None, None
+                    for _lbl in ["Operating Cash Flow", "Total Cash From Operating Activities"]:
+                        if _lbl in _cf_stmt.index:
+                            _ocf = float(_cf_stmt.loc[_lbl].dropna().iloc[0])
+                            break
+                    for _lbl in ["Capital Expenditure", "Capital Expenditures"]:
+                        if _lbl in _cf_stmt.index:
+                            _capex = float(_cf_stmt.loc[_lbl].dropna().iloc[0])
+                            break
+                    if _ocf is not None:
+                        out["fcf"] = _ocf + (_capex if _capex is not None else 0.0)
+            except Exception:
+                pass
+
+        # ── Gross margins fallback from income statement ───────────────────
+        if _isnan(out["gross_margins"]):
+            try:
+                if _ann_income is not None and not _ann_income.empty:
+                    if "Gross Profit" in _ann_income.index:
+                        for _tr_lbl in ["Total Revenue", "Revenue"]:
+                            if _tr_lbl in _ann_income.index:
+                                _gp = _ann_income.loc["Gross Profit"].dropna()
+                                _tr = _ann_income.loc[_tr_lbl].dropna()
+                                if not _gp.empty and not _tr.empty \
+                                        and float(_tr.iloc[0]) > 0:
+                                    out["gross_margins"] = \
+                                        float(_gp.iloc[0]) / float(_tr.iloc[0])
+                                break
+            except Exception:
+                pass
+
+        out["sector"]         = info.get("sector") or "N/A"
+        out["dividend_yield"] = float(_safe(info.get("dividendYield"), 0.0))
+
+        # 52-week range: info → fast_info
+        _52h = info.get("fiftyTwoWeekHigh") or _fi("year_high")
+        _52l = info.get("fiftyTwoWeekLow")  or _fi("year_low")
+        out["week52_high"] = float(_safe(_52h, float("nan")))
+        out["week52_low"]  = float(_safe(_52l, float("nan")))
+
+        # ── Market cap fallback: shares × price ───────────────────────────
+        if out["mkt_cap"] == 0.0:
+            try:
+                _shr_mc = info.get("sharesOutstanding") \
+                          or info.get("impliedSharesOutstanding") \
+                          or _fi("shares")
+                _px_mc  = out["current_price"]
+                if _shr_mc and float(_shr_mc) > 0 and not _isnan(_px_mc) and _px_mc > 0:
+                    out["mkt_cap"] = float(_shr_mc) * float(_px_mc)
+            except Exception:
+                pass
+
+        # ── Analyst data: info → fallback keys ────────────────────────────
+        out["analyst_target_mean"]   = float(_safe(
+            info.get("targetMeanPrice") or info.get("targetPrice"), float("nan")))
+        out["analyst_target_high"]   = float(_safe(
+            info.get("targetHighPrice"), float("nan")))
+        out["analyst_target_low"]    = float(_safe(
+            info.get("targetLowPrice"), float("nan")))
+        out["analyst_target_median"] = float(_safe(
+            info.get("targetMedianPrice") or info.get("targetMeanPrice"), float("nan")))
+        out["n_analysts"]            = int(_safe(
+            info.get("numberOfAnalystOpinions") or info.get("numAnalystOpinions"), 0))
+        out["rec_mean"]              = float(_safe(
+            info.get("recommendationMean"), float("nan")))
+        out["rec_key"]               = (info.get("recommendationKey")
+                                        or info.get("averageAnalystRating") or "N/A")
 
         # ── FCF Yield ──────────────────────────────────────────────────────
         if out["mkt_cap"] > 0 and not _isnan(out["fcf"]):
             out["fcf_yield"] = out["fcf"] / out["mkt_cap"]
 
-        # ── Revenue CAGR ───────────────────────────────────────────────────
+        # ── Revenue CAGR (annual, then quarterly fallback) ─────────────────
         try:
-            fin = obj.financials
-            if fin is not None and not fin.empty:
+            if _ann_fin is not None and not _ann_fin.empty:
                 for lbl in ["Total Revenue", "Revenue"]:
-                    if lbl in fin.index:
-                        rev = fin.loc[lbl].dropna().sort_index()
-                        if len(rev) >= 2:
+                    if lbl in _ann_fin.index:
+                        rev = _ann_fin.loc[lbl].dropna().sort_index()
+                        if len(rev) >= 3:
                             oldest, latest, n = float(rev.iloc[0]), float(rev.iloc[-1]), len(rev)-1
                             if oldest > 0 and latest > 0:
                                 out["revenue_cagr"] = float((latest/oldest)**(1.0/n) - 1.0)
+                        elif len(rev) == 2:
+                            oldest, latest = float(rev.iloc[0]), float(rev.iloc[-1])
+                            if oldest > 0 and latest > 0:
+                                out["revenue_cagr"] = float((latest/oldest - 1.0) * 0.6)
                         break
         except Exception:
             pass
 
-        # ── Historical prices ──────────────────────────────────────────────
-        try:
-            hist = obj.history(period="1y", interval="1d", auto_adjust=True)
-            hist = hist.dropna(subset=["Close"])
-            if hist.empty:
-                hist = obj.history(
-                    start=(datetime.today()-timedelta(days=400)).strftime("%Y-%m-%d"),
-                    end=datetime.today().strftime("%Y-%m-%d"),
-                    interval="1d", auto_adjust=True).dropna(subset=["Close"])
-            out["hist"] = hist
-            if _isnan(out["current_price"]) and not hist.empty:
+        if out["revenue_cagr"] == 0.0:
+            try:
+                if _q_income is not None and not _q_income.empty:
+                    for lbl in ["Total Revenue", "Revenue"]:
+                        if lbl in _q_income.index:
+                            qrev = _q_income.loc[lbl].dropna().sort_index()
+                            if len(qrev) >= 4:
+                                _recent = float(qrev.iloc[-4:].sum())
+                                _prior  = float(qrev.iloc[-8:-4].sum()) \
+                                          if len(qrev) >= 8 else float(qrev.iloc[:4].sum())
+                                if _prior > 0 and _recent > 0:
+                                    out["revenue_cagr"] = float((_recent/_prior - 1.0) * 0.7)
+                            break
+            except Exception:
+                pass
+
+        # ── PEG ratio: forward-first approach ─────────────────────────────
+        def _cap_growth(g_raw: float) -> float:
+            return float(np.clip(g_raw, 0.05, 0.40))
+
+        peg = None
+        _pg1 = _safe(info.get("pegRatio"), None)
+        if _pg1 is not None and not _isnan(float(_pg1)) and float(_pg1) > 0:
+            peg = float(_pg1)
+
+        if peg is None or _isnan(float(peg)):
+            try:
+                _ltg  = info.get("longTermGrowth") or info.get("longTermEpsGrowthRate")
+                _fpe2 = out["forward_pe"] if not _isnan(out["forward_pe"]) else None
+                if _fpe2 and _ltg and float(_fpe2) > 0 and float(_ltg) > 0:
+                    peg = float(_fpe2) / (_cap_growth(float(_ltg)) * 100.0)
+            except Exception:
+                pass
+
+        if peg is None or _isnan(float(peg)):
+            _pg3 = _safe(info.get("trailingPegRatio"), None)
+            if _pg3 is not None and not _isnan(float(_pg3)) and 0 < float(_pg3) < 10:
+                peg = float(_pg3)
+
+        if peg is None or _isnan(float(peg)):
+            try:
+                _fpe4 = out["forward_pe"] if not _isnan(out["forward_pe"]) \
+                        else info.get("forwardPE")
+                _eg4  = info.get("earningsGrowth")
+                if _fpe4 and _eg4 and float(_fpe4) > 0 and float(_eg4) > 0:
+                    peg = float(_fpe4) / (_cap_growth(float(_eg4)) * 100.0)
+            except Exception:
+                pass
+
+        if peg is None or _isnan(float(peg)):
+            try:
+                _pe5  = out["pe_ratio"]
+                _eqg5 = info.get("earningsQuarterlyGrowth")
+                if _pe5 and _eqg5 and not _isnan(float(_pe5)) and float(_pe5) > 0 \
+                        and float(_eqg5) > 0:
+                    peg = float(_pe5) / (_cap_growth(float(_eqg5)) * 100.0)
+            except Exception:
+                pass
+
+        if peg is None or _isnan(float(peg)):
+            try:
+                _pe6 = out["pe_ratio"]
+                if not _isnan(_pe6) and float(_pe6) > 0 \
+                        and _ann_income is not None and not _ann_income.empty:
+                    for _lbl6 in ["Basic EPS", "Diluted EPS"]:
+                        if _lbl6 in _ann_income.index:
+                            _eps6 = _ann_income.loc[_lbl6].dropna().sort_index()
+                            if len(_eps6) >= 2:
+                                _e_old6, _e_new6 = float(_eps6.iloc[0]), float(_eps6.iloc[-1])
+                                _n6 = len(_eps6) - 1
+                                if _e_old6 > 0 and _e_new6 > 0:
+                                    _eps_cagr6 = (_e_new6/_e_old6)**(1.0/_n6) - 1.0
+                                    if _eps_cagr6 > 0.01:
+                                        peg = float(_pe6) / (_cap_growth(_eps_cagr6) * 100.0)
+                            break
+            except Exception:
+                pass
+
+        if peg is None or _isnan(float(peg)):
+            try:
+                _pe7, _rcagr = out["pe_ratio"], out["revenue_cagr"]
+                if not _isnan(_pe7) and float(_pe7) > 0 \
+                        and not _isnan(_rcagr) and float(_rcagr) > 0.02:
+                    peg = float(_pe7) / (_cap_growth(float(_rcagr)) * 100.0)
+            except Exception:
+                pass
+
+        out["peg_ratio"] = float(_safe(peg, float("nan")))
+
+        # ── Historical prices (with retry + yf.download fallback) ────────────
+        _hist_ok = False
+        for _ha in range(3):
+            try:
+                hist = obj.history(period="1y", interval="1d", auto_adjust=True)
+                hist = hist.dropna(subset=["Close"])
+                if hist.empty:
+                    hist = obj.history(
+                        start=(datetime.today()-timedelta(days=400)).strftime("%Y-%m-%d"),
+                        end=datetime.today().strftime("%Y-%m-%d"),
+                        interval="1d", auto_adjust=True).dropna(subset=["Close"])
+                if not hist.empty:
+                    out["hist"] = hist
+                    _hist_ok = True
+                    break
+            except Exception as _he:
+                _hmsg = str(_he).lower()
+                if ("too many requests" in _hmsg or "429" in _hmsg or "rate limit" in _hmsg) \
+                        and _ha < 2:
+                    _time.sleep(4 * (2 ** _ha))  # 4s → 8s → 16s
+                    continue
+                break
+
+        # Final fallback: yf.download (different endpoint, less rate-limited)
+        if not _hist_ok or out["hist"].empty:
+            try:
+                _dl = yf.download(
+                    ticker, period="1y", interval="1d",
+                    auto_adjust=True, progress=False, threads=False,
+                )
+                if _dl is not None and not _dl.empty:
+                    _dl = _dl.dropna(subset=["Close"])
+                    out["hist"] = _dl
+                    _hist_ok = True
+            except Exception:
+                pass
+
+        hist = out["hist"]
+        if not hist.empty:
+            if _isnan(out["current_price"]):
                 out["current_price"] = float(hist["Close"].iloc[-1])
             if _isnan(out["prev_close"]) and len(hist) >= 2:
                 out["prev_close"] = float(hist["Close"].iloc[-2])
-        except Exception as e:
-            out["error"] = str(e)
+        elif not _hist_ok:
+            out["error"] = out.get("error") or "Rate limited. Try after a while."
 
     except Exception as e:
         out["error"] = str(e)
@@ -689,18 +1119,61 @@ def compute_ma_series(df: pd.DataFrame, period: int) -> pd.Series:
     return df["Close"].astype(float).rolling(period, min_periods=1).mean()
 
 
+# ── News Sentiment Score (via stock-analysis skill) ───────────────────────────
+_SKILL_SCRIPT = os.path.join(
+    os.path.dirname(__file__),
+    ".agents", "skills", "stock-analysis", "scripts", "analyze_stock.py"
+)
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_news_score(ticker: str) -> float:
+    """
+    Calls the stock-analysis skill script and returns a sentiment score 0.0–1.0.
+    Returns 0.5 (neutral) on any failure.
+    """
+    import subprocess, sys
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "uv", "run", _SKILL_SCRIPT, ticker, "--output", "json"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            # Find the JSON object in stdout (may have install noise before it)
+            _txt = result.stdout
+            _start = _txt.find("{")
+            if _start != -1:
+                _data = json.loads(_txt[_start:])
+                _s = float(_data.get("final_score", 0.5))
+                return float(np.clip(_s, 0.0, 1.0))
+    except Exception:
+        pass
+    return 0.5  # neutral fallback
+
+
 # ── Quantum Scoring Engine ────────────────────────────────────────────────────
-def compute_score(data: dict, tech: dict, horizon: str) -> int:
+def compute_score(data: dict, tech: dict, horizon: str, use_news: bool = True) -> int:
     price   = np.float64(_safe(data["current_price"], 100.0))
     rsi     = np.float64(tech["rsi"])
     macd    = np.float64(tech["macd_hist"])
-    ma50v   = np.float64(_safe(tech["ma50"], float(price)))
+
+    # MA50: if missing, give neutral 5/10 (not full 10/10)
+    _ma50_raw = tech.get("ma50")
+    _ma50_missing = _ma50_raw is None or _isnan(float(_ma50_raw))
+    ma50v = np.float64(float(price) if _ma50_missing else float(_ma50_raw))
+
     pe      = np.float64(data["pe_ratio"])
     peg     = np.float64(data["peg_ratio"])
-    margins = np.float64(_safe(data["gross_margins"], 0.25))
+
+    # margins/fcf: NaN if missing — never assume a default value
+    _margins_raw = data["gross_margins"]
+    _margins_missing = _isnan(float(_safe(_margins_raw, float("nan"))))
+    margins = np.float64(float(_safe(_margins_raw, 0.0)))
+
     cagr    = np.float64(data["revenue_cagr"])
-    fcfy    = np.float64(_safe(data["fcf_yield"], 0.02))
-    mktcap  = np.float64(data["mkt_cap"])
+
+    _fcfy_raw = data["fcf_yield"]
+    _fcfy_missing = _isnan(float(_safe(_fcfy_raw, float("nan"))))
+    fcfy    = np.float64(float(_safe(_fcfy_raw, 0.0)))
 
     total = np.float64(0.0)
 
@@ -710,58 +1183,624 @@ def compute_score(data: dict, tech: dict, horizon: str) -> int:
         if float(rsi) > 75.0: rsi_score = np.float64(max(0.0, float(rsi_score)-8.0))
         if float(rsi) < 25.0: rsi_score = np.float64(max(0.0, float(rsi_score)-5.0))
 
-        # MACD (max 20) — centered at 10
-        denom      = np.float64(max(abs(float(price)*0.002), 1e-9))
+        # MACD (max 20) — normalize by 1% of price to handle all price levels
+        denom      = np.float64(max(abs(float(price)*0.01), 1e-9))
         macd_norm  = np.float64(np.clip(float(macd)/float(denom), -1.0, 1.0))
         macd_score = np.float64(10.0 + macd_norm*10.0)
 
-        # MA50 trend (max 10)
-        if float(price) >= float(ma50v):
+        # MA50 trend (max 10) — neutral 5 if MA50 unavailable
+        if _ma50_missing:
+            ma_score = np.float64(5.0)
+        elif float(price) >= float(ma50v):
             ma_score = np.float64(10.0)
         else:
             below = (float(ma50v)-float(price))/max(float(ma50v),1e-9)
             ma_score = np.float64(max(0.0, 10.0 - below*120.0))
 
-        # P/E (max 15)
+        # P/E (max 15) — neutral 4 if missing (below average, not free points)
         if _isnan(float(pe)) or float(pe) <= 0:
-            pe_score = np.float64(7.5)
+            pe_score = np.float64(4.0)
         elif float(pe) < 20:   pe_score = np.float64(15.0)
         elif float(pe) < 35:   pe_score = np.float64(15.0-(float(pe)-20.0)/15.0*7.0)
         elif float(pe) < 60:   pe_score = np.float64(8.0-(float(pe)-35.0)/25.0*5.0)
         else:                  pe_score = np.float64(3.0)
 
-        # PEG (max 10)
+        # PEG (max 10) — neutral 3 if missing
         if _isnan(float(peg)) or float(peg) <= 0:
-            peg_score = np.float64(5.0)
+            peg_score = np.float64(3.0)
         else:
             peg_score = np.float64(np.clip((3.0-float(peg))/3.0*10.0, 0.0, 10.0))
 
-        # CAGR bonus (max 10)
-        cagr_bonus = np.float64(np.clip(float(cagr)/0.30*10.0, 0.0, 10.0))
+        # CAGR bonus (max 10, penalty for negative CAGR)
+        _cagr_clipped = float(np.clip(float(cagr), -0.30, 0.30))
+        cagr_bonus = np.float64(_cagr_clipped / 0.30 * 10.0)
+        cagr_bonus = np.float64(np.clip(float(cagr_bonus), -5.0, 10.0))
 
         total = rsi_score + macd_score + ma_score + pe_score + peg_score + cagr_bonus
-        if mktcap > MEGA_CAP_THRESHOLD:
-            total = np.float64(max(float(total), 45.0))
+        # No mega-cap floor guarantee — let each stock earn its score
 
     else:  # 1Y Strategic
-        cagr_score   = np.float64(np.clip(float(cagr)/0.30*25.0, 0.0, 25.0))
+        # CAGR (max 25, penalty for negative CAGR down to -8)
+        _cagr_clipped = float(np.clip(float(cagr), -0.30, 0.30))
+        cagr_score = np.float64(np.clip(_cagr_clipped / 0.30 * 25.0, -8.0, 25.0))
 
+        # PEG (max 20) — neutral 5 if missing (not 8)
         if _isnan(float(peg)) or float(peg) <= 0:
-            peg_score = np.float64(8.0)
+            peg_score = np.float64(5.0)
         else:
             peg_score = np.float64(np.clip((3.0-float(peg))/3.0*20.0, 0.0, 20.0))
-            if float(peg) < 1.5: peg_score = np.float64(min(20.0, float(peg_score)+3.0))
+            # No extra PEG double bonus — peg_score already rewards low PEG
 
-        fcf_score    = np.float64(np.clip(float(fcfy)/0.08*20.0, 0.0, 20.0))
-        margin_score = np.float64(np.clip(float(margins)/0.40*15.0, 0.0, 15.0))
-        if float(margins) > 0.40: margin_score = np.float64(15.0)
+        # FCF yield (max 20) — 0 if missing (not free points)
+        if _fcfy_missing:
+            fcf_score = np.float64(0.0)
+        else:
+            fcf_score = np.float64(np.clip(float(fcfy)/0.08*20.0, 0.0, 20.0))
+
+        # Gross margins (max 15) — 0 if missing
+        if _margins_missing:
+            margin_score = np.float64(0.0)
+        else:
+            margin_score = np.float64(np.clip(float(margins)/0.40*15.0, 0.0, 15.0))
 
         tech_score   = np.float64(np.clip((float(rsi)-20.0)/60.0*20.0, 0.0, 20.0))
         total = cagr_score + peg_score + fcf_score + margin_score + tech_score
-        if mktcap > MEGA_CAP_THRESHOLD:
-            total = np.float64(max(float(total), 50.0))
+        # No mega-cap floor guarantee
+
+    # ── News Sentiment overlay (only for single-ticker analysis, not batch scans) ──
+    # 30D: news = 15% weight  |  1Y: news = 5% weight
+    if use_news:
+        try:
+            _news_raw = fetch_news_score(data["ticker"])
+            _news_weight = 0.15 if horizon == "30D Tactical" else 0.05
+            total = float(total) * (1.0 - _news_weight) + _news_raw * 100.0 * _news_weight
+        except Exception:
+            pass  # If news fetch fails, use base score unchanged
 
     return int(np.clip(float(total), 1.0, 100.0))
+
+
+# ── Portfolio persistence helpers ─────────────────────────────────────────────
+_PORTFOLIO_FILE = os.path.join(os.path.dirname(__file__), "portfolio_state.json")
+
+
+def _save_portfolio(portfolio: list) -> None:
+    # אם משתמש מחובר דרך טלגרם — שמור בחשבון שלו
+    try:
+        _cu = st.session_state.get("current_user_phone", "")
+        if _cu:
+            _save_user_portfolio(_cu, portfolio)
+            return
+    except Exception:
+        pass
+    # fallback — קובץ מקומי
+    try:
+        with open(_PORTFOLIO_FILE, "w", encoding="utf-8") as _f:
+            json.dump(portfolio, _f)
+    except Exception:
+        pass
+
+
+def _load_portfolio() -> list:
+    # אם משתמש מחובר דרך טלגרם — טען מחשבון שלו
+    try:
+        _cu = st.session_state.get("current_user_phone", "")
+        if _cu:
+            return _load_user_portfolio(_cu)
+    except Exception:
+        pass
+    # fallback — קובץ מקומי
+    try:
+        if os.path.exists(_PORTFOLIO_FILE):
+            with open(_PORTFOLIO_FILE, "r", encoding="utf-8") as _f:
+                data = json.load(_f)
+            if isinstance(data, list):
+                return data
+    except Exception:
+        pass
+    return []
+
+
+# ── Telegram Price Alerts ──────────────────────────────────────────────────────
+_ALERTS_FILE = os.path.join(os.path.dirname(__file__), "telegram_chats.json")
+
+
+def _normalize_phone(phone: str) -> str:
+    import re as _re
+    digits = _re.sub(r"\D", "", phone)
+    if digits.startswith("00"):
+        return digits[2:]
+    if digits.startswith("0"):
+        return "972" + digits[1:]
+    return digits
+
+
+def _load_alerts_db() -> dict:
+    try:
+        if os.path.exists(_ALERTS_FILE):
+            data = json.load(open(_ALERTS_FILE, encoding="utf-8"))
+            if isinstance(data, dict):
+                data.setdefault("registrations", {})
+                data.setdefault("alerts", [])
+                data.setdefault("_last_poll", None)
+                return data
+    except Exception:
+        pass
+    return {"registrations": {}, "alerts": [], "_last_poll": None}
+
+
+def _save_alerts_db(db: dict) -> None:
+    try:
+        json.dump(db, open(_ALERTS_FILE, "w", encoding="utf-8"),
+                  ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def _tg_token() -> str:
+    return st.secrets.get("TELEGRAM_BOT_TOKEN", "")
+
+
+def _poll_telegram_registrations() -> int:
+    """קורא עדכונים מהבוט ורושם מספרי טלפון שנשלחו דרך /start"""
+    import requests as _req, re as _re
+    try:
+        token = _tg_token()
+        if not token:
+            return 0
+        db = _load_alerts_db()
+        # throttle: לא יותר מפעם אחת ב-30 שניות
+        if db["_last_poll"]:
+            elapsed = (datetime.now() - datetime.fromisoformat(db["_last_poll"])).total_seconds()
+            if elapsed < 30:
+                return 0
+        resp = _req.get(
+            f"https://api.telegram.org/bot{token}/getUpdates",
+            params={"offset": -100, "limit": 100},
+            timeout=8,
+        )
+        if not resp.ok:
+            return 0
+        new = 0
+        for upd in resp.json().get("result", []):
+            msg = upd.get("message", {})
+            text = (msg.get("text") or "").strip()
+            chat_id = msg.get("chat", {}).get("id")
+            if not text or not chat_id:
+                continue
+            m = _re.match(r"^/start\s+([\d\s\-\+]+)$", text, _re.I)
+            if not m:
+                continue
+            norm = _normalize_phone(m.group(1))
+            if len(norm) >= 7 and norm not in db["registrations"]:
+                db["registrations"][norm] = {
+                    "chat_id": chat_id,
+                    "registered_at": datetime.now().isoformat(timespec="seconds"),
+                    "display_phone": m.group(1).strip(),
+                }
+                new += 1
+        db["_last_poll"] = datetime.now().isoformat(timespec="seconds")
+        _save_alerts_db(db)
+        return new
+    except Exception:
+        return 0
+
+
+def _send_telegram_msg(phone: str, text: str) -> bool:
+    import requests as _req
+    try:
+        token = _tg_token()
+        if not token:
+            return False
+        db = _load_alerts_db()
+        reg = db["registrations"].get(_normalize_phone(phone), {})
+        chat_id = reg.get("chat_id")
+        if not chat_id:
+            return False
+        r = _req.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+            timeout=8,
+        )
+        return r.ok
+    except Exception:
+        return False
+
+
+def _is_phone_registered(phone: str) -> bool:
+    return _normalize_phone(phone) in _load_alerts_db().get("registrations", {})
+
+
+def _add_tg_alert(phone: str, ticker: str, condition: str, target_price: float) -> bool:
+    try:
+        if not _is_phone_registered(phone):
+            return False
+        db = _load_alerts_db()
+        db["alerts"].append({
+            "phone": _normalize_phone(phone),
+            "ticker": ticker.upper(),
+            "condition": condition,
+            "target_price": float(target_price),
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "triggered": False,
+            "last_checked": None,
+        })
+        _save_alerts_db(db)
+        return True
+    except Exception:
+        return False
+
+
+def _list_tg_alerts(phone: str) -> list:
+    norm = _normalize_phone(phone)
+    return [a for a in _load_alerts_db().get("alerts", []) if a.get("phone") == norm]
+
+
+def _delete_tg_alert(phone: str, idx: int) -> None:
+    norm = _normalize_phone(phone)
+    db = _load_alerts_db()
+    user_idxs = [i for i, a in enumerate(db["alerts"]) if a.get("phone") == norm]
+    if 0 <= idx < len(user_idxs):
+        db["alerts"].pop(user_idxs[idx])
+        _save_alerts_db(db)
+
+
+def _check_and_fire_tg_alerts(current_prices: dict) -> int:
+    try:
+        db = _load_alerts_db()
+        fired = 0
+        changed = False
+        for alert in db.get("alerts", []):
+            if alert.get("triggered"):
+                continue
+            price = current_prices.get(alert["ticker"])
+            if not price:
+                continue
+            target = float(alert["target_price"])
+            hit = (
+                (alert["condition"] == "above" and price >= target) or
+                (alert["condition"] == "below" and price <= target) or
+                (alert["condition"] == "equals" and abs(price - target) / target <= 0.005)
+            )
+            alert["last_checked"] = datetime.now().isoformat(timespec="seconds")
+            changed = True
+            if hit:
+                direction = "עלה מעל" if alert["condition"] == "above" else ("הגיע ל" if alert["condition"] == "equals" else "ירד מתחת")
+                body = (
+                    f"🔔 *Eden Sovereign — התראת מחיר*\n\n"
+                    f"מניה: *{alert['ticker']}*\n"
+                    f"{direction} יעד ${target:,.2f}\n"
+                    f"מחיר נוכחי: *${price:,.2f}*"
+                )
+                ok = _send_telegram_msg(alert["phone"], body)
+                if ok:
+                    alert["triggered"] = True
+                    fired += 1
+        if changed:
+            _save_alerts_db(db)
+        return fired
+    except Exception:
+        return 0
+
+
+def _load_user_portfolio(phone: str) -> list:
+    """טוען את ה-Portfolio מחשבון הטלגרם של המשתמש"""
+    try:
+        norm = _normalize_phone(phone)
+        db = _load_alerts_db()
+        reg = db.get("registrations", {}).get(norm, {})
+        data = reg.get("portfolio", [])
+        if isinstance(data, list):
+            return data
+    except Exception:
+        pass
+    return []
+
+
+def _save_user_portfolio(phone: str, portfolio: list) -> None:
+    """שומר את ה-Portfolio בחשבון הטלגרם של המשתמש"""
+    try:
+        norm = _normalize_phone(phone)
+        db = _load_alerts_db()
+        if norm in db.get("registrations", {}):
+            db["registrations"][norm]["portfolio"] = portfolio
+            _save_alerts_db(db)
+    except Exception:
+        pass
+
+
+# ── Monte Carlo Price Simulation ──────────────────────────────────────────────
+def run_monte_carlo(
+    hist: "pd.DataFrame",
+    current_price: float,
+    n_sims: int = 1000,
+    days_30: int = 30,
+    days_365: int = 252,
+) -> dict:
+    """
+    Geometric Brownian Motion simulation.
+    Returns dict with Plotly figure + summary stats for 30d and 1y horizons.
+    """
+    if hist is None or hist.empty or current_price <= 0:
+        return {}
+
+    # Daily log-returns from last 252 trading days
+    _close = hist["Close"].dropna().tail(252)
+    if len(_close) < 20:
+        return {}
+
+    _log_ret = np.log(_close / _close.shift(1)).dropna()
+    _mu  = float(_log_ret.mean())          # daily drift
+    _sig = float(_log_ret.std())           # daily volatility
+
+    if _sig == 0:
+        return {}
+
+    _rng = np.random.default_rng(seed=42)
+    _max_days = days_365
+    _dt = 1.0
+
+    # Simulate all paths at once: shape (n_sims, max_days)
+    _shocks = _rng.normal(
+        (_mu - 0.5 * _sig ** 2) * _dt,
+        _sig * np.sqrt(_dt),
+        size=(n_sims, _max_days),
+    )
+    _cum = np.exp(np.cumsum(_shocks, axis=1))
+    _paths = current_price * _cum  # shape (n_sims, max_days)
+
+    def _stats(col_idx: int) -> dict:
+        _vals = _paths[:, col_idx]
+        return {
+            "p10":    float(np.percentile(_vals, 10)),
+            "p25":    float(np.percentile(_vals, 25)),
+            "median": float(np.percentile(_vals, 50)),
+            "p75":    float(np.percentile(_vals, 75)),
+            "p90":    float(np.percentile(_vals, 90)),
+            "mean":   float(_vals.mean()),
+        }
+
+    _s30  = _stats(min(days_30, _max_days) - 1)
+    _s365 = _stats(_max_days - 1)
+
+    # Build Plotly figure — fan chart with percentile bands
+    _x = list(range(1, _max_days + 1))
+    _p10  = [float(np.percentile(_paths[:, i], 10))  for i in range(_max_days)]
+    _p25  = [float(np.percentile(_paths[:, i], 25))  for i in range(_max_days)]
+    _p50  = [float(np.percentile(_paths[:, i], 50))  for i in range(_max_days)]
+    _p75  = [float(np.percentile(_paths[:, i], 75))  for i in range(_max_days)]
+    _p90  = [float(np.percentile(_paths[:, i], 90))  for i in range(_max_days)]
+
+    _fig = go.Figure()
+
+    # 80% confidence band (p10–p90)
+    _fig.add_trace(go.Scatter(
+        x=_x + _x[::-1],
+        y=_p90 + _p10[::-1],
+        fill="toself",
+        fillcolor="rgba(99,102,241,0.08)",
+        line=dict(color="rgba(0,0,0,0)"),
+        name="80% Confidence",
+        hoverinfo="skip",
+    ))
+    # 50% confidence band (p25–p75)
+    _fig.add_trace(go.Scatter(
+        x=_x + _x[::-1],
+        y=_p75 + _p25[::-1],
+        fill="toself",
+        fillcolor="rgba(99,102,241,0.18)",
+        line=dict(color="rgba(0,0,0,0)"),
+        name="50% Confidence",
+        hoverinfo="skip",
+    ))
+    # Median path
+    _fig.add_trace(go.Scatter(
+        x=_x, y=_p50,
+        line=dict(color="#6366f1", width=2.5),
+        name="Median Path",
+    ))
+    # Current price baseline
+    _fig.add_hline(
+        y=current_price,
+        line_dash="dot",
+        line_color="rgba(156,163,175,0.6)",
+        annotation_text=f"Current ${current_price:.2f}",
+        annotation_font_size=11,
+    )
+    # 30-day marker
+    if days_30 <= _max_days:
+        _fig.add_vline(
+            x=days_30,
+            line_dash="dash",
+            line_color="rgba(250,204,21,0.5)",
+            annotation_text="30d",
+            annotation_font_size=10,
+        )
+
+    _fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(t=30, b=40, l=50, r=20),
+        height=320,
+        xaxis=dict(
+            title="Trading Days",
+            showgrid=False,
+            color="#9ca3af",
+            tickfont=dict(size=11),
+        ),
+        yaxis=dict(
+            title="Price ($)",
+            showgrid=True,
+            gridcolor="rgba(243,244,246,0.15)",
+            color="#9ca3af",
+            tickprefix="$",
+            tickfont=dict(size=11),
+        ),
+        legend=dict(
+            font=dict(size=11, color="#9ca3af"),
+            bgcolor="rgba(0,0,0,0)",
+            x=0, y=1,
+        ),
+        hovermode="x unified",
+    )
+
+    return {"fig": _fig, "s30": _s30, "s365": _s365, "vol_annual": _sig * np.sqrt(252)}
+
+
+# ── Portfolio & Best Pick helpers ─────────────────────────────────────────────
+@st.cache_data(ttl=300, show_spinner=False)
+def get_usd_ils() -> float:
+    import time as _t
+    for _a in range(3):
+        try:
+            rate = yf.Ticker("ILS=X").fast_info.get("lastPrice")
+            if rate:
+                return float(rate)
+        except Exception as _e:
+            if ("too many requests" in str(_e).lower() or "429" in str(_e)) and _a < 2:
+                _t.sleep(2 * (2 ** _a))
+                continue
+        break
+    # Fallback: try USDILS=X as alternative symbol
+    try:
+        rate2 = yf.Ticker("USDILS=X").fast_info.get("lastPrice")
+        if rate2:
+            return float(rate2)
+    except Exception:
+        pass
+    return 3.7
+
+
+@st.cache_data(ttl=180, show_spinner=False)
+def fetch_portfolio_prices(tickers: tuple) -> dict:
+    import time as _t
+
+    def _fetch_one(t):
+        for _a in range(3):
+            try:
+                fi = yf.Ticker(t).fast_info
+                price = fi.get("lastPrice") or fi.get("previousClose") or 0
+                if price:
+                    return t, float(price)
+            except Exception as _e:
+                if ("too many requests" in str(_e).lower() or "429" in str(_e)) \
+                        and _a < 2:
+                    _t.sleep(2 * (2 ** _a))
+                    continue
+            break
+        # Fallback: yf.download last close
+        try:
+            _dl = yf.download(t, period="2d", interval="1d",
+                              auto_adjust=True, progress=False, threads=False)
+            if _dl is not None and not _dl.empty:
+                return t, float(_dl["Close"].iloc[-1])
+        except Exception:
+            pass
+        return t, 0.0
+
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        results = list(ex.map(_fetch_one, tickers))
+    return dict(results)
+
+
+def portfolio_ai_analysis(holdings: list, usd_ils: float) -> str:
+    if not holdings:
+        return "התיק ריק."
+    total_val = sum(h["value_usd"] for h in holdings)
+    if total_val <= 0:
+        return "לא ניתן לחשב ניתוח — ערך התיק הוא אפס."
+    sector_vals: dict = {}
+    for h in holdings:
+        sec = h.get("sector", "Unknown")
+        sector_vals[sec] = sector_vals.get(sec, 0) + h["value_usd"]
+    top_sector = max(sector_vals, key=lambda k: sector_vals[k])
+    top_pct = sector_vals[top_sector] / total_val * 100
+    scores = [h.get("score", 50) for h in holdings]
+    avg_score = sum(scores) / len(scores)
+    low_score_stocks = [h["ticker"] for h in holdings if h.get("score", 50) < 40]
+    total_ils = total_val * usd_ils
+    lines = [
+        f"**שווי תיק כולל:** ${total_val:,.0f} | ₪{total_ils:,.0f}",
+        f"**ציון ממוצע:** {avg_score:.0f}/100",
+    ]
+    if top_pct > 50:
+        lines.append(f"⚠️ **ריכוז גבוה בסקטור {top_sector}** ({top_pct:.0f}%) — שקול גיוון.")
+    else:
+        lines.append(f"✅ **פיזור סקטורי סביר** — {top_sector} מהווה {top_pct:.0f}% מהתיק.")
+    if avg_score >= 70:
+        lines.append("✅ **ציון ממוצע גבוה** — התיק מאוזן היטב.")
+    elif avg_score >= 50:
+        lines.append("⚠️ **ציון ממוצע בינוני** — ישנן הזדמנויות לשיפור.")
+    else:
+        lines.append("🔴 **ציון ממוצע נמוך** — כדאי לבחון מחדש את ההרכב.")
+    if low_score_stocks:
+        lines.append(f"🔴 **מניות עם ציון נמוך (<40):** {', '.join(low_score_stocks)} — שקול לבחון מחדש.")
+    return "\n\n".join(lines)
+
+
+# Crypto/mining tickers to exclude from best-pick scanner
+_CRYPTO_MINING_EXCLUDE = {
+    "RIOT","MARA","HUT","CLSK","BTBT","IREN","WULF","HIVE","CIFR","BITF",
+    "CORZ","ARBK","DMGI","SDIG","GFAI","BSRT","GRIID","MIGI","NXGL","BTCS",
+    "BFAR","CBIT","SLNH",
+}
+
+@st.cache_data(ttl=600, show_spinner=False)
+def find_best_pick(horizon: str) -> list:
+    """Scans all tickers and returns list of (ticker, score) sorted descending.
+    Only includes stocks with sufficient fundamental data quality.
+    """
+    def _score_one(t):
+        try:
+            # Skip known crypto/mining tickers
+            if t in _CRYPTO_MINING_EXCLUDE:
+                return t, 0
+            d = fetch_data(t)
+            if d["hist"].empty or d.get("is_etf"):
+                return t, 0
+            # ── Data quality gates ────────────────────────────────────────
+            # 1. Require meaningful market cap (≥ $1B)
+            if d["mkt_cap"] < 1_000_000_000:
+                return t, 0
+            # 2. Price ≥ $1 (exclude penny stocks and unknown-price stocks)
+            _cp = d.get("current_price", 0) or 0
+            if _isnan(float(_cp)) or float(_cp) < 1.0:
+                return t, 0
+            # 3. Require ≥ 60 trading days of history
+            if len(d["hist"]) < 60:
+                return t, 0
+            # 3b. Require average daily volume ≥ 100K (liquidity filter)
+            _avg_vol = d["hist"]["Volume"].tail(30).mean() if "Volume" in d["hist"].columns else 0
+            if _avg_vol < 100_000:
+                return t, 0
+            # 4. Must be actual equity, not crypto/commodity ETF
+            if d.get("quote_type") not in ("EQUITY", None, ""):
+                return t, 0
+            # 5. Require at least ONE valid fundamental metric
+            has_pe     = not _isnan(d["pe_ratio"]) and d["pe_ratio"] > 0
+            has_cagr   = d["revenue_cagr"] > 0.01
+            has_margin = not _isnan(d["gross_margins"]) and d["gross_margins"] > 0
+            if not (has_pe or has_cagr or has_margin):
+                return t, 0
+            # ── Score ─────────────────────────────────────────────────────
+            tech = compute_technicals(d["hist"])
+            s = compute_score(d, tech, horizon, use_news=False)
+            # 6. Scale penalty for missing fundamentals
+            missing = sum([not has_pe, not has_cagr, not has_margin])
+            if missing == 1:
+                s = max(0, s - 5)    # 1 missing → -5 pts
+            elif missing == 2:
+                s = max(0, s - 15)   # 2 missing → -15 pts
+            # 7. Penalize negative revenue CAGR stocks
+            if d["revenue_cagr"] < -0.05:
+                s = max(0, s - 8)
+            return t, s
+        except Exception:
+            return t, 0
+    with ThreadPoolExecutor(max_workers=50) as ex:
+        results = list(ex.map(_score_one, TICKER_LIST))
+    results.sort(key=lambda x: x[1], reverse=True)
+    return results
 
 
 # ── Candlestick + Indicators Chart ────────────────────────────────────────────
@@ -1198,27 +2237,29 @@ def get_peers_for(ticker: str) -> list[str]:
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def build_peers(ticker: str, self_info: dict | None = None, extra_peers: tuple = ()) -> pd.DataFrame:
+def build_peers(ticker: str, self_data: dict | None = None, extra_peers: tuple = ()) -> pd.DataFrame:
     peers = get_peers_for(ticker)
     # Merge extra_peers without duplicates
     all_peers = list(dict.fromkeys(peers + [p for p in extra_peers if p != ticker.upper()]))
     if not all_peers:
         return pd.DataFrame()
-    peers = all_peers
 
+    # Use fetch_data (with all fallbacks) for every peer
     def _one(sym: str) -> tuple[str, dict]:
-        try: return sym, yf.Ticker(sym, session=_YF_SESSION).info or {}
-        except: return sym, {}
+        try:
+            return sym, fetch_data(sym)
+        except Exception:
+            return sym, {}
 
     with ThreadPoolExecutor(max_workers=6) as ex:
-        results = list(ex.map(_one, peers))
+        results = list(ex.map(_one, all_peers))
 
-    def _row_from(sym: str, info: dict, is_self: bool = False) -> dict:
-        mc = float(_safe(info.get("marketCap"), 0.0))
-        p  = float(_safe(info.get("currentPrice") or info.get("regularMarketPrice"), float("nan")))
-        pe = float(_safe(info.get("trailingPE"), float("nan")))
-        pg = float(_safe(info.get("pegRatio"),   float("nan")))
-        gm = float(_safe(info.get("grossMargins"), float("nan")))
+    def _row_from(sym: str, d: dict, is_self: bool = False) -> dict:
+        mc = float(_safe(d.get("mkt_cap", 0.0), 0.0))
+        p  = float(_safe(d.get("current_price", float("nan")), float("nan")))
+        pe = float(_safe(d.get("pe_ratio",  float("nan")), float("nan")))
+        pg = float(_safe(d.get("peg_ratio", float("nan")), float("nan")))
+        gm = float(_safe(d.get("gross_margins", float("nan")), float("nan")))
         label = f"★ {sym}" if is_self else sym
         return {
             "Ticker":       label,
@@ -1230,12 +2271,12 @@ def build_peers(ticker: str, self_info: dict | None = None, extra_peers: tuple =
         }
 
     rows = []
-    # Add self first
-    if self_info:
-        rows.append(_row_from(ticker.upper(), self_info, is_self=True))
+    # Add self first — uses the already-loaded fetch_data result from main flow
+    if self_data:
+        rows.append(_row_from(ticker.upper(), self_data, is_self=True))
     # Add peers
-    for sym, info in results:
-        rows.append(_row_from(sym, info))
+    for sym, d in results:
+        rows.append(_row_from(sym, d))
 
     return pd.DataFrame(rows)
 
@@ -1247,7 +2288,8 @@ def render_metric_cards(data: dict, tech: dict) -> None:
     pct_cls  = "positive" if not _isnan(pct) and pct>=0 else "negative"
     pct_sign = "+" if not _isnan(pct) and pct>=0 else ""
     pe  = data["pe_ratio"]; peg = data["peg_ratio"]; mc = data["mkt_cap"]
-    ma50v = tech["ma50"]
+    w52h = data.get("week52_high", float("nan"))
+    w52l = data.get("week52_low",  float("nan"))
     peg_sub_cls = ("positive" if not _isnan(float(peg)) and float(peg)<1.5
                    else "negative" if not _isnan(float(peg)) and float(peg)>2.5 else "neutral")
     peg_sub = ("Attractive" if not _isnan(float(peg)) and float(peg)<1.5
@@ -1261,9 +2303,9 @@ def render_metric_cards(data: dict, tech: dict) -> None:
         <div class="metric-sub {pct_cls}">{f'{pct_sign}{pct:.2f}%' if not _isnan(pct) else 'N/A'}</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">MA 50</div>
-        <div class="metric-value">{fmt_price(float(ma50v)) if not _isnan(float(ma50v)) else "N/A"}</div>
-        <div class="metric-sub neutral">50-Day Average</div>
+        <div class="metric-label">52-Week Range</div>
+        <div class="metric-value" style="font-size:15px;">{fmt_price(float(w52h)) if not _isnan(float(w52h)) else "N/A"}</div>
+        <div class="metric-sub neutral">Low: {fmt_price(float(w52l)) if not _isnan(float(w52l)) else "N/A"}</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">P/E Ratio</div>
@@ -1383,7 +2425,7 @@ def fmt_fin_val(v) -> str:
 @st.cache_data(ttl=300, show_spinner=False)
 def build_news(ticker: str) -> None:
     try:
-        articles = yf.Ticker(ticker, session=_YF_SESSION).news or []
+        articles = yf.Ticker(ticker).news or []
     except Exception:
         articles = []
     if not articles:
@@ -1446,13 +2488,32 @@ def build_news(ticker: str) -> None:
 # ── Financials Tab ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_financials(ticker: str) -> tuple:
-    obj = yf.Ticker(ticker, session=_YF_SESSION)
-    try:   inc = obj.financials
-    except: inc = None
-    try:   bal = obj.balance_sheet
-    except: bal = None
-    try:   cf  = obj.cashflow
-    except: cf  = None
+    import time as _t
+    obj = yf.Ticker(ticker)
+
+    def _get(attr_primary: str, attr_fallback: str | None = None):
+        for _attempt in range(3):
+            try:
+                val = getattr(obj, attr_primary, None)
+                if val is not None and not (hasattr(val, "empty") and val.empty):
+                    return val
+                if attr_fallback:
+                    val2 = getattr(obj, attr_fallback, None)
+                    if val2 is not None and not (hasattr(val2, "empty") and val2.empty):
+                        return val2
+                return val
+            except Exception as _e:
+                _msg = str(_e).lower()
+                if ("too many requests" in _msg or "429" in _msg or "rate limit" in _msg) \
+                        and _attempt < 2:
+                    _t.sleep(3 * (2 ** _attempt))
+                    continue
+                return None
+        return None
+
+    inc = _get("financials", "income_stmt")
+    bal = _get("balance_sheet")
+    cf  = _get("cashflow", "cash_flow")
     return inc, bal, cf
 
 
@@ -1489,7 +2550,7 @@ def build_financials(ticker: str) -> None:
 # ── Earnings Tab ───────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_earnings(ticker: str):
-    obj = yf.Ticker(ticker, session=_YF_SESSION)
+    obj = yf.Ticker(ticker)
     # Try get_earnings_dates (requires lxml, installed)
     try:
         df = obj.get_earnings_dates(limit=12)
@@ -1593,8 +2654,29 @@ def build_earnings(ticker: str, info: dict) -> None:
 # ── Insiders Tab ───────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_insiders(ticker: str):
-    try:   return yf.Ticker(ticker, session=_YF_SESSION).insider_transactions
-    except: return None
+    import time as _t
+    obj = yf.Ticker(ticker)
+    for _attempt in range(3):
+        try:
+            df = obj.insider_transactions
+            if df is not None and not df.empty:
+                return df
+            # Fallback: newer yfinance API
+            try:
+                df2 = obj.get_insider_transactions()
+                if df2 is not None and not df2.empty:
+                    return df2
+            except Exception:
+                pass
+            return df
+        except Exception as _e:
+            _msg = str(_e).lower()
+            if ("too many requests" in _msg or "429" in _msg or "rate limit" in _msg) \
+                    and _attempt < 2:
+                _t.sleep(3 * (2 ** _attempt))
+                continue
+            return None
+    return None
 
 
 def build_insiders(ticker: str) -> None:
@@ -2178,8 +3260,7 @@ def _logo_candidates(ticker: str, info: dict) -> list:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def _logo_url(ticker: str, logo_hint: str, website: str) -> str:
-    """Verify logo URLs and return first one that is a real image (>= 80×80 px).
-    Cached per ticker for 1 hour to avoid repeated HTTP calls."""
+    """Verify logo URLs — returns first real image (pixel content check)."""
     import requests
     from io import BytesIO
     try:
@@ -2188,36 +3269,63 @@ def _logo_url(ticker: str, logo_hint: str, website: str) -> str:
     except ImportError:
         _pil_ok = False
 
-    # Build candidate list inline (can't call _logo_candidates inside cache_data easily)
+    _KNOWN = {
+        "AAPL": "apple.com", "MSFT": "microsoft.com", "GOOGL": "google.com",
+        "GOOG": "google.com", "AMZN": "amazon.com", "META": "meta.com",
+        "TSLA": "tesla.com", "NVDA": "nvidia.com", "NFLX": "netflix.com",
+        "IREN": "iren.com", "MSTR": "microstrategy.com", "COIN": "coinbase.com",
+        "RIOT": "riotplatforms.com", "MARA": "marathondh.com",
+    }
+
+    domain = ""
+    if website:
+        domain = website.replace("https://", "").replace("http://", "").split("/")[0]
+        if domain.startswith("www."):
+            domain = domain[4:]
+    if not domain:
+        domain = _KNOWN.get(ticker.upper(), "")
+
     candidates: list = []
     if logo_hint and not logo_hint.startswith("data:"):
         candidates.append(logo_hint)
     candidates.append(f"https://financialmodelingprep.com/image-stock/{ticker}.png")
     candidates.append(f"https://assets.parqet.com/logos/symbol/{ticker}?format=png")
-    if website:
-        domain = website.replace("https://", "").replace("http://", "").split("/")[0]
-        if domain.startswith("www."):
-            domain = domain[4:]
-        if domain:
-            candidates.append(f"https://logo.clearbit.com/{domain}")
+    candidates.append(f"https://storage.googleapis.com/iex/api/logos/{ticker}.png")
+    if domain:
+        candidates.append(f"https://logo.clearbit.com/{domain}")
 
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     for url in candidates:
         try:
-            r = requests.get(url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
+            r = requests.get(url, timeout=6, headers=headers)
             if r.status_code != 200:
                 continue
             content = r.content
-            # Byte-size gate: real logos are almost always > 5 KB
-            if len(content) < 5000:
+            if len(content) < 200:
                 continue
             if _pil_ok:
-                img = _PIL.open(BytesIO(content))
-                w, h = img.size
-                if w < 128 or h < 128:    # reject anything smaller than 128×128
+                try:
+                    img = _PIL.open(BytesIO(content)).convert("RGBA")
+                    import numpy as _np
+                    arr = _np.array(img)
+                    mask = ~(((arr[:,:,0] > 230) & (arr[:,:,1] > 230) & (arr[:,:,2] > 230)) |
+                             (arr[:,:,3] < 30))
+                    rows = _np.any(mask, axis=1)
+                    cols = _np.any(mask, axis=0)
+                    if not rows.any() or not cols.any():
+                        continue
+                    content_h = int(rows.sum())
+                    content_w = int(cols.sum())
+                    if content_w < 24 or content_h < 24:
+                        continue
+                    total_px = img.size[0] * img.size[1]
+                    content_px = content_w * content_h
+                    if content_px / total_px < 0.08:
+                        continue
+                except Exception:
                     continue
             else:
-                # Pillow not available — use a stricter byte threshold as proxy
-                if len(content) < 15000:
+                if len(content) < 500:
                     continue
             return url
         except Exception:
@@ -2413,32 +3521,96 @@ def render_stock_video(ticker: str, data: dict, tech: dict, score: int, hist: pd
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main() -> None:
-    inject_css()
+    # ── Google Login (graceful fallback) ───────────────────────────────────
+    try:
+        _user = st.experimental_user
+        _user_email = _user.get("email", "") if _user else ""
+        _user_name  = _user.get("name", "")  if _user else ""
+    except Exception:
+        _user = None
+        _user_email = ""
+        _user_name  = ""
+
+    _account_label = (
+        f"&#128100; {_user_email}" if _user_email else "&#128100; Sandbox Mode"
+    )
+    inject_css(account_label=_account_label, is_logged_in=bool(_user_email))
+
+    # ── session_state defaults ─────────────────────────────────────────────
+    st.session_state.setdefault("active_ticker", "AAPL")
+    st.session_state.setdefault("run_best_pick", False)
+    st.session_state.setdefault("best_pick_results", [])
+    st.session_state.setdefault("tg_phone", "")
+    st.session_state.setdefault("current_user_phone", "")
+
+    # ── זיהוי משתמש מחובר / התנתקות ──────────────────────────────────────────
+    _tg_ph = st.session_state.get("tg_phone", "")
+    _expected_user = _tg_ph if (_tg_ph and _is_phone_registered(_tg_ph)) else ""
+    if _expected_user != st.session_state["current_user_phone"]:
+        # שינוי מצב התחברות — טען portfolio מתאים
+        st.session_state["current_user_phone"] = _expected_user
+        if _expected_user:
+            st.session_state["portfolio"] = _load_user_portfolio(_expected_user)
+        else:
+            st.session_state["portfolio"] = _load_portfolio()
+    elif "portfolio" not in st.session_state:
+        st.session_state["portfolio"] = _load_portfolio()
+
+    # ── בדיקת התראות מחיר Telegram (כל רענון) ────────────────────────────────
+    try:
+        _alert_tickers = set(
+            a["ticker"] for a in _load_alerts_db().get("alerts", [])
+            if not a.get("triggered")
+        )
+        _portfolio_tickers = set(
+            h["ticker"] for h in (st.session_state.get("portfolio") or [])
+        )
+        _all_check_tickers = tuple(_alert_tickers | _portfolio_tickers)
+        if _all_check_tickers:
+            _all_prices = fetch_portfolio_prices(_all_check_tickers)
+            _check_and_fire_tg_alerts(_all_prices)
+    except Exception:
+        pass
+
+    # Apply pending ticker change BEFORE the selectbox widget is instantiated
+    if st.session_state.get("pending_ticker"):
+        _pt = st.session_state.pop("pending_ticker")
+        if _pt in TICKER_LIST:
+            st.session_state["ticker_selectbox"] = _pt
+            st.session_state["active_ticker"] = _pt
 
     # ── Sidebar ────────────────────────────────────────────────────────────
     with st.sidebar:
         st.markdown(EDEN_LOGO, unsafe_allow_html=True)
 
         st.markdown("**Stock Search**")
+        _ticker_idx = TICKER_LIST.index(st.session_state["active_ticker"]) \
+            if st.session_state["active_ticker"] in TICKER_LIST \
+            else (TICKER_LIST.index("AAPL") if "AAPL" in TICKER_LIST else 0)
         ticker = st.selectbox(
             "Search ticker",
             options=TICKER_LIST,
-            index=TICKER_LIST.index("AAPL") if "AAPL" in TICKER_LIST else 0,
+            index=_ticker_idx,
             label_visibility="collapsed",
-            placeholder="Type to search (e.g. NVD → NVDA)...")
+            placeholder="Type to search (e.g. NVD → NVDA)",
+            key="ticker_selectbox")
+        st.session_state["active_ticker"] = ticker
 
         st.markdown("---")
         st.markdown("**Analysis Horizon**")
         horizon = st.radio(
             "Horizon", ["30D Tactical", "1Y Strategic"],
-            index=0, label_visibility="collapsed")
+            index=0, label_visibility="collapsed",
+            key="horizon_radio")
 
         st.markdown("**Moving Averages**")
         col1, col2 = st.columns(2)
         with col1:
-            ma1 = st.number_input("MA 1", min_value=0, max_value=200, value=50, help="0 = hidden")
+            ma1 = st.number_input("MA 1", min_value=0, max_value=200, value=50,
+                                  help="0 = hidden", key="ma1_input")
         with col2:
-            ma2 = st.number_input("MA 2", min_value=0, max_value=200, value=200, help="0 = hidden")
+            ma2 = st.number_input("MA 2", min_value=0, max_value=200, value=200,
+                                  help="0 = hidden", key="ma2_input")
 
         st.markdown("**Indicators**")
         selected_indicators = st.multiselect(
@@ -2446,7 +3618,159 @@ def main() -> None:
             options=ALL_INDS,
             default=[],
             label_visibility="collapsed",
-            placeholder="Add indicators...")
+            placeholder="Add indicators...",
+            key="indicators_multi")
+
+        st.markdown("---")
+
+        # ── Best Pick ──────────────────────────────────────────────────────
+        if st.button("⚡ Best Pick Now", use_container_width=True, type="primary",
+                     key="best_pick_btn"):
+            st.session_state["run_best_pick"] = True
+            st.session_state["best_pick_results"] = []
+
+        if st.session_state["run_best_pick"]:
+            with st.status("Scouting the market for Alpha...", expanded=True) as _bp_status:
+                st.write(f"Scanning {len(TICKER_LIST)} stocks — may take ~30s first time...")
+                _bp_results = find_best_pick(horizon)
+                st.session_state["best_pick_results"] = _bp_results
+                st.session_state["run_best_pick"] = False
+                _bp_status.update(label="Done! Best picks ready.", state="complete")
+
+        if st.session_state["best_pick_results"]:
+            _top5 = st.session_state["best_pick_results"][:5]
+            st.markdown("**Top picks:**")
+            for _rank, (_t, _s) in enumerate(_top5, 1):
+                if _s >= 80:   _rc, _rl = "#10b981", "STRONG BUY"
+                elif _s >= 65: _rc, _rl = "#f59e0b", "BUY"
+                elif _s >= 45: _rc, _rl = "#f97316", "HOLD"
+                else:          _rc, _rl = "#ef4444", "SELL"
+                _medal = "🥇" if _rank == 1 else ("🥈" if _rank == 2 else ("🥉" if _rank == 3 else f"{_rank}."))
+                st.markdown(
+                    f'<div style="background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.12);'
+                    f'border-radius:10px;padding:7px 10px;margin:4px 0">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center">'
+                    f'<span style="font-size:13px">{_medal} <b>{_t}</b></span>'
+                    f'<span style="font-size:11px;font-family:monospace;color:#6366f1;font-weight:700">{_s}</span>'
+                    f'</div>'
+                    f'<div style="font-size:10px;font-weight:700;color:{_rc};margin-top:2px">{_rl}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True)
+            if st.button(f"Analyze {_top5[0][0]} Now", use_container_width=True,
+                         key="analyze_best_btn"):
+                st.session_state["pending_ticker"] = _top5[0][0]
+                st.session_state["best_pick_results"] = []
+                st.rerun()
+
+        # ── 👤 חשבון משתמש + 🔔 התראות מחיר — Telegram ──────────────────────
+        st.markdown("---")
+        _cu = st.session_state.get("current_user_phone", "")
+        if _cu:
+            # ── מחובר — הצג שם + כפתור התנתקות ──────────────────────────
+            _db_reg = _load_alerts_db().get("registrations", {}).get(_cu, {})
+            _disp = _db_reg.get("display_phone", f"+{_cu}")
+            _uc1, _uc2 = st.columns([3, 1])
+            with _uc1:
+                st.markdown(f"**👤 {_disp}**")
+            with _uc2:
+                if st.button("יציאה", key="logout_btn", use_container_width=True):
+                    st.session_state["tg_phone"] = ""
+                    st.session_state["current_user_phone"] = ""
+                    st.session_state["portfolio"] = _load_portfolio()
+                    st.rerun()
+            st.markdown("**🔔 התראות מחיר**")
+        else:
+            st.markdown("**🔔 התחברות / התראות מחיר**")
+
+        _tg_phone = st.text_input(
+            "מספר טלפון",
+            value=st.session_state["tg_phone"],
+            placeholder="Enter phone number",
+            key="tg_phone_input",
+            label_visibility="collapsed",
+        )
+        if _tg_phone != st.session_state["tg_phone"]:
+            st.session_state["tg_phone"] = _tg_phone
+
+        _tg_configured = bool(_tg_token())
+        _bot_name = st.secrets.get("TELEGRAM_BOT_NAME", "@eden_alerts_bot")
+
+        if not _tg_configured:
+            st.markdown(
+                "**הגדרה נדרשת (פעם אחת):**\n\n"
+                "1. פתח טלגרם → `@BotFather`\n"
+                "2. שלח `/newbot` → קבל token\n"
+                "3. הכנס ב-`.streamlit/secrets.toml`:\n\n"
+                "```\nTELEGRAM_BOT_TOKEN = \"...\"\n```\n\n"
+                "4. הפעל מחדש את Streamlit"
+            )
+        elif _tg_phone and len(_normalize_phone(_tg_phone)) >= 7:
+            _norm = _normalize_phone(_tg_phone)
+            if _is_phone_registered(_tg_phone):
+                st.success(f"✅ {_tg_phone} — מחובר לטלגרם")
+                # ── בדוק אם יש הודעות רישום חדשות ─────────────────────────
+                _poll_telegram_registrations()
+
+                # ── טופס הוספת התראה ──────────────────────────────────────
+                _ac1, _ac2 = st.columns(2)
+                with _ac1:
+                    _alert_ticker = st.text_input(
+                        "טיקר", placeholder="NVDA",
+                        key="alert_ticker_input",
+                        label_visibility="visible",
+                    ).strip().upper()
+                with _ac2:
+                    _alert_cond = st.selectbox(
+                        "תנאי", ["מעל", "מתחת", "שווה ל"],
+                        key="alert_cond_select",
+                        label_visibility="visible",
+                    )
+                _alert_price = st.number_input(
+                    "מחיר יעד ($)", min_value=0.01, value=100.0,
+                    step=1.0, key="alert_price_input",
+                )
+                if st.button("➕ הוסף התראה", use_container_width=True, key="add_alert_btn"):
+                    if _alert_ticker:
+                        _cond_en = "above" if _alert_cond == "מעל" else ("equals" if _alert_cond == "שווה ל" else "below")
+                        if _add_tg_alert(_tg_phone, _alert_ticker, _cond_en, _alert_price):
+                            st.toast(f"✅ התראה נוספה: {_alert_ticker} {_alert_cond} ${_alert_price:,.2f}")
+                        else:
+                            st.toast("שגיאה בהוספת התראה")
+
+                # ── רשימת התראות פעילות ───────────────────────────────────
+                _active = [a for a in _list_tg_alerts(_tg_phone) if not a.get("triggered")]
+                if _active:
+                    st.markdown("**התראות פעילות:**")
+                    for _ai, _al in enumerate(_active):
+                        _dir = "מעל" if _al["condition"] == "above" else ("שווה ל" if _al["condition"] == "equals" else "מתחת")
+                        _col_a, _col_b = st.columns([4, 1])
+                        with _col_a:
+                            st.caption(f"• {_al['ticker']} {_dir} ${_al['target_price']:,.2f}")
+                        with _col_b:
+                            if st.button("🗑", key=f"del_alert_{_ai}"):
+                                _delete_tg_alert(_tg_phone, _ai)
+                                st.rerun()
+            else:
+                # ── לא רשום — Deep Link אוטומטי ───────────────────────────
+                _bot_username = _bot_name.lstrip("@")
+                _deep_link = f"https://t.me/{_bot_username}?start={_norm}"
+                st.markdown(
+                    f'<a href="{_deep_link}" target="_blank" style="'
+                    f'display:block;text-align:center;background:#229ED9;color:#fff;'
+                    f'padding:10px;border-radius:8px;font-weight:600;font-size:14px;'
+                    f'text-decoration:none;margin-bottom:8px;">'
+                    f'📲 הירשם דרך טלגרם</a>',
+                    unsafe_allow_html=True,
+                )
+                st.caption("לחץ → טלגרם נפתח → לחץ START → חזור לכאן")
+                if st.button("✅ בדוק רישום", use_container_width=True, key="check_reg_btn"):
+                    with st.spinner("בודק..."):
+                        _poll_telegram_registrations()
+                    if _is_phone_registered(_tg_phone):
+                        st.toast("✅ נרשמת בהצלחה!")
+                        st.rerun()
+                    else:
+                        st.warning("עדיין לא נמצא. לחץ START בטלגרם ונסה שוב.")
 
         st.markdown("---")
         st.caption("⚠️ For educational purposes only. Not financial advice.")
@@ -2488,19 +3812,26 @@ def main() -> None:
         f'Updated {datetime.now().strftime("%H:%M:%S")}</div>',
         unsafe_allow_html=True)
 
+
     render_metric_cards(data, tech)
     if not is_etf:
         render_analyst_card(data)
 
-    # ── Tabs (no Forecast) ──────────────────────────────────────────────────
+    # ── Tabs ────────────────────────────────────────────────────────────────
     _video_enabled = _node_available()
     _tab_names = ["📈 Chart", "📋 Report", "🔎 Peers", "📰 News", "📊 Financials",
                   "📅 Earnings", "👔 Insiders"]
     if _video_enabled:
         _tab_names.append("🎬 Video")
+    _tab_names.append("💼 Portfolio")
     _tabs = st.tabs(_tab_names)
     tab_chart, tab_rep, tab_peers, tab_news, tab_fin, tab_earn, tab_ins = _tabs[:7]
-    tab_slides = _tabs[7] if _video_enabled else None
+    if _video_enabled:
+        tab_slides = _tabs[7]
+        tab_portfolio = _tabs[8]
+    else:
+        tab_slides = None
+        tab_portfolio = _tabs[7]
 
     with tab_chart:
         if len(hist) < 5:
@@ -2542,6 +3873,68 @@ def main() -> None:
         else:
             st.markdown(build_report(ticker, data, tech, score, horizon), unsafe_allow_html=True)
 
+            # ── Monte Carlo Price Simulation ─────────────────────────────────
+            st.markdown("---")
+            st.markdown(
+                '<div style="font-size:13px;font-weight:700;color:#6366f1;'
+                'letter-spacing:.08em;margin-bottom:4px;">&#127922; MONTE CARLO PRICE SIMULATION</div>'
+                '<div style="font-size:11px;color:#9ca3af;margin-bottom:12px;">'
+                '1,000 Geometric Brownian Motion paths · Calibrated to 1-year historical volatility</div>',
+                unsafe_allow_html=True,
+            )
+            with st.spinner("מריץ סימולציה..."):
+                _mc = run_monte_carlo(hist, data.get("current_price", 0))
+
+            if _mc:
+                _s30  = _mc["s30"]
+                _s365 = _mc["s365"]
+                _vol  = _mc["vol_annual"] * 100
+
+                # Summary cards
+                _mc1, _mc2, _mc3 = st.columns(3)
+                with _mc1:
+                    st.markdown(
+                        f'<div style="background:rgba(99,102,241,.07);border-radius:12px;padding:14px 18px;">'
+                        f'<div style="font-size:11px;color:#9ca3af;font-weight:600;letter-spacing:.06em;">30-DAY MEDIAN</div>'
+                        f'<div style="font-size:22px;font-weight:700;color:#f8fafc;margin:4px 0;">'
+                        f'${_s30["median"]:,.2f}</div>'
+                        f'<div style="font-size:11px;color:#6b7280;">Range: ${_s30["p10"]:,.0f} – ${_s30["p90"]:,.0f}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                with _mc2:
+                    _chg = (_s365["median"] / data.get("current_price", 1) - 1) * 100
+                    _chg_color = "#22c55e" if _chg >= 0 else "#ef4444"
+                    st.markdown(
+                        f'<div style="background:rgba(99,102,241,.07);border-radius:12px;padding:14px 18px;">'
+                        f'<div style="font-size:11px;color:#9ca3af;font-weight:600;letter-spacing:.06em;">1-YEAR MEDIAN</div>'
+                        f'<div style="font-size:22px;font-weight:700;color:#f8fafc;margin:4px 0;">'
+                        f'${_s365["median"]:,.2f}</div>'
+                        f'<div style="font-size:11px;color:{_chg_color};">{"▲" if _chg>=0 else "▼"} '
+                        f'{abs(_chg):.1f}% expected</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                with _mc3:
+                    st.markdown(
+                        f'<div style="background:rgba(99,102,241,.07);border-radius:12px;padding:14px 18px;">'
+                        f'<div style="font-size:11px;color:#9ca3af;font-weight:600;letter-spacing:.06em;">IMPLIED VOLATILITY</div>'
+                        f'<div style="font-size:22px;font-weight:700;color:#f8fafc;margin:4px 0;">'
+                        f'{_vol:.1f}%</div>'
+                        f'<div style="font-size:11px;color:#6b7280;">Annualized · Historical</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+
+                st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
+                st.plotly_chart(_mc["fig"], config={"displayModeBar": False},
+                                use_container_width=True)
+                st.caption(
+                    "⚠️ סימולציה זו מבוססת על תנועת מחיר היסטורית בלבד ואינה מהווה המלצת השקעה."
+                )
+            else:
+                st.info("אין מספיק נתוני מחיר לסימולציה.")
+
     with tab_peers:
         # Session-state key for custom peers per ticker
         _extra_key = f"extra_peers_{ticker}"
@@ -2554,7 +3947,7 @@ def main() -> None:
             st.info(f"No peer group found for **{ticker}**. Use the search below to add stocks manually.")
         else:
             with st.spinner("Fetching peer data..."):
-                df_peers = build_peers(ticker, self_info=data["info"], extra_peers=extra_tuple)
+                df_peers = build_peers(ticker, self_data=data, extra_peers=extra_tuple)
             if df_peers.empty:
                 st.warning("Could not retrieve peer data.")
             else:
@@ -2616,7 +4009,6 @@ def main() -> None:
         else:
             build_insiders(ticker)
 
-
     if tab_slides is not None:
         with tab_slides:
             if is_etf:
@@ -2664,6 +4056,108 @@ def main() -> None:
                         st.video(mp4_path)
                     except Exception:
                         st.warning("Video file not found. Generate again.")
+
+    # ── Portfolio Tab (far right) ────────────────────────────────────────────
+    with tab_portfolio:
+        st.markdown("### 💼 Portfolio Builder")
+        usd_ils = get_usd_ils()
+
+        # Add stock row
+        _pc1, _pc2, _pc3, _pc4 = st.columns([2, 1, 1.5, 1])
+        with _pc1:
+            _port_ticker = st.selectbox("מניה", options=TICKER_LIST,
+                                        label_visibility="collapsed",
+                                        key="port_ticker_sel",
+                                        placeholder="בחר מניה...")
+        with _pc2:
+            _port_qty = st.number_input("כמות", min_value=0.01, value=1.0,
+                                        step=1.0, label_visibility="collapsed",
+                                        key="port_qty")
+        with _pc3:
+            _port_buy = st.number_input("מחיר קנייה $", min_value=0.01, value=100.0,
+                                        step=1.0, label_visibility="collapsed",
+                                        key="port_buy")
+        with _pc4:
+            if st.button("+ הוסף", use_container_width=True, key="port_add"):
+                _existing = [h["ticker"] for h in st.session_state["portfolio"]]
+                if _port_ticker not in _existing:
+                    st.session_state["portfolio"].append({
+                        "ticker": _port_ticker,
+                        "quantity": _port_qty,
+                        "buy_price": _port_buy,
+                    })
+                    _save_portfolio(st.session_state["portfolio"])
+                    st.rerun()
+                else:
+                    st.warning(f"{_port_ticker} כבר בתיק.")
+
+        if st.button("&#9851; Reset Portfolio", use_container_width=False, key="port_reset"):
+            st.session_state["portfolio"] = []
+            _save_portfolio([])
+            st.rerun()
+
+        _portfolio = st.session_state["portfolio"]
+
+        if not _portfolio:
+            st.info("התיק ריק — הוסף מניות למעלה.")
+        else:
+            _tickers_tuple = tuple(h["ticker"] for h in _portfolio)
+            with st.spinner("מעדכן מחירים..."):
+                _prices = fetch_portfolio_prices(_tickers_tuple)
+
+            _rows = []
+            _ai_holdings = []
+            for _h in _portfolio:
+                _t = _h["ticker"]
+                _cur = _prices.get(_t, 0.0)
+                _qty = _h["quantity"]
+                _buy = _h["buy_price"]
+                _val_usd = _cur * _qty
+                _val_ils = _val_usd * usd_ils
+                _pl = (_cur - _buy) * _qty
+                _pl_pct = ((_cur / _buy) - 1) * 100 if _buy else 0
+                _rows.append({
+                    "Ticker": _t,
+                    "Qty": _qty,
+                    "Buy $": f"${_buy:,.2f}",
+                    "Current $": f"${_cur:,.2f}" if _cur else "N/A",
+                    "Value ($)": f"${_val_usd:,.0f}",
+                    "Value (₪)": f"₪{_val_ils:,.0f}",
+                    "P&L $": f"{'+'if _pl>=0 else ''}{_pl:,.0f}",
+                    "P&L %": f"{'+'if _pl_pct>=0 else ''}{_pl_pct:.1f}%",
+                })
+                try:
+                    _d = fetch_data(_t)
+                    _sc = compute_score(_d, compute_technicals(_d["hist"]), horizon, use_news=False) if not _d["hist"].empty else 50
+                    _sector = _d.get("sector", "Unknown")
+                except Exception:
+                    _sc = 50
+                    _sector = "Unknown"
+                _ai_holdings.append({
+                    "ticker": _t, "sector": _sector, "qty": _qty,
+                    "value_usd": _val_usd, "score": _sc,
+                })
+
+            st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
+
+            _pie_labels = [r["Ticker"] for r in _rows]
+            _pie_vals   = [_prices.get(h["ticker"], 0) * h["quantity"] for h in _portfolio]
+            if any(v > 0 for v in _pie_vals):
+                _pie_fig = go.Figure(go.Pie(
+                    labels=_pie_labels, values=_pie_vals,
+                    marker_colors=EDEN_COLORS[:len(_pie_labels)],
+                    hole=0.45, textinfo="label+percent", textfont_size=13,
+                ))
+                _pie_fig.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    showlegend=False, margin=dict(t=20, b=20, l=20, r=20), height=320,
+                )
+                st.plotly_chart(_pie_fig, config={"displayModeBar": False},
+                                use_container_width=True)
+
+            st.markdown("---")
+            st.markdown("#### &#129302; ניתוח תיק")
+            st.markdown(portfolio_ai_analysis(_ai_holdings, usd_ils))
 
 
 if __name__ == "__main__":
