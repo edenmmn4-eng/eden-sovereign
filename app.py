@@ -327,7 +327,7 @@ EDEN_COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6",
 
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
-def inject_css(account_label: str = "&#128100; Sandbox Mode", is_logged_in: bool = False) -> None:
+def inject_css() -> None:
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -525,13 +525,7 @@ def inject_css(account_label: str = "&#128100; Sandbox Mode", is_logged_in: bool
     """, unsafe_allow_html=True)
 
     # HTML only — no <script> (Streamlit would render script content as visible text)
-    _auth_href = "/_stauth/logout" if is_logged_in else "https://accounts.google.com"
-    _auth_label = (
-        f'&#128682; Sign Out ({account_label.replace("&#128100; ", "")})' if is_logged_in
-        else '&#128100; Sign in with Google'
-    )
-    _auth_color = "#ef4444" if is_logged_in else "#6366f1"
-    st.markdown(f"""
+    st.markdown("""
     <input type="checkbox" id="eden-menu-chk" style="position:fixed;opacity:0;pointer-events:none;top:-9999px">
     <input type="checkbox" id="eden-dark-chk" style="position:fixed;opacity:0;pointer-events:none;top:-9999px">
     <label for="eden-menu-chk" id="eden-menu-backdrop"></label>
@@ -542,11 +536,6 @@ def inject_css(account_label: str = "&#128100; Sandbox Mode", is_logged_in: bool
         <span>&#127769; Dark Mode</span>
         <div class="eden-toggle"><div class="eden-toggle-knob"></div></div>
       </label>
-      <div class="eden-panel-sep"></div>
-      <a href="{_auth_href}" class="eden-panel-item"
-         style="text-decoration:none;cursor:pointer;color:{_auth_color};display:flex;align-items:center;">
-        <span>{_auth_label}</span>
-      </a>
       <div class="eden-panel-sep"></div>
       <div class="eden-panel-item" style="color:#6b7280;font-size:11px;cursor:default">
         <span>Eden Sovereign v1.0</span>
@@ -3669,10 +3658,7 @@ def main() -> None:
         _user_email = ""
         _user_name  = ""
 
-    _account_label = (
-        f"&#128100; {_user_email}" if _user_email else "&#128100; Sandbox Mode"
-    )
-    inject_css(account_label=_account_label, is_logged_in=bool(_user_email))
+    inject_css()
 
     # ── session_state defaults ─────────────────────────────────────────────
     st.session_state.setdefault("active_ticker", "AAPL")
@@ -3929,32 +3915,6 @@ def main() -> None:
                                 _delete_score_alert(_tg_phone, _si)
                                 st.rerun()
 
-                # ── תדירות בדיקה אוטומטית ─────────────────────────────────
-                st.markdown("---")
-                st.markdown("**⏱ סוכן בדיקה אוטומטית**")
-                _interval_options = {"כל שעה": 1, "כל 4 שעות": 4, "כל 12 שעות": 12, "פעם ביום": 24}
-                _db_now = _load_alerts_db()
-                _cur_interval = _db_now.get("check_interval_hours", 1)
-                _cur_label = next((k for k, v in _interval_options.items() if v == _cur_interval), "כל שעה")
-                _selected_interval_label = st.selectbox(
-                    "תדירות בדיקה", list(_interval_options.keys()),
-                    index=list(_interval_options.keys()).index(_cur_label),
-                    key="bg_interval_select",
-                )
-                _selected_interval_h = _interval_options[_selected_interval_label]
-                if _selected_interval_h != _cur_interval:
-                    _db_now["check_interval_hours"] = _selected_interval_h
-                    _save_alerts_db(_db_now)
-                # הצג מתי הייתה הבדיקה האחרונה
-                _last_bg = _db_now.get("_last_bg_check")
-                if _last_bg:
-                    try:
-                        _ago = int((_time.time() - datetime.fromisoformat(_last_bg).timestamp()) / 60)
-                        st.caption(f"בדיקה אחרונה: לפני {_ago} דקות")
-                    except Exception:
-                        pass
-                else:
-                    st.caption("הסוכן יבצע את הבדיקה הראשונה בקרוב")
             else:
                 # ── לא רשום — Deep Link אוטומטי ───────────────────────────
                 _bot_username = _bot_name.lstrip("@")

@@ -1,0 +1,17 @@
+name: Keep App Alive (Hourly Alert Check)
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # כל שעה בדיוק
+  workflow_dispatch:        # אפשר גם להפעיל ידנית
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake up Streamlit app
+        run: |
+          curl -s -o /dev/null -w "HTTP %{http_code}" \
+            https://eden-sovereign-e5do9uuuqq5iyccwgqkxfy.streamlit.app/ \
+            --max-time 30 || true
+          echo " — app pinged"
