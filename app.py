@@ -1476,7 +1476,7 @@ def _delete_score_alert(phone: str, idx: int) -> None:
         _save_alerts_db(db)
 
 
-def _check_and_fire_score_alerts(scores: list) -> int:
+def _check_and_fire_score_alerts(scores: list, horizon: str = "1Y Strategic") -> int:
     """scores = list of (ticker, score) tuples — כל תוצאות הסורק"""
     try:
         db = _load_alerts_db()
@@ -1493,7 +1493,7 @@ def _check_and_fire_score_alerts(scores: list) -> int:
                 continue
             # בנה הודעה רק על המניות החדשות שחצו את הסף
             lines = [f"🏆 *Eden Sovereign — התראת ציון*\n"]
-            lines.append(f"מניות חדשות שהגיעו לציון ≥{min_s}:\n")
+            lines.append(f"מניות חדשות שהגיעו לציון ≥{min_s} ({horizon}):\n")
             for t in new_tickers[:10]:
                 s = next((sc for tk, sc in qualifying if tk == t), 0)
                 label = "STRONG BUY" if s >= 80 else "BUY" if s >= 65 else "HOLD"
@@ -1586,8 +1586,8 @@ def _bg_worker() -> None:
             # ── 2. התראות ציון ──────────────────────────────────────────────
             if db.get("score_alerts"):
                 try:
-                    _scan_results = find_best_pick("6M")
-                    _check_and_fire_score_alerts(_scan_results)
+                    _scan_results = find_best_pick("1Y Strategic")
+                    _check_and_fire_score_alerts(_scan_results, "1Y Strategic")
                 except Exception:
                     pass
             # עדכן זמן בדיקה אחרון
@@ -3767,7 +3767,7 @@ def main() -> None:
                 _bp_status.update(label="Done! Best picks ready.", state="complete")
                 # ── התראות ציון — שלח הודעה אם מניות חדשות חצו את הסף ──
                 try:
-                    _check_and_fire_score_alerts(_bp_results)
+                    _check_and_fire_score_alerts(_bp_results, horizon)
                 except Exception:
                     pass
 
