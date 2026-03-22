@@ -61,5 +61,14 @@
       "last_checked": "2026-03-22T00:14:40"
     }
   ],
-  "_last_poll": "2026-03-22T00:18:27"
+  "_last_poll": "2026-03-22T19:47:20",
+  "score_alerts": [
+    {
+      "phone": "972587008082",
+      "min_score": 80,
+      "created_at": "2026-03-22T19:47:34",
+      "last_notified_tickers": [],
+      "last_notified_at": null
+    }
+  ]
 }

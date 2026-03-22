@@ -14,6 +14,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
+import threading
+import time as _time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 
@@ -1322,11 +1324,15 @@ def _load_alerts_db() -> dict:
             if isinstance(data, dict):
                 data.setdefault("registrations", {})
                 data.setdefault("alerts", [])
+                data.setdefault("score_alerts", [])
+                data.setdefault("check_interval_hours", 1)
                 data.setdefault("_last_poll", None)
+                data.setdefault("_last_bg_check", None)
                 return data
     except Exception:
         pass
-    return {"registrations": {}, "alerts": [], "_last_poll": None}
+    return {"registrations": {}, "alerts": [], "score_alerts": [],
+            "check_interval_hours": 1, "_last_poll": None, "_last_bg_check": None}
 
 
 def _save_alerts_db(db: dict) -> None:
@@ -1445,6 +1451,78 @@ def _delete_tg_alert(phone: str, idx: int) -> None:
         _save_alerts_db(db)
 
 
+def _add_score_alert(phone: str, min_score: int) -> bool:
+    try:
+        if not _is_phone_registered(phone):
+            return False
+        norm = _normalize_phone(phone)
+        db = _load_alerts_db()
+        # מחק אם כבר קיים אחד עם אותו ציון
+        db["score_alerts"] = [a for a in db.get("score_alerts", [])
+                               if not (a.get("phone") == norm and a.get("min_score") == int(min_score))]
+        db["score_alerts"].append({
+            "phone": norm,
+            "min_score": int(min_score),
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "last_notified_tickers": [],
+            "last_notified_at": None,
+        })
+        _save_alerts_db(db)
+        return True
+    except Exception:
+        return False
+
+
+def _list_score_alerts(phone: str) -> list:
+    norm = _normalize_phone(phone)
+    return [a for a in _load_alerts_db().get("score_alerts", []) if a.get("phone") == norm]
+
+
+def _delete_score_alert(phone: str, idx: int) -> None:
+    norm = _normalize_phone(phone)
+    db = _load_alerts_db()
+    user_idxs = [i for i, a in enumerate(db.get("score_alerts", [])) if a.get("phone") == norm]
+    if 0 <= idx < len(user_idxs):
+        db["score_alerts"].pop(user_idxs[idx])
+        _save_alerts_db(db)
+
+
+def _check_and_fire_score_alerts(scores: list) -> int:
+    """scores = list of (ticker, score) tuples — כל תוצאות הסורק"""
+    try:
+        db = _load_alerts_db()
+        fired = 0
+        changed = False
+        for alert in db.get("score_alerts", []):
+            min_s = int(alert.get("min_score", 80))
+            # מצא מניות שעברו את הסף
+            qualifying = [(t, s) for t, s in scores if s >= min_s]
+            qualifying_tickers = [t for t, _ in qualifying]
+            prev_tickers = set(alert.get("last_notified_tickers", []))
+            new_tickers = [t for t in qualifying_tickers if t not in prev_tickers]
+            if not new_tickers:
+                continue
+            # בנה הודעה רק על המניות החדשות שחצו את הסף
+            lines = [f"🏆 *Eden Sovereign — התראת ציון*\n"]
+            lines.append(f"מניות חדשות שהגיעו לציון ≥{min_s}:\n")
+            for t in new_tickers[:10]:
+                s = next((sc for tk, sc in qualifying if tk == t), 0)
+                label = "STRONG BUY" if s >= 80 else "BUY" if s >= 65 else "HOLD"
+                lines.append(f"• *{t}* — ציון {s} ({label})")
+            body = "\n".join(lines)
+            ok = _send_telegram_msg(alert["phone"], body)
+            if ok:
+                alert["last_notified_tickers"] = qualifying_tickers
+                alert["last_notified_at"] = datetime.now().isoformat(timespec="seconds")
+                changed = True
+                fired += 1
+        if changed:
+            _save_alerts_db(db)
+        return fired
+    except Exception:
+        return 0
+
+
 def _check_and_fire_tg_alerts(current_prices: dict) -> int:
     try:
         db = _load_alerts_db()
@@ -1481,6 +1559,66 @@ def _check_and_fire_tg_alerts(current_prices: dict) -> int:
         return fired
     except Exception:
         return 0
+
+
+# ── Background Alert Scheduler ────────────────────────────────────────────────
+_bg_thread: threading.Thread = None  # type: ignore[assignment]
+_bg_lock = threading.Lock()
+
+
+def _bg_worker() -> None:
+    """Thread רקע: בודק התראות מחיר + ציון כל X שעות"""
+    while True:
+        try:
+            db = _load_alerts_db()
+            interval_h = int(db.get("check_interval_hours", 1))
+            # בדוק אם הגיע הזמן
+            last = db.get("_last_bg_check")
+            if last:
+                elapsed = (_time.time() -
+                           datetime.fromisoformat(last).timestamp())
+                if elapsed < interval_h * 3600:
+                    _time.sleep(60)  # המתן דקה ובדוק שוב
+                    continue
+            # ── 1. התראות מחיר ──────────────────────────────────────────────
+            alert_tickers = list(set(
+                a["ticker"] for a in db.get("alerts", [])
+                if not a.get("triggered")
+            ))
+            if alert_tickers:
+                _prices: dict = {}
+                for _tk in alert_tickers:
+                    try:
+                        _prices[_tk] = yf.Ticker(_tk).fast_info.last_price
+                    except Exception:
+                        pass
+                if _prices:
+                    _check_and_fire_tg_alerts(_prices)
+            # ── 2. התראות ציון ──────────────────────────────────────────────
+            if db.get("score_alerts"):
+                try:
+                    _scan_results = find_best_pick("6M")
+                    _check_and_fire_score_alerts(_scan_results)
+                except Exception:
+                    pass
+            # עדכן זמן בדיקה אחרון
+            db2 = _load_alerts_db()
+            db2["_last_bg_check"] = datetime.now().isoformat(timespec="seconds")
+            _save_alerts_db(db2)
+        except Exception:
+            pass
+        _time.sleep(60)
+
+
+def _ensure_bg_scheduler() -> None:
+    """מוודא שה-thread הרקע רץ — מופעל פעם אחת לכל תהליך"""
+    global _bg_thread
+    with _bg_lock:
+        if _bg_thread is None or not _bg_thread.is_alive():
+            _bg_thread = threading.Thread(
+                target=_bg_worker, daemon=True, name="eden-alert-scheduler"
+            )
+            _bg_thread.start()
 
 
 def _load_user_portfolio(phone: str) -> list:
@@ -3543,6 +3681,11 @@ def main() -> None:
     st.session_state.setdefault("tg_phone", "")
     st.session_state.setdefault("current_user_phone", "")
 
+    # ── הפעל סוכן רקע לבדיקת התראות (פעם אחת לתהליך) ──────────────────────
+    if not st.session_state.get("_bg_scheduler_started"):
+        _ensure_bg_scheduler()
+        st.session_state["_bg_scheduler_started"] = True
+
     # ── זיהוי משתמש מחובר / התנתקות ──────────────────────────────────────────
     _tg_ph = st.session_state.get("tg_phone", "")
     _expected_user = _tg_ph if (_tg_ph and _is_phone_registered(_tg_ph)) else ""
@@ -3636,6 +3779,11 @@ def main() -> None:
                 st.session_state["best_pick_results"] = _bp_results
                 st.session_state["run_best_pick"] = False
                 _bp_status.update(label="Done! Best picks ready.", state="complete")
+                # ── התראות ציון — שלח הודעה אם מניות חדשות חצו את הסף ──
+                try:
+                    _check_and_fire_score_alerts(_bp_results)
+                except Exception:
+                    pass
 
         if st.session_state["best_pick_results"]:
             _top5 = st.session_state["best_pick_results"][:5]
@@ -3750,6 +3898,63 @@ def main() -> None:
                             if st.button("🗑", key=f"del_alert_{_ai}"):
                                 _delete_tg_alert(_tg_phone, _ai)
                                 st.rerun()
+
+                # ── התראות ציון ───────────────────────────────────────────
+                st.markdown("---")
+                st.markdown("**🏆 התראות ציון**")
+                st.caption("קבל הודעה כאשר מניה חדשה מגיעה לציון מינימלי")
+                _sc1, _sc2 = st.columns([3, 2])
+                with _sc1:
+                    _score_threshold = st.number_input(
+                        "ציון מינימלי", min_value=1, max_value=100, value=80,
+                        step=1, key="score_alert_threshold",
+                        label_visibility="visible",
+                    )
+                with _sc2:
+                    st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+                    if st.button("➕ הוסף", use_container_width=True, key="add_score_alert_btn"):
+                        if _add_score_alert(_tg_phone, int(_score_threshold)):
+                            st.toast(f"✅ התראה נוספה: ציון ≥{_score_threshold}")
+                        else:
+                            st.toast("שגיאה בהוספת התראת ציון")
+
+                _active_score = _list_score_alerts(_tg_phone)
+                if _active_score:
+                    for _si, _sa in enumerate(_active_score):
+                        _sc_a, _sc_b = st.columns([4, 1])
+                        with _sc_a:
+                            st.caption(f"• ציון ≥{_sa['min_score']}")
+                        with _sc_b:
+                            if st.button("🗑", key=f"del_score_alert_{_si}"):
+                                _delete_score_alert(_tg_phone, _si)
+                                st.rerun()
+
+                # ── תדירות בדיקה אוטומטית ─────────────────────────────────
+                st.markdown("---")
+                st.markdown("**⏱ סוכן בדיקה אוטומטית**")
+                _interval_options = {"כל שעה": 1, "כל 4 שעות": 4, "כל 12 שעות": 12, "פעם ביום": 24}
+                _db_now = _load_alerts_db()
+                _cur_interval = _db_now.get("check_interval_hours", 1)
+                _cur_label = next((k for k, v in _interval_options.items() if v == _cur_interval), "כל שעה")
+                _selected_interval_label = st.selectbox(
+                    "תדירות בדיקה", list(_interval_options.keys()),
+                    index=list(_interval_options.keys()).index(_cur_label),
+                    key="bg_interval_select",
+                )
+                _selected_interval_h = _interval_options[_selected_interval_label]
+                if _selected_interval_h != _cur_interval:
+                    _db_now["check_interval_hours"] = _selected_interval_h
+                    _save_alerts_db(_db_now)
+                # הצג מתי הייתה הבדיקה האחרונה
+                _last_bg = _db_now.get("_last_bg_check")
+                if _last_bg:
+                    try:
+                        _ago = int((_time.time() - datetime.fromisoformat(_last_bg).timestamp()) / 60)
+                        st.caption(f"בדיקה אחרונה: לפני {_ago} דקות")
+                    except Exception:
+                        pass
+                else:
+                    st.caption("הסוכן יבצע את הבדיקה הראשונה בקרוב")
             else:
                 # ── לא רשום — Deep Link אוטומטי ───────────────────────────
                 _bot_username = _bot_name.lstrip("@")
