@@ -4309,7 +4309,7 @@ def main() -> None:
                 _prev_close = float("nan")
                 try:
                     _d = fetch_data(_t)
-                    _sc = compute_score(_d, compute_technicals(_d["hist"]), horizon, use_news=False) if not _d["hist"].empty else 50
+                    _sc = compute_score(_d, compute_technicals(_d["hist"]), horizon, use_news=True) if not _d["hist"].empty else 50
                     _sector = _d.get("sector", "Unknown")
                     _prev_close = float(_d.get("prev_close") or float("nan"))
                 except Exception:
