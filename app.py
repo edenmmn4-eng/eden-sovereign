@@ -1955,7 +1955,7 @@ def find_best_pick(horizon: str) -> list:
             return t, s
         except Exception:
             return t, 0
-    with ThreadPoolExecutor(max_workers=50) as ex:
+    with ThreadPoolExecutor(max_workers=8) as ex:
         results = list(ex.map(_score_one, TICKER_LIST))
     results.sort(key=lambda x: x[1], reverse=True)
     return results
@@ -3809,9 +3809,9 @@ def main() -> None:
                 f'<span>סורק {len(TICKER_LIST)} מניות ברקע…<br>'
                 '<b>ניתן להמשיך להשתמש באתר</b></span></div>',
                 unsafe_allow_html=True)
-            # רענון אוטומטי כל 3 שניות עד שהסריקה מסתיימת
+            # רענון אוטומטי כל 5 שניות עד שהסריקה מסתיימת
             st.markdown(
-                '<meta http-equiv="refresh" content="3">',
+                '<meta http-equiv="refresh" content="5">',
                 unsafe_allow_html=True)
 
         if _bp_is_done and _bp_scan_state["results"] and not st.session_state.get("best_pick_results"):
