@@ -4302,7 +4302,7 @@ def main() -> None:
                     "Current $": f"${_cur:,.2f}" if _cur else "N/A",
                     "Value ($)": f"${_val_usd:,.0f}",
                     "Value (₪)": f"₪{_val_ils:,.0f}",
-                    "P&L $": f"{'+'if _pl>=0 else ''}{_pl:,.0f}",
+                    "P&L ($)": f"{'+'if _pl>=0 else ''}${_pl:,.0f}",
                     "P&L %": f"{'+'if _pl_pct>=0 else ''}{_pl_pct:.1f}%",
                 })
                 _prev_close = float("nan")
