@@ -545,12 +545,21 @@ def inject_css() -> None:
       [data-testid="stTabs"] [role="tab"]{font-size:11px;white-space:nowrap}
       .term::after{display:none}
       #eden-dots-btn{top:10px;right:10px;width:36px;height:36px;font-size:20px}
-      /* החזר את כפתור ה-hamburger של Streamlit במובייל */
-      header{visibility:visible!important;display:flex!important;
-             background:transparent!important;box-shadow:none!important}
-      header [data-testid="stToolbar"]{visibility:hidden!important}
-      header [data-testid="stSidebarCollapsedControl"],
-      header button[kind="header"]{visibility:visible!important;display:flex!important}
+      /* כפתור פתיחת סיידבר במובייל — מוצג תמיד, ללא תלות ב-header */
+      [data-testid="stSidebarCollapsedControl"],
+      [data-testid="stSidebarCollapseButton"],
+      section[data-testid="stSidebar"] > div:first-child > button{
+        visibility:visible!important;display:flex!important;
+        position:fixed!important;left:10px!important;top:10px!important;
+        z-index:99999!important;
+        background:rgba(255,255,255,.92)!important;
+        backdrop-filter:blur(8px)!important;
+        border:1.5px solid rgba(99,102,241,.3)!important;
+        border-radius:50%!important;
+        width:36px!important;height:36px!important;
+        box-shadow:0 3px 14px rgba(0,0,0,.12)!important;
+        align-items:center!important;justify-content:center!important;
+      }
     }
 
     /* ── Narrow phones (≤480px) ─────────────────────────────────── */
