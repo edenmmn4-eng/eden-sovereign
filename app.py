@@ -696,6 +696,9 @@ def fetch_data(ticker: str) -> dict:
                     _time.sleep(3 * (2 ** _attempt))  # 3s → 6s → 12s
                     continue
                 break  # non-rate-limit error — give up
+        # אם info ריק לגמרי — rate limit — אל תשמור ב-cache
+        if not info or len(info) < 5:
+            raise RuntimeError(f"fetch_data({ticker}): empty info — rate limited, skip cache")
         out["info"] = info
 
         # ── fast_info (always works — cached separately by yfinance) ──────────
@@ -4071,7 +4074,16 @@ def main() -> None:
 
     # ── Auto-analyze (no button needed) ──────────────────────────────────
     with st.spinner(f"Analyzing {ticker}..."):
-        data = fetch_data(ticker)
+        try:
+            data = fetch_data(ticker)
+        except RuntimeError:
+            # rate limit — נסה שוב פעם אחת אחרי עיכוב קצר
+            import time as _t; _t.sleep(3)
+            try:
+                data = fetch_data(ticker)
+            except RuntimeError:
+                st.error(f"Failed to retrieve data for **{ticker}**: Rate limited. Try after a while.")
+                return
 
     if data["error"] and data["hist"].empty:
         st.error(f"Failed to retrieve data for **{ticker}**: {data['error']}")
