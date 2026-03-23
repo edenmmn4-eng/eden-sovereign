@@ -1834,8 +1834,32 @@ def portfolio_ai_analysis(holdings: list, usd_ils: float) -> str:
     avg_score = sum(scores) / len(scores)
     low_score_stocks = [h["ticker"] for h in holdings if h.get("score", 50) < 40]
     total_ils = total_val * usd_ils
+
+    # ── רווח/הפסד יומי ──────────────────────────────────────────────────────
+    daily_usd = 0.0
+    has_daily = False
+    for h in holdings:
+        cur = h.get("current_price", 0.0) or 0.0
+        prev = h.get("prev_close", float("nan"))
+        qty = h.get("qty", 0)
+        if cur and prev and not _isnan(prev) and prev > 0:
+            daily_usd += (cur - prev) * qty
+            has_daily = True
+
+    daily_ils = daily_usd * usd_ils
+    daily_pct = (daily_usd / (total_val - daily_usd) * 100) if has_daily and (total_val - daily_usd) > 0 else 0.0
+    _sign = "+" if daily_usd >= 0 else ""
+    _arrow = "📈" if daily_usd >= 0 else "📉"
+    daily_line = (
+        f"{_arrow} **שינוי יומי:** {_sign}{daily_pct:.2f}% "
+        f"| {_sign}${daily_usd:,.0f} | {_sign}₪{daily_ils:,.0f}"
+        if has_daily else
+        "**שינוי יומי:** N/A"
+    )
+
     lines = [
         f"**שווי תיק כולל:** ${total_val:,.0f} | ₪{total_ils:,.0f}",
+        daily_line,
         f"**ציון ממוצע:** {avg_score:.0f}/100",
     ]
     if top_pct > 50:
@@ -4282,16 +4306,19 @@ def main() -> None:
                     "P&L $": f"{'+'if _pl>=0 else ''}{_pl:,.0f}",
                     "P&L %": f"{'+'if _pl_pct>=0 else ''}{_pl_pct:.1f}%",
                 })
+                _prev_close = float("nan")
                 try:
                     _d = fetch_data(_t)
                     _sc = compute_score(_d, compute_technicals(_d["hist"]), horizon, use_news=False) if not _d["hist"].empty else 50
                     _sector = _d.get("sector", "Unknown")
+                    _prev_close = float(_d.get("prev_close") or float("nan"))
                 except Exception:
                     _sc = 50
                     _sector = "Unknown"
                 _ai_holdings.append({
                     "ticker": _t, "sector": _sector, "qty": _qty,
                     "value_usd": _val_usd, "score": _sc,
+                    "current_price": _cur, "prev_close": _prev_close,
                 })
 
             st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
