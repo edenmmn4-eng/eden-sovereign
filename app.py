@@ -1832,7 +1832,7 @@ def portfolio_ai_analysis(holdings: list, usd_ils: float) -> str:
     top_pct = sector_vals[top_sector] / total_val * 100
     scores = [h.get("score", 50) for h in holdings]
     avg_score = sum(scores) / len(scores)
-    low_score_stocks = [h["ticker"] for h in holdings if h.get("score", 50) < 40]
+    low_score_stocks = [(h["ticker"], h.get("score", 50)) for h in holdings if h.get("score", 50) < 45]
     total_ils = total_val * usd_ils
 
     # ── רווח/הפסד יומי ──────────────────────────────────────────────────────
@@ -1872,7 +1872,8 @@ def portfolio_ai_analysis(holdings: list, usd_ils: float) -> str:
     else:
         lines.append("🔴 **ציון ממוצע נמוך** — כדאי לבחון מחדש את ההרכב.")
     if low_score_stocks:
-        lines.append(f"🔴 **מניות עם ציון נמוך (<40):** {', '.join(low_score_stocks)} — שקול לבחון מחדש.")
+        _low_str = ", ".join(f"{t} ({s}/100)" for t, s in low_score_stocks)
+        lines.append(f"🔴 **מניות בדירוג SELL:** {_low_str} — שקול לבחון מחדש.")
     return "\n\n".join(lines)
 
 
