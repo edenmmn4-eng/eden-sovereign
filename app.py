@@ -449,6 +449,17 @@ def inject_css() -> None:
                padding:14px 18px;background:rgba(99,102,241,.04);
                border:1px dashed rgba(99,102,241,.25);border-radius:12px}
 
+    /* ── כפתור סיידבר (מובייל בלבד) ──────────────────────────────────── */
+    #eden-sidebar-btn{display:none;position:fixed;top:14px;left:14px;z-index:99999;
+        width:38px;height:38px;border-radius:50%;
+        background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
+        border:1.5px solid rgba(99,102,241,.3);cursor:pointer;
+        font-size:20px;align-items:center;justify-content:center;
+        box-shadow:0 3px 14px rgba(0,0,0,.12);color:#6366f1;
+        user-select:none;line-height:1;transition:box-shadow .18s;padding:0}
+    #eden-sidebar-btn:hover{box-shadow:0 5px 18px rgba(99,102,241,.28)}
+    @media (max-width:768px){#eden-sidebar-btn{display:flex}}
+
     /* ── 3-Dots Settings Menu ─────────────────────────────────────────── */
     #eden-dots-btn{position:fixed;top:14px;right:14px;z-index:99999;
         width:38px;height:38px;border-radius:50%;
@@ -545,21 +556,6 @@ def inject_css() -> None:
       [data-testid="stTabs"] [role="tab"]{font-size:11px;white-space:nowrap}
       .term::after{display:none}
       #eden-dots-btn{top:10px;right:10px;width:36px;height:36px;font-size:20px}
-      /* כפתור פתיחת סיידבר במובייל — מוצג תמיד, ללא תלות ב-header */
-      [data-testid="stSidebarCollapsedControl"],
-      [data-testid="stSidebarCollapseButton"],
-      section[data-testid="stSidebar"] > div:first-child > button{
-        visibility:visible!important;display:flex!important;
-        position:fixed!important;left:10px!important;top:10px!important;
-        z-index:99999!important;
-        background:rgba(255,255,255,.92)!important;
-        backdrop-filter:blur(8px)!important;
-        border:1.5px solid rgba(99,102,241,.3)!important;
-        border-radius:50%!important;
-        width:36px!important;height:36px!important;
-        box-shadow:0 3px 14px rgba(0,0,0,.12)!important;
-        align-items:center!important;justify-content:center!important;
-      }
     }
 
     /* ── Narrow phones (≤480px) ─────────────────────────────────── */
@@ -579,6 +575,7 @@ def inject_css() -> None:
     <input type="checkbox" id="eden-dark-chk" style="position:fixed;opacity:0;pointer-events:none;top:-9999px">
     <label for="eden-menu-chk" id="eden-menu-backdrop"></label>
     <label for="eden-menu-chk" id="eden-dots-btn" title="Settings">&#8942;</label>
+    <button id="eden-sidebar-btn" title="Open sidebar">&#9776;</button>
     <div id="eden-panel">
       <div class="eden-panel-title">Settings</div>
       <label for="eden-dark-chk" class="eden-panel-item">
@@ -607,6 +604,19 @@ def inject_css() -> None:
             darkChk.addEventListener('change', function() {
                 window.parent.localStorage.setItem('eden-dark', this.checked ? '1' : '0');
             });
+
+            // כפתור פתיחת סיידבר למובייל
+            var sidebarBtn = doc.getElementById('eden-sidebar-btn');
+            if (sidebarBtn && !sidebarBtn._bound) {
+                sidebarBtn._bound = true;
+                sidebarBtn.addEventListener('click', function() {
+                    var toggle = doc.querySelector('[data-testid="stSidebarCollapsedControl"] button')
+                              || doc.querySelector('[data-testid="stSidebarCollapseButton"]')
+                              || doc.querySelector('button[aria-label="Open sidebar"]')
+                              || doc.querySelector('button[aria-label*="sidebar"]');
+                    if (toggle) toggle.click();
+                });
+            }
         }
         tryInit();
     })();
