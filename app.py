@@ -335,7 +335,8 @@ def inject_css() -> None:
     #MainMenu,footer,.stDeployButton,[data-testid="stToolbar"]{visibility:hidden;display:none}
     /* header — שקוף ומחוץ לתצוגה, pointer-events נשמרים לצורך JS */
     header{opacity:0!important;height:0!important;overflow:hidden!important;
-           padding:0!important;margin:0!important;position:fixed!important;top:-999px!important}
+           padding:0!important;margin:0!important;position:fixed!important;top:-999px!important;
+           pointer-events:none!important}
     /* כפתור ☰ מותאם — תמיד גלוי */
     #eden-sb-btn{position:fixed;top:14px;left:14px;z-index:99999;
         width:38px;height:38px;border-radius:50%;
@@ -607,7 +608,11 @@ def inject_css() -> None:
             if (btn) btn.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true}));
         }
 
+        var _bindRetries = 0;
         function bindAll() {
+            _bindRetries++;
+            if (_bindRetries > 40) return; // max ~6 seconds of retries
+
             // ── Dark mode ──
             var darkChk = doc.getElementById('eden-dark-chk');
             if (!darkChk) { setTimeout(bindAll, 150); return; }
@@ -623,9 +628,11 @@ def inject_css() -> None:
             var sbBtn = doc.getElementById('eden-sb-btn');
             if (sbBtn && !sbBtn._sb) {
                 sbBtn._sb = true;
-                sbBtn.addEventListener('click', clickSidebarToggle);
+                sbBtn.addEventListener('click', function() {
+                    clickSidebarToggle();
+                });
             }
-            if (!sbBtn) setTimeout(bindAll, 150); // retry if not in DOM yet
+            if (!sbBtn) { setTimeout(bindAll, 150); return; } // retry if not in DOM yet
         }
 
         bindAll();
@@ -697,7 +704,7 @@ def fetch_data(ticker: str) -> dict:
                     continue
                 break  # non-rate-limit error — give up
         # אם info ריק לגמרי — rate limit — אל תשמור ב-cache
-        if not info or len(info) < 5:
+        if not info:
             raise RuntimeError(f"fetch_data({ticker}): empty info — rate limited, skip cache")
         out["info"] = info
 
@@ -1988,7 +1995,7 @@ def find_best_pick(horizon: str) -> list:
             # Skip known crypto/mining tickers
             if t in _CRYPTO_MINING_EXCLUDE:
                 return t, 0
-            _time.sleep(0.1)  # 100ms בין בקשות — מניעת rate-limit
+            _time.sleep(0.3)  # 300ms בין בקשות — מניעת rate-limit
             d = fetch_data(t)
             if d["hist"].empty or d.get("is_etf"):
                 return t, 0
@@ -2031,7 +2038,7 @@ def find_best_pick(horizon: str) -> list:
             return t, s
         except Exception:
             return t, 0
-    with ThreadPoolExecutor(max_workers=3) as ex:
+    with ThreadPoolExecutor(max_workers=1) as ex:
         results = list(ex.map(_score_one, TICKER_LIST))
     results.sort(key=lambda x: x[1], reverse=True)
     return results
@@ -4080,7 +4087,7 @@ def main() -> None:
             data = fetch_data(ticker)
         except RuntimeError:
             # rate limit — נסה שוב פעם אחת אחרי עיכוב קצר
-            import time as _t; _t.sleep(3)
+            import time as _t; _t.sleep(6)
             try:
                 data = fetch_data(ticker)
             except RuntimeError:
