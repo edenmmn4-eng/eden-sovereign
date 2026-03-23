@@ -333,9 +333,9 @@ def inject_css() -> None:
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
     #MainMenu,footer,.stDeployButton,[data-testid="stToolbar"]{visibility:hidden;display:none}
-    /* header — מוסתר חזותית אך נשאר ב-DOM לצורך JS */
-    header{visibility:hidden!important;height:0!important;overflow:hidden!important;
-           padding:0!important;margin:0!important;pointer-events:none!important}
+    /* header — שקוף ומחוץ לתצוגה, pointer-events נשמרים לצורך JS */
+    header{opacity:0!important;height:0!important;overflow:hidden!important;
+           padding:0!important;margin:0!important;position:fixed!important;top:-999px!important}
     /* כפתור ☰ מותאם — תמיד גלוי */
     #eden-sb-btn{position:fixed;top:14px;left:14px;z-index:99999;
         width:38px;height:38px;border-radius:50%;
@@ -594,35 +594,41 @@ def inject_css() -> None:
     st.components.v1.html("""
     <script>
     (function(){
-        function tryInit() {
-            var doc = window.parent.document;
-            var darkChk = doc.getElementById('eden-dark-chk');
-            if (!darkChk) { setTimeout(tryInit, 100); return; }
-            if (darkChk._lsBound) return;
-            darkChk._lsBound = true;
-            var saved = window.parent.localStorage.getItem('eden-dark') === '1';
-            darkChk.checked = saved;
-            darkChk.addEventListener('change', function() {
-                window.parent.localStorage.setItem('eden-dark', this.checked ? '1' : '0');
-            });
+        var doc = window.parent.document;
+        var ls  = window.parent.localStorage;
 
-            // כפתור ☰ — לחיצה מפעילה את כפתור הסיידבר הנסתר
-            function clickStreamlitSidebarBtn() {
-                // Streamlit מחזיק את הכפתור ב-header (נסתר חזותית אך נגיש ב-DOM)
-                var btn = doc.querySelector('[data-testid="stSidebarCollapsedControl"] button')
-                       || doc.querySelector('[data-testid="stSidebarCollapseButton"]')
-                       || doc.querySelector('button[aria-label="Open sidebar"]')
-                       || doc.querySelector('button[aria-label="Close sidebar"]')
-                       || doc.querySelector('header button');
-                if (btn) btn.click();
-            }
-            var sbBtn = doc.getElementById('eden-sb-btn');
-            if (sbBtn && !sbBtn._bound) {
-                sbBtn._bound = true;
-                sbBtn.addEventListener('click', clickStreamlitSidebarBtn);
-            }
+        function clickSidebarToggle() {
+            // כשפתוח: כפתור סגירה בתוך הסיידבר
+            // כשסגור:  כפתור פתיחה בתוך header (נסתר אך נגיש)
+            var btn = doc.querySelector('[data-testid="stSidebarCollapseButton"] button')
+                   || doc.querySelector('[data-testid="stSidebarCollapseButton"]')
+                   || doc.querySelector('[data-testid="stSidebarCollapsedControl"] button')
+                   || doc.querySelector('[data-testid="stSidebarCollapsedControl"]');
+            if (btn) btn.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true}));
         }
-        tryInit();
+
+        function bindAll() {
+            // ── Dark mode ──
+            var darkChk = doc.getElementById('eden-dark-chk');
+            if (!darkChk) { setTimeout(bindAll, 150); return; }
+            if (!darkChk._dm) {
+                darkChk._dm = true;
+                darkChk.checked = ls.getItem('eden-dark') === '1';
+                darkChk.addEventListener('change', function(){
+                    ls.setItem('eden-dark', this.checked ? '1' : '0');
+                });
+            }
+
+            // ── Sidebar toggle button ──
+            var sbBtn = doc.getElementById('eden-sb-btn');
+            if (sbBtn && !sbBtn._sb) {
+                sbBtn._sb = true;
+                sbBtn.addEventListener('click', clickSidebarToggle);
+            }
+            if (!sbBtn) setTimeout(bindAll, 150); // retry if not in DOM yet
+        }
+
+        bindAll();
     })();
     </script>
     """, height=0)
