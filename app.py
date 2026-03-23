@@ -333,19 +333,18 @@ def inject_css() -> None:
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
     #MainMenu,footer,.stDeployButton,[data-testid="stToolbar"]{visibility:hidden;display:none}
-    /* header — שקוף, רק כפתור סיידבר נשאר גלוי */
-    header{background:transparent!important;box-shadow:none!important;
-           border:none!important;height:auto!important}
-    /* כפתור פתיחת סיידבר — עיצוב מותאם */
-    [data-testid="stSidebarCollapsedControl"]{
-        position:fixed!important;top:14px!important;left:14px!important;
-        z-index:99999!important;visibility:visible!important;display:flex!important}
-    [data-testid="stSidebarCollapsedControl"] button{
-        width:38px!important;height:38px!important;border-radius:50%!important;
-        background:rgba(255,255,255,.92)!important;backdrop-filter:blur(8px)!important;
-        border:1.5px solid rgba(99,102,241,.3)!important;cursor:pointer!important;
-        color:#6366f1!important;box-shadow:0 3px 14px rgba(0,0,0,.12)!important;
-        display:flex!important;align-items:center!important;justify-content:center!important}
+    /* header — מוסתר חזותית אך נשאר ב-DOM לצורך JS */
+    header{visibility:hidden!important;height:0!important;overflow:hidden!important;
+           padding:0!important;margin:0!important;pointer-events:none!important}
+    /* כפתור ☰ מותאם — תמיד גלוי */
+    #eden-sb-btn{position:fixed;top:14px;left:14px;z-index:99999;
+        width:38px;height:38px;border-radius:50%;
+        background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
+        border:1.5px solid rgba(99,102,241,.3);cursor:pointer;
+        font-size:18px;display:flex;align-items:center;justify-content:center;
+        box-shadow:0 3px 14px rgba(0,0,0,.12);color:#6366f1;
+        user-select:none;transition:box-shadow .18s;padding:0;line-height:1}
+    #eden-sb-btn:hover{box-shadow:0 5px 18px rgba(99,102,241,.28)}
 
     html,body,[class*="css"]{font-family:'Inter',-apple-system,sans-serif;background-color:#fcfcfc}
 
@@ -576,6 +575,7 @@ def inject_css() -> None:
     <input type="checkbox" id="eden-menu-chk" style="position:fixed;opacity:0;pointer-events:none;top:-9999px">
     <input type="checkbox" id="eden-dark-chk" style="position:fixed;opacity:0;pointer-events:none;top:-9999px">
     <label for="eden-menu-chk" id="eden-menu-backdrop"></label>
+    <button id="eden-sb-btn" title="Toggle sidebar">&#9776;</button>
     <label for="eden-menu-chk" id="eden-dots-btn" title="Settings">&#8942;</label>
     <div id="eden-panel">
       <div class="eden-panel-title">Settings</div>
@@ -606,20 +606,20 @@ def inject_css() -> None:
                 window.parent.localStorage.setItem('eden-dark', this.checked ? '1' : '0');
             });
 
-            // פתח סיידבר אוטומטית במובייל אם סגור
-            function openSidebarIfClosed() {
-                var sidebar = doc.querySelector('[data-testid="stSidebar"]');
-                if (!sidebar) { setTimeout(openSidebarIfClosed, 200); return; }
-                // בדוק אם הסיידבר סגור (aria-expanded=false או collapsed class)
-                var expandBtn = doc.querySelector('[data-testid="stSidebarCollapsedControl"] button')
-                             || doc.querySelector('button[aria-label="Open sidebar"]')
-                             || doc.querySelector('button[aria-label*="Open"]');
-                if (expandBtn) {
-                    expandBtn.click();
-                }
+            // כפתור ☰ — לחיצה מפעילה את כפתור הסיידבר הנסתר
+            function clickStreamlitSidebarBtn() {
+                // Streamlit מחזיק את הכפתור ב-header (נסתר חזותית אך נגיש ב-DOM)
+                var btn = doc.querySelector('[data-testid="stSidebarCollapsedControl"] button')
+                       || doc.querySelector('[data-testid="stSidebarCollapseButton"]')
+                       || doc.querySelector('button[aria-label="Open sidebar"]')
+                       || doc.querySelector('button[aria-label="Close sidebar"]')
+                       || doc.querySelector('header button');
+                if (btn) btn.click();
             }
-            if (window.parent.innerWidth <= 768) {
-                setTimeout(openSidebarIfClosed, 400);
+            var sbBtn = doc.getElementById('eden-sb-btn');
+            if (sbBtn && !sbBtn._bound) {
+                sbBtn._bound = true;
+                sbBtn.addEventListener('click', clickStreamlitSidebarBtn);
             }
         }
         tryInit();
