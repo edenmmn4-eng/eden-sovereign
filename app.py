@@ -2031,7 +2031,7 @@ def find_best_pick(horizon: str) -> list:
                 return t, 0
             # ── Score ─────────────────────────────────────────────────────
             tech = compute_technicals(d["hist"])
-            s = compute_score(d, tech, horizon, use_news=False)
+            s = compute_score(d, tech, horizon, use_news=True)
             # 6. Scale penalty for missing fundamentals
             missing = sum([not has_pe, not has_cagr, not has_margin])
             if missing == 1:
