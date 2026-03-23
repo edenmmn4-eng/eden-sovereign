@@ -1066,6 +1066,8 @@ def fetch_data(ticker: str) -> dict:
         elif not _hist_ok:
             out["error"] = out.get("error") or "Rate limited. Try after a while."
 
+    except RuntimeError:
+        raise  # rate-limit skip-cache — אל תשמור ב-cache, העבר הלאה
     except Exception as e:
         out["error"] = str(e)
     return out
