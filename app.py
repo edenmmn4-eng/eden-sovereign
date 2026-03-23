@@ -332,7 +332,20 @@ def inject_css() -> None:
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-    #MainMenu,footer,header,.stDeployButton,[data-testid="stToolbar"]{visibility:hidden;display:none}
+    #MainMenu,footer,.stDeployButton,[data-testid="stToolbar"]{visibility:hidden;display:none}
+    /* header — שקוף, רק כפתור סיידבר נשאר גלוי */
+    header{background:transparent!important;box-shadow:none!important;
+           border:none!important;height:auto!important}
+    /* כפתור פתיחת סיידבר — עיצוב מותאם */
+    [data-testid="stSidebarCollapsedControl"]{
+        position:fixed!important;top:14px!important;left:14px!important;
+        z-index:99999!important;visibility:visible!important;display:flex!important}
+    [data-testid="stSidebarCollapsedControl"] button{
+        width:38px!important;height:38px!important;border-radius:50%!important;
+        background:rgba(255,255,255,.92)!important;backdrop-filter:blur(8px)!important;
+        border:1.5px solid rgba(99,102,241,.3)!important;cursor:pointer!important;
+        color:#6366f1!important;box-shadow:0 3px 14px rgba(0,0,0,.12)!important;
+        display:flex!important;align-items:center!important;justify-content:center!important}
 
     html,body,[class*="css"]{font-family:'Inter',-apple-system,sans-serif;background-color:#fcfcfc}
 
