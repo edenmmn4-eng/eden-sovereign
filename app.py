@@ -594,7 +594,7 @@ def fmt_price(v: float) -> str:
 
 
 # ── Data Fetching ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=180, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def fetch_data(ticker: str) -> dict:
     out: dict = {
         "ticker": ticker, "info": {}, "hist": pd.DataFrame(),
@@ -1558,18 +1558,10 @@ _bg_lock = threading.Lock()
 def _bg_worker() -> None:
     """Thread רקע: בודק התראות מחיר + ציון כל X שעות"""
     while True:
+        _time.sleep(3600)  # המתן שעה בין בדיקות
         try:
             db = _load_alerts_db()
-            interval_h = int(db.get("check_interval_hours", 1))
-            # בדוק אם הגיע הזמן
-            last = db.get("_last_bg_check")
-            if last:
-                elapsed = (_time.time() -
-                           datetime.fromisoformat(last).timestamp())
-                if elapsed < interval_h * 3600:
-                    _time.sleep(60)  # המתן דקה ובדוק שוב
-                    continue
-            # ── 1. התראות מחיר ──────────────────────────────────────────────
+            # ── התראות מחיר בלבד — קל, ללא סריקה מלאה ──────────────────
             alert_tickers = list(set(
                 a["ticker"] for a in db.get("alerts", [])
                 if not a.get("triggered")
@@ -1579,24 +1571,17 @@ def _bg_worker() -> None:
                 for _tk in alert_tickers:
                     try:
                         _prices[_tk] = yf.Ticker(_tk).fast_info.last_price
+                        _time.sleep(0.3)  # מניעת rate-limit
                     except Exception:
                         pass
                 if _prices:
                     _check_and_fire_tg_alerts(_prices)
-            # ── 2. התראות ציון ──────────────────────────────────────────────
-            if db.get("score_alerts"):
-                try:
-                    _scan_results = find_best_pick("1Y Strategic")
-                    _check_and_fire_score_alerts(_scan_results, "1Y Strategic")
-                except Exception:
-                    pass
             # עדכן זמן בדיקה אחרון
             db2 = _load_alerts_db()
             db2["_last_bg_check"] = datetime.now().isoformat(timespec="seconds")
             _save_alerts_db(db2)
         except Exception:
             pass
-        _time.sleep(60)
 
 
 def _ensure_bg_scheduler() -> None:
@@ -1798,7 +1783,7 @@ def get_usd_ils() -> float:
     return 3.7
 
 
-@st.cache_data(ttl=180, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def fetch_portfolio_prices(tickers: tuple) -> dict:
     import time as _t
 
