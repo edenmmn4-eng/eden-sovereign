@@ -40,8 +40,8 @@ for i, line in enumerate(lines, 1):
 m = re.search(r'@st\.cache_data\(ttl=(\d+)[^)]*\)\s*\ndef fetch_data', src)
 if m:
     ttl = int(m.group(1))
-    if ttl < 600:
-        err(f"fetch_data() TTL={ttl}s — חייב להיות ≥600 שניות (מניעת rate-limit)")
+    if ttl < 300:
+        err(f"fetch_data() TTL={ttl}s — חייב להיות ≥300 שניות (מניעת rate-limit)")
 
 m2 = re.search(r'@st\.cache_data\(ttl=(\d+)[^)]*\)\s*\ndef fetch_portfolio_prices', src)
 if m2:

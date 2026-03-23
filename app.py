@@ -594,7 +594,7 @@ def fmt_price(v: float) -> str:
 
 
 # ── Data Fetching ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_data(ticker: str) -> dict:
     out: dict = {
         "ticker": ticker, "info": {}, "hist": pd.DataFrame(),
@@ -1786,7 +1786,7 @@ def get_usd_ils() -> float:
     return 3.7
 
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_portfolio_prices(tickers: tuple) -> dict:
     import time as _t
 
