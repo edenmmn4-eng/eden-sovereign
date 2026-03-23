@@ -1859,7 +1859,6 @@ def portfolio_ai_analysis(holdings: list, usd_ils: float) -> str:
 
     lines = [
         f"**שווי תיק כולל:** ${total_val:,.0f} | ₪{total_ils:,.0f}",
-        daily_line,
         f"**ציון ממוצע:** {avg_score:.0f}/100",
     ]
     if top_pct > 50:
@@ -4339,6 +4338,73 @@ def main() -> None:
                                 use_container_width=True)
 
             st.markdown("---")
+
+            # ── טבלת שינוי יומי ──────────────────────────────────────────
+            _daily_rows = []
+            _total_daily_usd = 0.0
+            _total_val_prev = 0.0
+            for _h in _ai_holdings:
+                _cur  = _h.get("current_price", 0.0) or 0.0
+                _prev = _h.get("prev_close", float("nan"))
+                _qty  = _h.get("qty", 0)
+                if _cur and _prev and not _isnan(_prev) and _prev > 0:
+                    _d_usd = (_cur - _prev) * _qty
+                    _d_pct = (_cur / _prev - 1) * 100
+                    _d_ils = _d_usd * usd_ils
+                    _total_daily_usd += _d_usd
+                    _total_val_prev  += _prev * _qty
+                    _daily_rows.append((_h["ticker"], _d_pct, _d_usd, _d_ils))
+
+            if _daily_rows:
+                _tot_pct = (_total_daily_usd / _total_val_prev * 100) if _total_val_prev > 0 else 0.0
+                _tot_ils = _total_daily_usd * usd_ils
+                _tot_color = "#10b981" if _total_daily_usd >= 0 else "#ef4444"
+                _tot_sign  = "+" if _total_daily_usd >= 0 else ""
+
+                _rows_html = ""
+                for _tk, _dp, _du, _di in sorted(_daily_rows, key=lambda x: x[1], reverse=True):
+                    _c = "#10b981" if _dp >= 0 else "#ef4444"
+                    _s = "+" if _dp >= 0 else ""
+                    _rows_html += (
+                        f'<tr>'
+                        f'<td style="font-weight:700;color:#e2e8f0;padding:7px 12px">{_tk}</td>'
+                        f'<td style="color:{_c};font-weight:700;text-align:right;padding:7px 12px">{_s}{_dp:.2f}%</td>'
+                        f'<td style="color:{_c};text-align:right;padding:7px 12px">{_s}${_du:,.0f}</td>'
+                        f'<td style="color:{_c};text-align:right;padding:7px 12px">{_s}₪{_di:,.0f}</td>'
+                        f'</tr>'
+                    )
+
+                st.markdown(f"""
+<div style="background:rgba(15,23,42,.6);border:1px solid rgba(99,102,241,.2);
+            border-radius:12px;overflow:hidden;margin-bottom:16px">
+  <div style="background:rgba(99,102,241,.12);padding:10px 14px;
+              font-size:13px;font-weight:700;color:#a5b4fc;letter-spacing:.05em">
+    📊 שינוי יומי
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:monospace">
+    <thead>
+      <tr style="border-bottom:1px solid rgba(99,102,241,.15)">
+        <th style="text-align:left;padding:7px 12px;color:#64748b;font-weight:600">מניה</th>
+        <th style="text-align:right;padding:7px 12px;color:#64748b;font-weight:600">%</th>
+        <th style="text-align:right;padding:7px 12px;color:#64748b;font-weight:600">$</th>
+        <th style="text-align:right;padding:7px 12px;color:#64748b;font-weight:600">₪</th>
+      </tr>
+    </thead>
+    <tbody>
+      {_rows_html}
+    </tbody>
+    <tfoot>
+      <tr style="border-top:1px solid rgba(99,102,241,.25);background:rgba(99,102,241,.07)">
+        <td style="padding:8px 12px;font-weight:700;color:#e2e8f0">סה״כ תיק</td>
+        <td style="text-align:right;padding:8px 12px;font-weight:700;color:{_tot_color}">{_tot_sign}{_tot_pct:.2f}%</td>
+        <td style="text-align:right;padding:8px 12px;font-weight:700;color:{_tot_color}">{_tot_sign}${_total_daily_usd:,.0f}</td>
+        <td style="text-align:right;padding:8px 12px;font-weight:700;color:{_tot_color}">{_tot_sign}₪{_tot_ils:,.0f}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+""", unsafe_allow_html=True)
+
             st.markdown("#### &#129302; ניתוח תיק")
             st.markdown(portfolio_ai_analysis(_ai_holdings, usd_ils))
 
