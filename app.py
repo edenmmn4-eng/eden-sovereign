@@ -1564,6 +1564,7 @@ _bp_scan_state: dict = {"running": False, "done": False, "results": [], "horizon
 
 def _run_bp_scan(horizon: str) -> None:
     """מריץ סריקת Best Pick ברקע ללא חסימת ה-UI"""
+    _time.sleep(3)  # המתן שה-UI יסיים את הבקשה הנוכחית לפני שמתחילים
     try:
         results = find_best_pick(horizon)
         with _bp_scan_lock:
@@ -1913,6 +1914,7 @@ def find_best_pick(horizon: str) -> list:
             # Skip known crypto/mining tickers
             if t in _CRYPTO_MINING_EXCLUDE:
                 return t, 0
+            _time.sleep(0.1)  # 100ms בין בקשות — מניעת rate-limit
             d = fetch_data(t)
             if d["hist"].empty or d.get("is_etf"):
                 return t, 0
@@ -1955,7 +1957,7 @@ def find_best_pick(horizon: str) -> list:
             return t, s
         except Exception:
             return t, 0
-    with ThreadPoolExecutor(max_workers=8) as ex:
+    with ThreadPoolExecutor(max_workers=3) as ex:
         results = list(ex.map(_score_one, TICKER_LIST))
     results.sort(key=lambda x: x[1], reverse=True)
     return results
