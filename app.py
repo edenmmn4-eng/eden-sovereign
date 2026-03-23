@@ -521,6 +521,40 @@ def inject_css() -> None:
     html:has(#eden-dark-chk:checked) #eden-panel{background:#1a1a2e!important;border-color:rgba(99,102,241,.3)!important}
     html:has(#eden-dark-chk:checked) .eden-panel-item{color:#e2e2f0!important}
     html:has(#eden-dark-chk:checked) #eden-dots-btn{background:rgba(26,26,46,.92)!important;border-color:rgba(167,139,250,.5)!important}
+
+    /* ── Mobile Responsive (≤768px) ──────────────────────────────── */
+    @media (max-width: 768px) {
+      .block-container,.stMainBlockContainer{padding:12px 12px 40px!important}
+      .metric-grid{grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0 10px}
+      .metric-card{padding:12px 10px}
+      .metric-value{font-size:16px}
+      .metric-label{font-size:9px}
+      .analyst-card{gap:16px;padding:14px 16px}
+      .analyst-val{font-size:15px}
+      .exec-card{padding:20px 16px}
+      .ceo-summary{padding:12px 14px;margin-bottom:20px}
+      .ticker-symbol{font-size:24px}
+      .ticker-header{gap:8px;flex-wrap:wrap}
+      .score-badge{font-size:13px;padding:5px 12px;margin-left:0}
+      .verdict-box{padding:14px 16px;gap:12px}
+      .verdict-label{font-size:1.2rem}
+      .hero{padding:40px 16px}
+      .hero h1{font-size:1.5rem}
+      [data-testid="stTabs"]>div:first-child{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+      [data-testid="stTabs"]>div:first-child::-webkit-scrollbar{display:none}
+      [data-testid="stTabs"] [role="tab"]{font-size:11px;white-space:nowrap}
+      .term::after{display:none}
+      #eden-dots-btn{top:10px;right:10px;width:36px;height:36px;font-size:20px}
+    }
+
+    /* ── Narrow phones (≤480px) ─────────────────────────────────── */
+    @media (max-width: 480px) {
+      .metric-grid{grid-template-columns:repeat(2,1fr);gap:8px}
+      .analyst-card{flex-direction:column;gap:12px}
+      .rpt-name,.rpt-value{font-size:12px}
+      .ticker-symbol{font-size:20px}
+      .score-badge{font-size:12px;padding:4px 10px}
+    }
     </style>
     """, unsafe_allow_html=True)
 
