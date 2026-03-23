@@ -1557,6 +1557,25 @@ def _check_and_fire_tg_alerts(current_prices: dict) -> int:
 _bg_thread: threading.Thread = None  # type: ignore[assignment]
 _bg_lock = threading.Lock()
 
+# ── Best Pick background scan ──────────────────────────────────────────────────
+_bp_scan_lock = threading.Lock()
+_bp_scan_state: dict = {"running": False, "done": False, "results": [], "horizon": None}
+
+
+def _run_bp_scan(horizon: str) -> None:
+    """מריץ סריקת Best Pick ברקע ללא חסימת ה-UI"""
+    try:
+        results = find_best_pick(horizon)
+        with _bp_scan_lock:
+            _bp_scan_state["results"] = results
+            _bp_scan_state["horizon"] = horizon
+            _bp_scan_state["running"] = False
+            _bp_scan_state["done"] = True
+    except Exception:
+        with _bp_scan_lock:
+            _bp_scan_state["running"] = False
+            _bp_scan_state["done"] = True
+
 
 def _bg_worker() -> None:
     """Thread רקע: בודק התראות מחיר + ציון כל X שעות"""
@@ -3765,23 +3784,47 @@ def main() -> None:
         st.markdown("---")
 
         # ── Best Pick ──────────────────────────────────────────────────────
-        if st.button("⚡ Best Pick Now", use_container_width=True, type="primary",
-                     key="best_pick_btn"):
-            st.session_state["run_best_pick"] = True
-            st.session_state["best_pick_results"] = []
+        with _bp_scan_lock:
+            _bp_is_running = _bp_scan_state["running"]
+            _bp_is_done    = _bp_scan_state["done"]
 
-        if st.session_state["run_best_pick"]:
-            with st.status("Scouting the market for Alpha...", expanded=True) as _bp_status:
-                st.write(f"Scanning {len(TICKER_LIST)} stocks — may take ~30s first time...")
-                _bp_results = find_best_pick(horizon)
-                st.session_state["best_pick_results"] = _bp_results
-                st.session_state["run_best_pick"] = False
-                _bp_status.update(label="Done! Best picks ready.", state="complete")
-                # ── התראות ציון — שלח הודעה אם מניות חדשות חצו את הסף ──
-                try:
-                    _check_and_fire_score_alerts(_bp_results, horizon)
-                except Exception:
-                    pass
+        if st.button("⚡ Best Pick Now", use_container_width=True, type="primary",
+                     key="best_pick_btn", disabled=_bp_is_running):
+            with _bp_scan_lock:
+                _bp_scan_state["running"] = True
+                _bp_scan_state["done"]    = False
+                _bp_scan_state["results"] = []
+            st.session_state["best_pick_results"] = []
+            threading.Thread(
+                target=_run_bp_scan, args=(horizon,), daemon=True, name="eden-bp-scan"
+            ).start()
+            st.rerun()
+
+        if _bp_is_running:
+            st.markdown(
+                '<div style="display:flex;align-items:center;gap:8px;'
+                'background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.2);'
+                'border-radius:10px;padding:8px 12px;font-size:12px;color:#6366f1">'
+                '<span style="font-size:16px">🔍</span>'
+                f'<span>סורק {len(TICKER_LIST)} מניות ברקע…<br>'
+                '<b>ניתן להמשיך להשתמש באתר</b></span></div>',
+                unsafe_allow_html=True)
+            # רענון אוטומטי כל 3 שניות עד שהסריקה מסתיימת
+            st.markdown(
+                '<meta http-equiv="refresh" content="3">',
+                unsafe_allow_html=True)
+
+        if _bp_is_done and _bp_scan_state["results"] and not st.session_state.get("best_pick_results"):
+            with _bp_scan_lock:
+                _fresh = _bp_scan_state["results"][:]
+                _fresh_horizon = _bp_scan_state["horizon"]
+                _bp_scan_state["done"] = False  # reset so it doesn't re-trigger
+            st.session_state["best_pick_results"] = _fresh
+            try:
+                _check_and_fire_score_alerts(_fresh, _fresh_horizon or horizon)
+            except Exception:
+                pass
+            st.rerun()
 
         if st.session_state["best_pick_results"]:
             _top5 = st.session_state["best_pick_results"][:5]
