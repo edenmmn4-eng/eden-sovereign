@@ -75,6 +75,15 @@ if bg_body and "fast_info" in bg_body and "sleep" not in bg_body:
 if "_bg_worker" not in src:
     warn("_bg_worker לא נמצא — הסוכן הרקע לא מוגדר")
 
+# ── 9. st.secrets ללא try/except ────────────────────────────────────────────
+for i, line in enumerate(lines, 1):
+    if "st.secrets" in line and "try" not in lines[max(0,i-3):i] \
+            and not line.strip().startswith("#"):
+        # בדוק שיש try בשורות הקרובות לפני
+        context = "\n".join(lines[max(0,i-4):i])
+        if "try:" not in context:
+            err(f"st.secrets ללא try/except — יקרוס כשאין secrets.toml (Streamlit Cloud)", i)
+
 # ── תוצאות ──────────────────────────────────────────────────────────────────
 print("\n" + "="*55)
 print("  Eden Sovereign — Regression Validator")

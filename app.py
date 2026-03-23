@@ -1333,7 +1333,10 @@ def _save_alerts_db(db: dict) -> None:
 
 
 def _tg_token() -> str:
-    return st.secrets.get("TELEGRAM_BOT_TOKEN", "")
+    try:
+        return st.secrets.get("TELEGRAM_BOT_TOKEN", "")
+    except Exception:
+        return ""
 
 
 def _poll_telegram_registrations() -> int:
@@ -3812,7 +3815,10 @@ def main() -> None:
             st.session_state["tg_phone"] = _tg_phone
 
         _tg_configured = bool(_tg_token())
-        _bot_name = st.secrets.get("TELEGRAM_BOT_NAME", "@eden_alerts_bot")
+        try:
+            _bot_name = st.secrets.get("TELEGRAM_BOT_NAME", "@eden_alerts_bot")
+        except Exception:
+            _bot_name = "@eden_alerts_bot"
 
         if not _tg_configured:
             st.markdown(
