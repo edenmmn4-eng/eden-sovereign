@@ -2796,27 +2796,51 @@ def build_financials(ticker: str) -> None:
 
 # ── Earnings Tab ───────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_earnings(ticker: str):
+    import time as _t
     obj = yf.Ticker(ticker)
-    # Try get_earnings_dates (requires lxml, installed)
+    # 1. get_earnings_dates method
+    for _attempt in range(3):
+        try:
+            df = obj.get_earnings_dates(limit=12)
+            if df is not None and not df.empty:
+                return df
+            break
+        except Exception as _e:
+            _emsg = str(_e).lower()
+            if ("too many requests" in _emsg or "429" in _emsg or "rate limit" in _emsg) and _attempt < 2:
+                _t.sleep(4 * (2 ** _attempt))
+                obj = yf.Ticker(ticker)
+                continue
+            break
+    # 2. earnings_dates property
     try:
-        df = obj.get_earnings_dates(limit=12)
+        df = obj.earnings_dates
         if df is not None and not df.empty:
             return df
     except Exception:
         pass
-    # Fallback: earnings_history (no lxml needed, decimal surprise)
+    # 3. earnings_history (older API)
     try:
         df = obj.earnings_history
         if df is not None and not df.empty:
-            # Normalise column names to match get_earnings_dates format
             df = df.rename(columns={
                 "epsActual":       "Reported EPS",
                 "epsEstimate":     "EPS Estimate",
                 "surprisePercent": "Surprise(%)",
             })
             if "Surprise(%)" in df.columns:
-                df["Surprise(%)"] = df["Surprise(%)"] * 100  # decimal → %
+                df["Surprise(%)"] = df["Surprise(%)"] * 100
+            df.index.name = "Earnings Date"
+            return df
+    except Exception:
+        pass
+    # 4. quarterly_earnings fallback
+    try:
+        df = obj.quarterly_earnings
+        if df is not None and not df.empty:
+            df = df.rename(columns={"Earnings": "Reported EPS"})
             df.index.name = "Earnings Date"
             return df
     except Exception:
@@ -2905,22 +2929,31 @@ def _fetch_insiders(ticker: str):
     obj = yf.Ticker(ticker)
     for _attempt in range(3):
         try:
+            # 1. insider_transactions property
             df = obj.insider_transactions
             if df is not None and not df.empty:
                 return df
-            # Fallback: newer yfinance API
+            # 2. get_insider_transactions method
             try:
                 df2 = obj.get_insider_transactions()
                 if df2 is not None and not df2.empty:
                     return df2
             except Exception:
                 pass
-            return df
+            # 3. insider_purchases fallback
+            try:
+                df3 = obj.insider_purchases
+                if df3 is not None and not df3.empty:
+                    return df3
+            except Exception:
+                pass
+            return None
         except Exception as _e:
             _msg = str(_e).lower()
             if ("too many requests" in _msg or "429" in _msg or "rate limit" in _msg) \
                     and _attempt < 2:
-                _t.sleep(3 * (2 ** _attempt))
+                _t.sleep(4 * (2 ** _attempt))
+                obj = yf.Ticker(ticker)
                 continue
             return None
     return None
