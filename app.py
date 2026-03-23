@@ -545,6 +545,12 @@ def inject_css() -> None:
       [data-testid="stTabs"] [role="tab"]{font-size:11px;white-space:nowrap}
       .term::after{display:none}
       #eden-dots-btn{top:10px;right:10px;width:36px;height:36px;font-size:20px}
+      /* החזר את כפתור ה-hamburger של Streamlit במובייל */
+      header{visibility:visible!important;display:flex!important;
+             background:transparent!important;box-shadow:none!important}
+      header [data-testid="stToolbar"]{visibility:hidden!important}
+      header [data-testid="stSidebarCollapsedControl"],
+      header button[kind="header"]{visibility:visible!important;display:flex!important}
     }
 
     /* ── Narrow phones (≤480px) ─────────────────────────────────── */
@@ -4097,7 +4103,7 @@ def main() -> None:
             st.warning("Not enough price history to render chart.")
         else:
             fig = build_chart(hist, tech, int(ma1), int(ma2), selected_indicators)
-            st.plotly_chart(fig, config={"displayModeBar": False}, use_container_width=True)
+            st.plotly_chart(fig, config={"displayModeBar": False, "scrollZoom": False}, use_container_width=True)
 
     with tab_rep:
         if is_etf:
