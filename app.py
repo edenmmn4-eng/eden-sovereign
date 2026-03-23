@@ -4365,40 +4365,38 @@ def main() -> None:
                 for _tk, _dp, _du, _di in sorted(_daily_rows, key=lambda x: x[1], reverse=True):
                     _c = "#10b981" if _dp >= 0 else "#ef4444"
                     _s = "+" if _dp >= 0 else ""
+                    _bg_row = "rgba(16,185,129,.06)" if _dp >= 0 else "rgba(239,68,68,.06)"
                     _rows_html += (
-                        f'<tr>'
-                        f'<td style="font-weight:700;color:#e2e8f0;padding:7px 12px">{_tk}</td>'
-                        f'<td style="color:{_c};font-weight:700;text-align:right;padding:7px 12px">{_s}{_dp:.2f}%</td>'
-                        f'<td style="color:{_c};text-align:right;padding:7px 12px">{_s}${_du:,.0f}</td>'
-                        f'<td style="color:{_c};text-align:right;padding:7px 12px">{_s}₪{_di:,.0f}</td>'
+                        f'<tr style="border-bottom:1px solid #f1f5f9;background:{_bg_row}">'
+                        f'<td style="font-weight:700;color:#1e293b;padding:8px 10px">{_tk}</td>'
+                        f'<td style="color:{_c};font-weight:700;text-align:right;padding:8px 10px">{_s}{_dp:.2f}%</td>'
+                        f'<td style="color:{_c};text-align:right;padding:8px 10px">{_s}${_du:,.0f}</td>'
+                        f'<td style="color:{_c};text-align:right;padding:8px 10px">{_s}₪{_di:,.0f}</td>'
                         f'</tr>'
                     )
 
                 st.markdown(f"""
-<div style="background:rgba(15,23,42,.6);border:1px solid rgba(99,102,241,.2);
-            border-radius:12px;overflow:hidden;margin-bottom:16px">
-  <div style="background:rgba(99,102,241,.12);padding:10px 14px;
-              font-size:13px;font-weight:700;color:#a5b4fc;letter-spacing:.05em">
-    📊 שינוי יומי
-  </div>
-  <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:monospace">
+<div style="margin-bottom:18px">
+  <div style="font-size:13px;font-weight:700;color:#6366f1;margin-bottom:8px;
+              letter-spacing:.04em">📊 שינוי יומי</div>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:'Inter',sans-serif">
     <thead>
-      <tr style="border-bottom:1px solid rgba(99,102,241,.15)">
-        <th style="text-align:left;padding:7px 12px;color:#64748b;font-weight:600">מניה</th>
-        <th style="text-align:right;padding:7px 12px;color:#64748b;font-weight:600">%</th>
-        <th style="text-align:right;padding:7px 12px;color:#64748b;font-weight:600">$</th>
-        <th style="text-align:right;padding:7px 12px;color:#64748b;font-weight:600">₪</th>
+      <tr style="border-bottom:2px solid #e2e8f0">
+        <th style="text-align:left;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">מניה</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">שינוי %</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">USD</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">ILS</th>
       </tr>
     </thead>
     <tbody>
       {_rows_html}
     </tbody>
     <tfoot>
-      <tr style="border-top:1px solid rgba(99,102,241,.25);background:rgba(99,102,241,.07)">
-        <td style="padding:8px 12px;font-weight:700;color:#e2e8f0">סה״כ תיק</td>
-        <td style="text-align:right;padding:8px 12px;font-weight:700;color:{_tot_color}">{_tot_sign}{_tot_pct:.2f}%</td>
-        <td style="text-align:right;padding:8px 12px;font-weight:700;color:{_tot_color}">{_tot_sign}${_total_daily_usd:,.0f}</td>
-        <td style="text-align:right;padding:8px 12px;font-weight:700;color:{_tot_color}">{_tot_sign}₪{_tot_ils:,.0f}</td>
+      <tr style="border-top:2px solid #e2e8f0">
+        <td style="padding:8px 10px;font-weight:700;color:#1e293b">סה״כ תיק</td>
+        <td style="text-align:right;padding:8px 10px;font-weight:700;font-size:14px;color:{_tot_color}">{_tot_sign}{_tot_pct:.2f}%</td>
+        <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_color}">{_tot_sign}${_total_daily_usd:,.0f}</td>
+        <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_color}">{_tot_sign}₪{_tot_ils:,.0f}</td>
       </tr>
     </tfoot>
   </table>
