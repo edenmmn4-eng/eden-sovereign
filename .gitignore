@@ -10,3 +10,5 @@ video/public/audio/
 *.wav
 .venv/
 venv/
+price_alerts.json
+portfolio_state.json
