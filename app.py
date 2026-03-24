@@ -1134,6 +1134,7 @@ def fetch_data(ticker: str) -> dict:
                 out["prev_close"] = float(hist["Close"].iloc[-2])
         elif not _hist_ok:
             out["error"] = out.get("error") or "Rate limited. Try after a while."
+            raise RuntimeError("rate_limited")  # אל תשמור ב-cache — נסה שוב בבקשה הבאה
 
     except RuntimeError:
         raise  # rate-limit skip-cache — אל תשמור ב-cache, העבר הלאה
@@ -4158,15 +4159,14 @@ def main() -> None:
         st.caption("⚠️ For educational purposes only. Not financial advice.")
 
     # ── Auto-analyze (no button needed) ──────────────────────────────────
-    with st.spinner(f"Analyzing {ticker}..."):
-        data = fetch_data(ticker)
-
-    hist = data["hist"]
-
-    # rate limit — hist ריק גם כן
-    if data.get("rate_limited") and hist.empty:
+    try:
+        with st.spinner(f"Analyzing {ticker}..."):
+            data = fetch_data(ticker)
+    except RuntimeError:
         st.warning(f"⚠️ Yahoo Finance חוסם זמנית בקשות. נסה שוב בעוד מספר דקות.")
         return
+
+    hist = data["hist"]
 
     if data["error"] and hist.empty:
         st.error(f"Failed to retrieve data for **{ticker}**: {data['error']}")
