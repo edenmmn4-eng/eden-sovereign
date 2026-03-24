@@ -8,6 +8,8 @@ warnings.filterwarnings("ignore")
 
 import json
 import os
+import math as _math
+import requests as _req
 import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
@@ -669,6 +671,60 @@ def fmt_price(v: float) -> str:
     return "N/A" if _isnan(v) or v == 0 else f"${v:,.2f}"
 
 
+# ── Supabase Persistent Cache ─────────────────────────────────────────────────
+def _supabase_get(ticker: str) -> dict | None:
+    """מחזיר info dict שנשמר ב-Supabase אם קיים ואם לא ישן מ-1 שעה."""
+    try:
+        url = st.secrets.get("SUPABASE_URL", "")
+        key = st.secrets.get("SUPABASE_KEY", "")
+        if not url or not key:
+            return None
+        r = _req.get(
+            f"{url}/rest/v1/ticker_cache",
+            params={"ticker": f"eq.{ticker}", "select": "data,cached_at"},
+            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            timeout=3,
+        )
+        if r.status_code == 200 and r.json():
+            row = r.json()[0]
+            from datetime import timezone, timedelta
+            cached_at = datetime.fromisoformat(row["cached_at"].replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) - cached_at < timedelta(hours=1):
+                return row["data"]
+    except Exception:
+        pass
+    return None
+
+
+def _supabase_set(ticker: str, info: dict) -> None:
+    """שומר info dict ב-Supabase לשימוש עתידי."""
+    try:
+        url = st.secrets.get("SUPABASE_URL", "")
+        key = st.secrets.get("SUPABASE_KEY", "")
+        if not url or not key:
+            return
+        # ודא שהנתונים ניתנים לסריאליזציה ל-JSON
+        def _safe(v):
+            if isinstance(v, float) and _math.isnan(v):
+                return None
+            if hasattr(v, "item"):
+                return v.item()
+            return v
+        safe_info = {k: _safe(v) for k, v in info.items()}
+        _req.post(
+            f"{url}/rest/v1/ticker_cache",
+            json={"ticker": ticker, "data": safe_info},
+            headers={
+                "apikey": key,
+                "Authorization": f"Bearer {key}",
+                "Prefer": "resolution=merge-duplicates",
+            },
+            timeout=3,
+        )
+    except Exception:
+        pass
+
+
 # ── Data Fetching ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_data(ticker: str) -> dict:
@@ -690,12 +746,18 @@ def fetch_data(ticker: str) -> dict:
     import time as _time
     try:
         obj = yf.Ticker(ticker)
-        # ── obj.info — ניסיון אחד בלבד. אם נכשל → fast_info מיד (אין retries) ──
-        info = {}
-        try:
-            info = obj.info or {}
-        except Exception:
-            pass
+        # ── obj.info — בדוק Supabase תחילה, אחרי כן yfinance ──────────────────
+        _cached_info = _supabase_get(ticker)
+        if _cached_info is not None:
+            info = _cached_info
+        else:
+            info = {}
+            try:
+                info = obj.info or {}
+            except Exception:
+                pass
+            if info:
+                _supabase_set(ticker, info)
         _info_ok = bool(info)
         out["info"] = info
 
