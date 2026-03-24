@@ -4507,6 +4507,7 @@ def main() -> None:
 
             _rows = []
             _ai_holdings = []
+            _pl_rows = []  # לסעיף רווח/הפסד
             for _h in _portfolio:
                 _t = _h["ticker"]
                 _cur = _prices.get(_t, 0.0)
@@ -4516,6 +4517,7 @@ def main() -> None:
                 _val_ils = _val_usd * usd_ils
                 _pl = (_cur - _buy) * _qty
                 _pl_pct = ((_cur / _buy) - 1) * 100 if _buy else 0
+                _pl_ils = _pl * usd_ils
                 _rows.append({
                     "Ticker": _t,
                     "Qty": _qty,
@@ -4526,6 +4528,7 @@ def main() -> None:
                     "P&L ($)": f"{'+'if _pl>=0 else ''}${_pl:,.0f}",
                     "P&L %": f"{'+'if _pl_pct>=0 else ''}{_pl_pct:.1f}%",
                 })
+                _pl_rows.append((_t, _buy, _cur, _qty, _pl_pct, _pl, _pl_ils))
                 _prev_close = float("nan")
                 try:
                     _d = fetch_data(_t)
@@ -4618,6 +4621,59 @@ def main() -> None:
         <td style="text-align:right;padding:8px 10px;font-weight:700;font-size:14px;color:{_tot_color}">{_tot_sign}{_tot_pct:.2f}%</td>
         <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_color}">{_tot_sign}${_total_daily_usd:,.0f}</td>
         <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_color}">{_tot_sign}₪{_tot_ils:,.0f}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+""", unsafe_allow_html=True)
+
+            # ── רווח/הפסד כולל מאז שער קנייה ─────────────────────────────
+            if _pl_rows:
+                _total_cost   = sum(b * q for _, b, _, q, *_ in _pl_rows)
+                _total_pl_usd = sum(pl for *_, pl, _ in _pl_rows)
+                _total_pl_ils = sum(pi for *_, pi in _pl_rows)
+                _total_pl_pct = (_total_pl_usd / _total_cost * 100) if _total_cost else 0
+                _tot_pl_color = "#10b981" if _total_pl_usd >= 0 else "#ef4444"
+                _tot_pl_sign  = "+" if _total_pl_usd >= 0 else ""
+
+                _pl_html_rows = ""
+                for _tk, _bp, _cp, _qq, _pp, _pu, _pi in sorted(_pl_rows, key=lambda x: x[4], reverse=True):
+                    _c  = "#10b981" if _pp >= 0 else "#ef4444"
+                    _sg = "+" if _pp >= 0 else ""
+                    _bg = "rgba(16,185,129,.06)" if _pp >= 0 else "rgba(239,68,68,.06)"
+                    _pl_html_rows += (
+                        f'<tr style="border-bottom:1px solid #f1f5f9;background:{_bg}">'
+                        f'<td style="font-weight:700;color:#1e293b;padding:8px 10px">{_tk}</td>'
+                        f'<td style="text-align:right;padding:8px 10px;color:#64748b">${_bp:,.2f}</td>'
+                        f'<td style="text-align:right;padding:8px 10px;color:#64748b">${_cp:,.2f}</td>'
+                        f'<td style="color:{_c};font-weight:700;text-align:right;padding:8px 10px">{_sg}{_pp:.2f}%</td>'
+                        f'<td style="color:{_c};text-align:right;padding:8px 10px">{_sg}${_pu:,.0f}</td>'
+                        f'<td style="color:{_c};text-align:right;padding:8px 10px">{_sg}₪{_pi:,.0f}</td>'
+                        f'</tr>'
+                    )
+
+                st.markdown(f"""
+<div style="margin-bottom:18px">
+  <div style="font-size:13px;font-weight:700;color:#6366f1;margin-bottom:8px;
+              letter-spacing:.04em">💰 רווח/הפסד כולל (מאז קנייה)</div>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:'Inter',sans-serif">
+    <thead>
+      <tr style="border-bottom:2px solid #e2e8f0">
+        <th style="text-align:left;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">מניה</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">שער קנייה</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">מחיר נוכחי</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">רווח %</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">USD</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">ILS</th>
+      </tr>
+    </thead>
+    <tbody>{_pl_html_rows}</tbody>
+    <tfoot>
+      <tr style="border-top:2px solid #e2e8f0">
+        <td colspan="3" style="padding:8px 10px;font-weight:700;color:#1e293b">סה״כ תיק</td>
+        <td style="text-align:right;padding:8px 10px;font-weight:700;font-size:14px;color:{_tot_pl_color}">{_tot_pl_sign}{_total_pl_pct:.2f}%</td>
+        <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_pl_color}">{_tot_pl_sign}${_total_pl_usd:,.0f}</td>
+        <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_pl_color}">{_tot_pl_sign}₪{_total_pl_ils:,.0f}</td>
       </tr>
     </tfoot>
   </table>
