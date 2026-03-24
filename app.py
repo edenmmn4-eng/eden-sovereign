@@ -690,26 +690,12 @@ def fetch_data(ticker: str) -> dict:
     import time as _time
     try:
         obj = yf.Ticker(ticker)
-        # ── obj.info with retry on rate-limit or empty response ──────────────
+        # ── obj.info — ניסיון אחד בלבד. אם נכשל → fast_info מיד (אין retries) ──
         info = {}
-        for _attempt in range(5):
-            try:
-                info = obj.info or {}
-            except Exception as _e:
-                _emsg = str(_e).lower()
-                if ("too many requests" in _emsg or "rate limit" in _emsg or "429" in _emsg) \
-                        and _attempt < 4:
-                    _time.sleep(4 * (2 ** _attempt))  # 4s → 8s → 16s → 32s
-                    obj = yf.Ticker(ticker)  # fresh object
-                    continue
-                break  # non-rate-limit error — give up
-            # גם dict ריק = rate limit — retry
-            if not info and _attempt < 4:
-                _time.sleep(4 * (2 ** _attempt))  # 4s → 8s → 16s → 32s
-                obj = yf.Ticker(ticker)  # fresh object
-                continue
-            break
-        # אם info ריק — rate limit — המשך עם fast_info בלבד (שמור ב-cache!)
+        try:
+            info = obj.info or {}
+        except Exception:
+            pass
         _info_ok = bool(info)
         out["info"] = info
 
