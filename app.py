@@ -4110,14 +4110,20 @@ def main() -> None:
     with st.spinner(f"Analyzing {ticker}..."):
         data = fetch_data(ticker)
 
-    if data["error"] and data["hist"].empty:
+    hist = data["hist"]
+
+    # rate limit — hist ריק גם כן
+    if data.get("rate_limited") and hist.empty:
+        st.warning(f"⚠️ Yahoo Finance חוסם זמנית בקשות. נסה שוב בעוד מספר דקות.")
+        return
+
+    if data["error"] and hist.empty:
         st.error(f"Failed to retrieve data for **{ticker}**: {data['error']}")
         return
 
     if data.get("rate_limited"):
-        st.warning(f"⚠️ נתוני פונדמנטלים זמנית לא זמינים עבור **{ticker}** (Yahoo Finance rate limit). הגרף והמחיר מוצגים מנתוני מחיר בלבד.")
+        st.warning(f"⚠️ נתוני פונדמנטלים זמנית חסרים ({ticker}) — Yahoo Finance rate limit. הגרף מוצג.")
 
-    hist = data["hist"]
     if hist.empty:
         st.warning(f"No price history for **{ticker}**. The ticker may be invalid or delisted.")
         return
