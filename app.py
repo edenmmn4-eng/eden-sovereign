@@ -709,9 +709,8 @@ def fetch_data(ticker: str) -> dict:
                 obj = yf.Ticker(ticker)  # fresh object
                 continue
             break
-        # אם info עדיין ריק לגמרי — rate limit — אל תשמור ב-cache
-        if not info:
-            raise RuntimeError(f"fetch_data({ticker}): empty info — rate limited, skip cache")
+        # אם info ריק — rate limit — המשך עם fast_info בלבד (שמור ב-cache!)
+        _info_ok = bool(info)
         out["info"] = info
 
         # ── fast_info (always works — cached separately by yfinance) ──────────
@@ -775,9 +774,15 @@ def fetch_data(ticker: str) -> dict:
                     return None
             return None
 
-        _ann_income = _stmt_fetch("income_stmt", "financials")       # annual income stmt
-        _q_income   = _stmt_fetch("quarterly_income_stmt", "quarterly_financials")
-        _cf_stmt    = _stmt_fetch("cashflow", "cash_flow")            # annual cash flow
+        # דלג על בקשות נוספות כשה-info ריק (rate limited)
+        if not _info_ok:
+            out["rate_limited"] = True
+            _ann_income = _q_income = _cf_stmt = None
+        else:
+            out["rate_limited"] = False
+            _ann_income = _stmt_fetch("income_stmt", "financials")       # annual income stmt
+            _q_income   = _stmt_fetch("quarterly_income_stmt", "quarterly_financials")
+            _cf_stmt    = _stmt_fetch("cashflow", "cash_flow")            # annual cash flow
         _ann_fin    = _ann_income  # same data; reuse
 
         # ── P/E fallback: multiple sources ───────────────────────────────────
@@ -4103,20 +4108,14 @@ def main() -> None:
 
     # ── Auto-analyze (no button needed) ──────────────────────────────────
     with st.spinner(f"Analyzing {ticker}..."):
-        try:
-            data = fetch_data(ticker)
-        except RuntimeError:
-            # rate limit — נסה שוב פעם אחת אחרי עיכוב קצר
-            import time as _t; _t.sleep(6)
-            try:
-                data = fetch_data(ticker)
-            except RuntimeError:
-                st.error(f"Failed to retrieve data for **{ticker}**: Rate limited. Try after a while.")
-                return
+        data = fetch_data(ticker)
 
     if data["error"] and data["hist"].empty:
         st.error(f"Failed to retrieve data for **{ticker}**: {data['error']}")
         return
+
+    if data.get("rate_limited"):
+        st.warning(f"⚠️ נתוני פונדמנטלים זמנית לא זמינים עבור **{ticker}** (Yahoo Finance rate limit). הגרף והמחיר מוצגים מנתוני מחיר בלבד.")
 
     hist = data["hist"]
     if hist.empty:
