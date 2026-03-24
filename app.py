@@ -674,6 +674,9 @@ def fmt_price(v: float) -> str:
 # ── Supabase Persistent Cache ─────────────────────────────────────────────────
 def _supabase_get(ticker: str) -> dict | None:
     """מחזיר info dict שנשמר ב-Supabase אם קיים ואם לא ישן מ-1 שעה."""
+    import threading as _threading
+    if _threading.current_thread() is not _threading.main_thread():
+        return None  # אל תגע ב-Supabase מ-background threads
     try:
         url = st.secrets.get("SUPABASE_URL", "")
         key = st.secrets.get("SUPABASE_KEY", "")
