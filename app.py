@@ -670,7 +670,7 @@ def fmt_price(v: float) -> str:
 
 
 # ── Data Fetching ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def fetch_data(ticker: str) -> dict:
     out: dict = {
         "ticker": ticker, "info": {}, "hist": pd.DataFrame(),
