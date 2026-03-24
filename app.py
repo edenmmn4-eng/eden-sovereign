@@ -1964,8 +1964,25 @@ def portfolio_ai_analysis(holdings: list, usd_ils: float) -> str:
         "**שינוי יומי:** N/A"
     )
 
+    total_cost = sum(h.get("buy_price", 0) * h.get("qty", 0) for h in holdings)
+    total_pl_usd = total_val - total_cost
+    total_pl_pct = (total_pl_usd / total_cost * 100) if total_cost > 0 else 0
+    total_pl_ils = total_pl_usd * usd_ils
+    _pl_sign  = "+" if total_pl_usd >= 0 else ""
+    _pl_emoji = "📈" if total_pl_usd >= 0 else "📉"
+
     lines = [
         f"**שווי תיק כולל:** ${total_val:,.0f} | ₪{total_ils:,.0f}",
+    ]
+    if total_cost > 0:
+        lines.append(
+            f"**עלות השקעה:** ${total_cost:,.0f} | ₪{total_cost * usd_ils:,.0f}"
+        )
+        lines.append(
+            f"{_pl_emoji} **רווח/הפסד כולל:** {_pl_sign}{_pl_pct:.1f}% "
+            f"| {_pl_sign}${total_pl_usd:,.0f} | {_pl_sign}₪{total_pl_ils:,.0f}"
+        )
+    lines += [
         f"**ציון ממוצע:** {avg_score:.0f}/100",
     ]
     if top_pct > 50:
@@ -4542,6 +4559,7 @@ def main() -> None:
                     "ticker": _t, "sector": _sector, "qty": _qty,
                     "value_usd": _val_usd, "score": _sc,
                     "current_price": _cur, "prev_close": _prev_close,
+                    "buy_price": _buy,
                 })
 
             st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
