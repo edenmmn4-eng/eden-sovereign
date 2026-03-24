@@ -1979,7 +1979,7 @@ def portfolio_ai_analysis(holdings: list, usd_ils: float) -> str:
             f"**עלות השקעה:** ${total_cost:,.0f} | ₪{total_cost * usd_ils:,.0f}"
         )
         lines.append(
-            f"{_pl_emoji} **רווח/הפסד כולל:** {_pl_sign}{_pl_pct:.1f}% "
+            f"{_pl_emoji} **רווח/הפסד כולל:** {_pl_sign}{total_pl_pct:.1f}% "
             f"| {_pl_sign}${total_pl_usd:,.0f} | {_pl_sign}₪{total_pl_ils:,.0f}"
         )
     lines += [
