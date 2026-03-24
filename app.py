@@ -4418,13 +4418,25 @@ def main() -> None:
         if is_etf:
             st.info("Earnings data is not applicable to ETFs/funds.")
         else:
-            build_earnings(ticker, data["info"])
+            _earn_key = f"earn_loaded_{ticker}"
+            if not st.session_state.get(_earn_key):
+                if st.button("📊 טען נתוני הכנסות", key="load_earn_btn"):
+                    st.session_state[_earn_key] = True
+                    st.rerun()
+            else:
+                build_earnings(ticker, data["info"])
 
     with tab_ins:
         if is_etf:
             st.info("Insider transactions are not applicable to ETFs/funds.")
         else:
-            build_insiders(ticker)
+            _ins_key = f"ins_loaded_{ticker}"
+            if not st.session_state.get(_ins_key):
+                if st.button("📊 טען נתוני פעילות פנים", key="load_ins_btn"):
+                    st.session_state[_ins_key] = True
+                    st.rerun()
+            else:
+                build_insiders(ticker)
 
     if tab_slides is not None:
         with tab_slides:
