@@ -2813,83 +2813,29 @@ def build_financials(ticker: str) -> None:
 
 # ── Earnings Tab ───────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
-def _yahoo_quotesummary(ticker: str, modules: list) -> dict:
-    """קריאה ישירה ל-Yahoo Finance v10 API — אמין יותר מ-yfinance properties."""
-    import requests as _req
-    url = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
-    params = {"modules": ",".join(modules), "corsDomain": "finance.yahoo.com"}
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-    try:
-        r = _req.get(url, params=params, headers=headers, timeout=10)
-        data = r.json()
-        results = data.get("quoteSummary", {}).get("result") or []
-        return results[0] if results else {}
-    except Exception:
-        return {}
-
-
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_earnings(ticker: str):
-    import time as _t
-    # ── שיטה 1: Yahoo Finance v10 API ישיר ────────────────────────────────
-    try:
-        qdata = _yahoo_quotesummary(ticker, ["earningsHistory", "calendarEvents"])
-        history = qdata.get("earningsHistory", {}).get("history", [])
-        if history:
-            rows = []
-            for item in history:
-                date_raw = item.get("quarter", {}).get("fmt") or item.get("period")
-                eps_est  = item.get("epsEstimate", {}).get("raw")
-                eps_act  = item.get("epsActual",   {}).get("raw")
-                surp     = item.get("surprisePercent", {}).get("raw")
-                rows.append({
-                    "Earnings Date": date_raw,
-                    "EPS Estimate":  eps_est,
-                    "Reported EPS":  eps_act,
-                    "Surprise(%)":   round(surp * 100, 2) if surp is not None else None,
-                })
-            df = pd.DataFrame(rows).set_index("Earnings Date")
-            if not df.empty:
-                return df
-    except Exception:
-        pass
-    # ── שיטה 2: yfinance get_earnings_dates ────────────────────────────────
     obj = yf.Ticker(ticker)
-    for _attempt in range(3):
-        try:
-            df = obj.get_earnings_dates(limit=12)
-            if df is not None and not df.empty:
-                return df
-            break
-        except Exception as _e:
-            _emsg = str(_e).lower()
-            if ("too many requests" in _emsg or "429" in _emsg or "rate limit" in _emsg) and _attempt < 2:
-                _t.sleep(4 * (2 ** _attempt))
-                obj = yf.Ticker(ticker)
-                continue
-            break
-    # ── שיטה 3: earnings_dates property ────────────────────────────────────
     try:
-        df = obj.earnings_dates
+        df = obj.get_earnings_dates(limit=12)
         if df is not None and not df.empty:
             return df
     except Exception:
         pass
-    # ── שיטה 4: earnings_history / quarterly_earnings ──────────────────────
-    for attr, rename in [
-        ("earnings_history", {"epsActual": "Reported EPS", "epsEstimate": "EPS Estimate", "surprisePercent": "Surprise(%)"}),
-        ("quarterly_earnings", {"Earnings": "Reported EPS"}),
-    ]:
-        try:
-            df = getattr(obj, attr)
-            if df is not None and not df.empty:
-                df = df.rename(columns=rename)
-                if "Surprise(%)" in df.columns and attr == "earnings_history":
-                    df["Surprise(%)"] = df["Surprise(%)"] * 100
-                df.index.name = "Earnings Date"
-                return df
-        except Exception:
-            pass
+    try:
+        df = obj.earnings_history
+        if df is not None and not df.empty:
+            df = df.rename(columns={
+                "epsActual":       "Reported EPS",
+                "epsEstimate":     "EPS Estimate",
+                "surprisePercent": "Surprise(%)",
+            })
+            if "Surprise(%)" in df.columns:
+                df["Surprise(%)"] = df["Surprise(%)"] * 100
+            df.index.name = "Earnings Date"
+            return df
+    except Exception:
+        pass
     return None
 
 
@@ -2971,27 +2917,6 @@ def build_earnings(ticker: str, info: dict) -> None:
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_insiders(ticker: str):
     import time as _t
-    # ── שיטה 1: Yahoo Finance v10 API ישיר ────────────────────────────────
-    try:
-        qdata = _yahoo_quotesummary(ticker, ["insiderTransactions"])
-        txns = qdata.get("insiderTransactions", {}).get("transactions", [])
-        if txns:
-            rows = []
-            for item in txns:
-                rows.append({
-                    "Date":        item.get("startDate", {}).get("fmt"),
-                    "Insider":     item.get("filerName"),
-                    "Position":    item.get("filerRelation"),
-                    "Transaction": item.get("transactionText"),
-                    "Shares":      item.get("shares", {}).get("raw"),
-                    "Value":       item.get("value", {}).get("raw"),
-                })
-            df = pd.DataFrame(rows)
-            if not df.empty:
-                return df
-    except Exception:
-        pass
-    # ── שיטה 2: yfinance properties ─────────────────────────────────────
     obj = yf.Ticker(ticker)
     for _attempt in range(3):
         try:
@@ -3004,19 +2929,12 @@ def _fetch_insiders(ticker: str):
                     return df2
             except Exception:
                 pass
-            try:
-                df3 = obj.insider_purchases
-                if df3 is not None and not df3.empty:
-                    return df3
-            except Exception:
-                pass
             return None
         except Exception as _e:
             _msg = str(_e).lower()
             if ("too many requests" in _msg or "429" in _msg or "rate limit" in _msg) \
                     and _attempt < 2:
-                _t.sleep(4 * (2 ** _attempt))
-                obj = yf.Ticker(ticker)
+                _t.sleep(3 * (2 ** _attempt))
                 continue
             return None
     return None
@@ -4418,25 +4336,13 @@ def main() -> None:
         if is_etf:
             st.info("Earnings data is not applicable to ETFs/funds.")
         else:
-            _earn_key = f"earn_loaded_{ticker}"
-            if not st.session_state.get(_earn_key):
-                if st.button("📊 טען נתוני הכנסות", key="load_earn_btn"):
-                    st.session_state[_earn_key] = True
-                    st.rerun()
-            else:
-                build_earnings(ticker, data["info"])
+            build_earnings(ticker, data["info"])
 
     with tab_ins:
         if is_etf:
             st.info("Insider transactions are not applicable to ETFs/funds.")
         else:
-            _ins_key = f"ins_loaded_{ticker}"
-            if not st.session_state.get(_ins_key):
-                if st.button("📊 טען נתוני פעילות פנים", key="load_ins_btn"):
-                    st.session_state[_ins_key] = True
-                    st.rerun()
-            else:
-                build_insiders(ticker)
+            build_insiders(ticker)
 
     if tab_slides is not None:
         with tab_slides:
