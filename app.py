@@ -1874,15 +1874,14 @@ def _run_bp_scan(horizon: str) -> None:
 def _supabase_load_portfolio(phone: str) -> list | None:
     """טוען portfolio מ-Supabase לפי מספר טלפון."""
     try:
-        url = st.secrets.get("SUPABASE_URL", "")
-        key = st.secrets.get("SUPABASE_KEY", "")
+        url, key = _sb_creds()
         if not url or not key:
             return None
         r = _req.get(
             f"{url}/rest/v1/user_portfolios",
             params={"phone": f"eq.{phone}", "select": "portfolio"},
             headers={"apikey": key, "Authorization": f"Bearer {key}"},
-            timeout=3,
+            timeout=5,
         )
         if r.status_code == 200 and r.json():
             data = r.json()[0]["portfolio"]
@@ -1893,25 +1892,26 @@ def _supabase_load_portfolio(phone: str) -> list | None:
     return None
 
 
-def _supabase_save_portfolio(phone: str, portfolio: list) -> None:
-    """שומר portfolio ב-Supabase לפי מספר טלפון."""
+def _supabase_save_portfolio(phone: str, portfolio: list) -> bool:
+    """שומר portfolio ב-Supabase לפי מספר טלפון. מחזיר True אם הצליח."""
     try:
-        url = st.secrets.get("SUPABASE_URL", "")
-        key = st.secrets.get("SUPABASE_KEY", "")
+        url, key = _sb_creds()
         if not url or not key:
-            return
-        _req.post(
+            return False
+        r = _req.post(
             f"{url}/rest/v1/user_portfolios",
             json={"phone": phone, "portfolio": portfolio},
             headers={
                 "apikey": key,
                 "Authorization": f"Bearer {key}",
                 "Prefer": "resolution=merge-duplicates",
+                "Content-Type": "application/json",
             },
-            timeout=3,
+            timeout=5,
         )
+        return r.status_code in (200, 201, 204)
     except Exception:
-        pass
+        return False
 
 
 def _load_user_portfolio(phone: str) -> list:
