@@ -699,14 +699,24 @@ def fmt_price(v: float) -> str:
 
 
 # ── Supabase Persistent Cache ─────────────────────────────────────────────────
+def _sb_creds() -> tuple[str, str]:
+    """מחזיר (url, key) ל-Supabase — תומך ב-background threads."""
+    try:
+        url = st.secrets.get("SUPABASE_URL", "") or os.environ.get("SUPABASE_URL", "")
+        key = st.secrets.get("SUPABASE_KEY", "") or os.environ.get("SUPABASE_KEY", "")
+    except Exception:
+        url = os.environ.get("SUPABASE_URL", "")
+        key = os.environ.get("SUPABASE_KEY", "")
+    return url, key
+
+
 def _supabase_get(ticker: str) -> dict | None:
     """מחזיר info dict שנשמר ב-Supabase אם קיים ואם לא ישן מ-1 שעה."""
     import threading as _threading
     if _threading.current_thread().name == "eden-alert-scheduler":
         return None  # אל תגע ב-Supabase מ-background thread של התראות
     try:
-        url = st.secrets.get("SUPABASE_URL", "")
-        key = st.secrets.get("SUPABASE_KEY", "")
+        url, key = _sb_creds()
         if not url or not key:
             return None
         r = _req.get(
@@ -729,8 +739,7 @@ def _supabase_get(ticker: str) -> dict | None:
 def _supabase_set(ticker: str, info: dict) -> None:
     """שומר info dict ב-Supabase לשימוש עתידי."""
     try:
-        url = st.secrets.get("SUPABASE_URL", "")
-        key = st.secrets.get("SUPABASE_KEY", "")
+        url, key = _sb_creds()
         if not url or not key:
             return
         # ודא שהנתונים ניתנים לסריאליזציה ל-JSON
@@ -758,8 +767,7 @@ def _supabase_set(ticker: str, info: dict) -> None:
 def _supabase_get_all() -> dict:
     """מחזיר {ticker: data} לכל המניות הטריות ב-Supabase (< שעה) — bulk query אחד."""
     try:
-        url = st.secrets.get("SUPABASE_URL", "")
-        key = st.secrets.get("SUPABASE_KEY", "")
+        url, key = _sb_creds()
         if not url or not key:
             return {}
         from datetime import timezone
@@ -1781,6 +1789,86 @@ def _ensure_bg_scheduler() -> None:
                 target=_bg_worker, daemon=True, name="eden-alert-scheduler"
             )
             _bg_thread.start()
+
+
+# ── Best Pick Background Scanner ──────────────────────────────────────────────
+_bp_scan_lock = threading.Lock()
+_bp_scan_state: dict = {
+    "running": False,
+    "progress": 0,
+    "total": 0,
+    "results": {},    # {horizon: [(ticker, score), ...]}
+}
+
+
+def _run_bp_scan(horizon: str) -> None:
+    """סורק את כל TICKER_LIST ברקע — אינו חוסם את ממשק המשתמש."""
+    try:
+        tickers = [t for t in TICKER_LIST if t not in _CRYPTO_MINING_EXCLUDE]
+        with _bp_scan_lock:
+            _bp_scan_state.update({"running": True, "progress": 0, "total": len(tickers)})
+
+        # שלוף cache בulk מ-Supabase
+        try:
+            all_cached = _supabase_get_all()
+        except Exception:
+            all_cached = {}
+
+        _yf_sem = threading.Semaphore(2)   # max 2 בקשות yfinance בו-זמניות
+        _done = [0]
+
+        def _score_one_bg(t):
+            try:
+                if t not in all_cached:
+                    with _yf_sem:
+                        _time.sleep(0.5)
+                try:
+                    d = fetch_data(t)
+                except Exception:
+                    return t, 0
+                if d["hist"].empty or d.get("is_etf"):
+                    return t, 0
+                if d["mkt_cap"] < 1_000_000_000:
+                    return t, 0
+                _cp = d.get("current_price", 0) or 0
+                if _isnan(float(_cp)) or float(_cp) < 1.0:
+                    return t, 0
+                if len(d["hist"]) < 60:
+                    return t, 0
+                _avg_vol = d["hist"]["Volume"].tail(30).mean() if "Volume" in d["hist"].columns else 0
+                if _avg_vol < 100_000:
+                    return t, 0
+                if d.get("quote_type") not in ("EQUITY", None, ""):
+                    return t, 0
+                has_pe     = not _isnan(d["pe_ratio"]) and d["pe_ratio"] > 0
+                has_cagr   = d["revenue_cagr"] > 0.01
+                has_margin = not _isnan(d["gross_margins"]) and d["gross_margins"] > 0
+                if not (has_pe or has_cagr or has_margin):
+                    return t, 0
+                tech = compute_technicals(d["hist"])
+                s = compute_score(d, tech, horizon, use_news=True)
+                missing = sum([not has_pe, not has_cagr, not has_margin])
+                if missing == 1: s = max(0, s - 5)
+                elif missing == 2: s = max(0, s - 15)
+                if d["revenue_cagr"] < -0.05: s = max(0, s - 8)
+                return t, s
+            except Exception:
+                return t, 0
+            finally:
+                _done[0] += 1
+                with _bp_scan_lock:
+                    _bp_scan_state["progress"] = _done[0]
+
+        with ThreadPoolExecutor(max_workers=8, thread_name_prefix="bp-scanner") as ex:
+            results = list(ex.map(_score_one_bg, tickers))
+
+        results.sort(key=lambda x: x[1], reverse=True)
+        with _bp_scan_lock:
+            _bp_scan_state["results"][horizon] = results
+            _bp_scan_state["running"] = False
+    except Exception:
+        with _bp_scan_lock:
+            _bp_scan_state["running"] = False
 
 
 def _supabase_load_portfolio(phone: str) -> list | None:
@@ -4023,26 +4111,25 @@ def main() -> None:
         # ── Best Pick ──────────────────────────────────────────────────────
         st.markdown("---")
         st.markdown("**⚡ Best Pick**")
-        if st.button("סרוק מניות מובילות", use_container_width=True,
-                     type="primary", key="bp_btn"):
-            with st.spinner("סורק מניות…"):
-                try:
-                    _bp_raw = find_best_pick(horizon)
-                    _bp_filtered = [(t, s) for t, s in _bp_raw if s > 0]
-                    st.session_state["best_pick_results"] = _bp_filtered
-                    st.session_state["best_pick_done"] = True
-                    try:
-                        _check_and_fire_score_alerts(_bp_raw, horizon)
-                    except Exception:
-                        pass
-                except Exception:
-                    st.session_state["best_pick_results"] = []
-                    st.session_state["best_pick_done"] = True
 
-        if st.session_state.get("best_pick_done"):
-            _top = st.session_state.get("best_pick_results", [])
+        with _bp_scan_lock:
+            _scan_running  = _bp_scan_state["running"]
+            _scan_progress = _bp_scan_state["progress"]
+            _scan_total    = _bp_scan_state["total"]
+            _scan_results  = _bp_scan_state["results"].get(horizon)
+
+        if _scan_running:
+            # ── סריקה פעילה: הצג progress + כפתור רענון ──────────────────
+            _pct = _scan_progress / _scan_total if _scan_total else 0
+            st.progress(_pct, text=f"סורק… {_scan_progress}/{_scan_total} מניות")
+            st.caption("ניתן להמשיך להשתמש באתר — הסריקה ברקע")
+            if st.button("🔄 רענן תוצאות", use_container_width=True, key="bp_refresh_btn"):
+                st.rerun()
+        elif _scan_results is not None:
+            # ── תוצאות זמינות ─────────────────────────────────────────────
+            _top = [(t, s) for t, s in _scan_results if s > 0][:5]
             if _top:
-                for _rank, (_t, _s) in enumerate(_top[:5], 1):
+                for _rank, (_t, _s) in enumerate(_top, 1):
                     if _s >= 80:   _rc, _rl = "#10b981", "STRONG BUY"
                     elif _s >= 65: _rc, _rl = "#f59e0b", "BUY"
                     elif _s >= 45: _rc, _rl = "#f97316", "HOLD"
@@ -4056,12 +4143,41 @@ def main() -> None:
                         f'<span style="font-size:11px;color:#6366f1;font-weight:700">{_s}</span>'
                         f'</div><div style="font-size:10px;font-weight:700;color:{_rc}">{_rl}</div></div>',
                         unsafe_allow_html=True)
-                if st.button(f"נתח {_top[0][0]}", use_container_width=True, key="bp_analyze_btn"):
-                    st.session_state["pending_ticker"] = _top[0][0]
-                    st.session_state["best_pick_done"] = False
-                    st.rerun()
+                _bp_cols = st.columns(2)
+                with _bp_cols[0]:
+                    if st.button(f"נתח {_top[0][0]}", use_container_width=True, key="bp_analyze_btn"):
+                        st.session_state["pending_ticker"] = _top[0][0]
+                        with _bp_scan_lock:
+                            _bp_scan_state["results"].pop(horizon, None)
+                        st.rerun()
+                with _bp_cols[1]:
+                    if st.button("🔄 סרוק שוב", use_container_width=True, key="bp_rescan_btn"):
+                        with _bp_scan_lock:
+                            _bp_scan_state["results"].pop(horizon, None)
+                        threading.Thread(
+                            target=_run_bp_scan, args=(horizon,),
+                            daemon=True, name="bp-scanner"
+                        ).start()
+                        st.rerun()
             else:
                 st.warning("לא נמצאו מניות — נסה שוב")
+                if st.button("🔄 סרוק שוב", use_container_width=True, key="bp_rescan2_btn"):
+                    with _bp_scan_lock:
+                        _bp_scan_state["results"].pop(horizon, None)
+                    threading.Thread(
+                        target=_run_bp_scan, args=(horizon,),
+                        daemon=True, name="bp-scanner"
+                    ).start()
+                    st.rerun()
+        else:
+            # ── כפתור התחלה ───────────────────────────────────────────────
+            if st.button("⚡ סרוק מניות מובילות", use_container_width=True,
+                         type="primary", key="bp_btn"):
+                threading.Thread(
+                    target=_run_bp_scan, args=(horizon,),
+                    daemon=True, name="bp-scanner"
+                ).start()
+                st.rerun()
 
         # ── 👤 חשבון משתמש + 🔔 התראות מחיר — Telegram ──────────────────────
         st.markdown("---")
