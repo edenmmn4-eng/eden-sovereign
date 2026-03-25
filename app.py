@@ -2447,25 +2447,27 @@ def build_chart(
                              title_font=dict(size=10), tickfont=dict(size=9))
 
     # ── Global layout ─────────────────────────────────────────────────────
-    spike = dict(showspikes=True, spikemode="across", spikesnap="cursor",
-                 spikecolor="#6366f1", spikethickness=1, spikedash="solid")
+    x_spike = dict(showspikes=True, spikemode="across", spikesnap="cursor",
+                   spikecolor="#6366f1", spikethickness=1, spikedash="solid")
+    y_spike = dict(showspikes=True, spikemode="across", spikesnap="cursor",
+                   spikecolor="#6366f1", spikethickness=1, spikedash="solid")
     fig.update_layout(
         height=chart_height,
         paper_bgcolor="#fcfcfc", plot_bgcolor="#fcfcfc",
         margin=dict(l=10, r=10, t=20, b=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.01,
                     xanchor="left", x=0, font=dict(size=10)),
-        hovermode="x unified",
+        hovermode="x",
         xaxis_rangeslider_visible=False,
-        xaxis=dict(**spike, gridcolor="rgba(0,0,0,.04)"),
-        yaxis=dict(**spike, gridcolor="rgba(0,0,0,.04)"),
-        xaxis2=dict(**spike),
-        yaxis2=dict(gridcolor="rgba(0,0,0,.04)"),
+        xaxis=dict(**x_spike, gridcolor="rgba(0,0,0,.04)"),
+        yaxis=dict(**y_spike, gridcolor="rgba(0,0,0,.04)"),
+        xaxis2=dict(**x_spike),
+        yaxis2=dict(**y_spike, gridcolor="rgba(0,0,0,.04)"),
         font=dict(family="Inter, sans-serif", size=11))
-    # Apply gridcolor to all indicator axes
+    # Apply gridcolor + spikes to all indicator axes
     for i in range(3, n_rows+1):
-        fig.update_xaxes(dict(**spike), row=i, col=1)
-        fig.update_yaxes(gridcolor="rgba(0,0,0,.04)", row=i, col=1)
+        fig.update_xaxes(dict(**x_spike), row=i, col=1)
+        fig.update_yaxes(dict(**y_spike, gridcolor="rgba(0,0,0,.04)"), row=i, col=1)
 
     fig.update_traces(xaxis="x1")
     return fig
