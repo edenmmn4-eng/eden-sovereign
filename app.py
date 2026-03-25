@@ -1703,23 +1703,25 @@ _bg_lock = threading.Lock()
 
 # ── Best Pick background scan ──────────────────────────────────────────────────
 _bp_scan_lock = threading.Lock()
-_bp_scan_state: dict = {"running": False, "done": False, "results": [], "horizon": None}
+_bp_scan_state: dict = {"running": False, "done": False, "results": [], "horizon": None, "error": None}
 
 
 def _run_bp_scan(horizon: str) -> None:
     """מריץ סריקת Best Pick ברקע ללא חסימת ה-UI"""
-    _time.sleep(3)  # המתן שה-UI יסיים את הבקשה הנוכחית לפני שמתחילים
+    _time.sleep(2)
     try:
         results = find_best_pick(horizon)
         with _bp_scan_lock:
             _bp_scan_state["results"] = results
             _bp_scan_state["horizon"] = horizon
             _bp_scan_state["running"] = False
-            _bp_scan_state["done"] = True
-    except Exception:
+            _bp_scan_state["done"]    = True
+            _bp_scan_state["error"]   = None
+    except Exception as _e:
         with _bp_scan_lock:
             _bp_scan_state["running"] = False
-            _bp_scan_state["done"] = True
+            _bp_scan_state["done"]    = True
+            _bp_scan_state["error"]   = str(_e)
 
 
 def _bg_worker() -> None:
@@ -1762,10 +1764,56 @@ def _ensure_bg_scheduler() -> None:
             _bg_thread.start()
 
 
-def _load_user_portfolio(phone: str) -> list:
-    """טוען את ה-Portfolio מחשבון הטלגרם של המשתמש"""
+def _supabase_load_portfolio(phone: str) -> list | None:
+    """טוען portfolio מ-Supabase לפי מספר טלפון."""
     try:
-        norm = _normalize_phone(phone)
+        url = st.secrets.get("SUPABASE_URL", "")
+        key = st.secrets.get("SUPABASE_KEY", "")
+        if not url or not key:
+            return None
+        r = _req.get(
+            f"{url}/rest/v1/user_portfolios",
+            params={"phone": f"eq.{phone}", "select": "portfolio"},
+            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            timeout=3,
+        )
+        if r.status_code == 200 and r.json():
+            data = r.json()[0]["portfolio"]
+            if isinstance(data, list):
+                return data
+    except Exception:
+        pass
+    return None
+
+
+def _supabase_save_portfolio(phone: str, portfolio: list) -> None:
+    """שומר portfolio ב-Supabase לפי מספר טלפון."""
+    try:
+        url = st.secrets.get("SUPABASE_URL", "")
+        key = st.secrets.get("SUPABASE_KEY", "")
+        if not url or not key:
+            return
+        _req.post(
+            f"{url}/rest/v1/user_portfolios",
+            json={"phone": phone, "portfolio": portfolio},
+            headers={
+                "apikey": key,
+                "Authorization": f"Bearer {key}",
+                "Prefer": "resolution=merge-duplicates",
+            },
+            timeout=3,
+        )
+    except Exception:
+        pass
+
+
+def _load_user_portfolio(phone: str) -> list:
+    """טוען את ה-Portfolio מ-Supabase, fallback ל-JSON מקומי."""
+    norm = _normalize_phone(phone)
+    sb = _supabase_load_portfolio(norm)
+    if sb is not None:
+        return sb
+    try:
         db = _load_alerts_db()
         reg = db.get("registrations", {}).get(norm, {})
         data = reg.get("portfolio", [])
@@ -1777,9 +1825,10 @@ def _load_user_portfolio(phone: str) -> list:
 
 
 def _save_user_portfolio(phone: str, portfolio: list) -> None:
-    """שומר את ה-Portfolio בחשבון הטלגרם של המשתמש"""
+    """שומר את ה-Portfolio ב-Supabase (עמיד לdeploy)."""
+    norm = _normalize_phone(phone)
+    _supabase_save_portfolio(norm, portfolio)
     try:
-        norm = _normalize_phone(phone)
         db = _load_alerts_db()
         if norm in db.get("registrations", {}):
             db["registrations"][norm]["portfolio"] = portfolio
@@ -3968,9 +4017,11 @@ def main() -> None:
                 f'<span>סורק {len(TICKER_LIST)} מניות ברקע…<br>'
                 '<b>ניתן להמשיך להשתמש באתר</b></span></div>',
                 unsafe_allow_html=True)
-            # רענון אוטומטי כל 5 שניות עד שהסריקה מסתיימת
-            _time.sleep(3)
+            _time.sleep(1)
             st.rerun()
+
+        if _bp_is_done and _bp_scan_state.get("error"):
+            st.error(f"שגיאת סריקה: {_bp_scan_state['error']}")
 
         if _bp_is_done and _bp_scan_state["results"] and not st.session_state.get("best_pick_results"):
             with _bp_scan_lock:
