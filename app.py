@@ -3954,51 +3954,6 @@ def main() -> None:
             placeholder="Add indicators...",
             key="indicators_multi")
 
-        # ── Best Pick ──────────────────────────────────────────────────────
-        st.markdown("---")
-        if st.button("⚡ Best Pick Now", use_container_width=True,
-                     type="primary", key="bp_btn"):
-            _bp_placeholder = st.empty()
-            _bp_placeholder.info(f"סורק {len(BEST_PICK_UNIVERSE)} מניות…")
-            try:
-                _bp_raw = find_best_pick(horizon)
-                _bp_filtered = [(t, s) for t, s in _bp_raw if s > 0]
-                st.session_state["best_pick_results"] = _bp_filtered
-                st.session_state["best_pick_done"] = True
-                try:
-                    _check_and_fire_score_alerts(_bp_raw, horizon)
-                except Exception:
-                    pass
-            except Exception as _e:
-                st.session_state["best_pick_results"] = []
-                st.session_state["best_pick_done"] = True
-            finally:
-                _bp_placeholder.empty()
-
-        if st.session_state.get("best_pick_done"):
-            _top = st.session_state.get("best_pick_results", [])
-            if _top:
-                for _rank, (_t, _s) in enumerate(_top[:5], 1):
-                    if _s >= 80:   _rc, _rl = "#10b981", "STRONG BUY"
-                    elif _s >= 65: _rc, _rl = "#f59e0b", "BUY"
-                    elif _s >= 45: _rc, _rl = "#f97316", "HOLD"
-                    else:          _rc, _rl = "#ef4444", "SELL"
-                    _medal = ["🥇","🥈","🥉","4.","5."][_rank-1]
-                    st.markdown(
-                        f'<div style="background:rgba(99,102,241,.05);border:1px solid '
-                        f'rgba(99,102,241,.12);border-radius:10px;padding:7px 10px;margin:4px 0">'
-                        f'<div style="display:flex;justify-content:space-between">'
-                        f'<span style="font-size:13px">{_medal} <b>{_t}</b></span>'
-                        f'<span style="font-size:11px;color:#6366f1;font-weight:700">{_s}</span>'
-                        f'</div><div style="font-size:10px;font-weight:700;color:{_rc}">{_rl}</div></div>',
-                        unsafe_allow_html=True)
-                if st.button(f"נתח {_top[0][0]}", use_container_width=True, key="bp_analyze_btn"):
-                    st.session_state["pending_ticker"] = _top[0][0]
-                    st.session_state["best_pick_done"] = False
-                    st.rerun()
-            else:
-                st.warning("לא נמצאו מניות — נסה שוב מאוחר יותר")
-
         # ── 👤 חשבון משתמש + 🔔 התראות מחיר — Telegram ──────────────────────
         st.markdown("---")
         _cu = st.session_state.get("current_user_phone", "")
