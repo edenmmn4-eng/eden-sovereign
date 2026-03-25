@@ -1089,28 +1089,21 @@ def fetch_data(ticker: str) -> dict:
 
         out["peg_ratio"] = float(_safe(peg, float("nan")))
 
-        # ── Historical prices (with retry + yf.download fallback) ────────────
+        # ── Historical prices (ניסיון אחד בלבד — אין retry, Supabase מטפל ב-cache) ──
         _hist_ok = False
-        for _ha in range(3):
-            try:
-                hist = obj.history(period="1y", interval="1d", auto_adjust=True)
-                hist = hist.dropna(subset=["Close"])
-                if hist.empty:
-                    hist = obj.history(
-                        start=(datetime.today()-timedelta(days=400)).strftime("%Y-%m-%d"),
-                        end=datetime.today().strftime("%Y-%m-%d"),
-                        interval="1d", auto_adjust=True).dropna(subset=["Close"])
-                if not hist.empty:
-                    out["hist"] = hist
-                    _hist_ok = True
-                    break
-            except Exception as _he:
-                _hmsg = str(_he).lower()
-                if ("too many requests" in _hmsg or "429" in _hmsg or "rate limit" in _hmsg) \
-                        and _ha < 2:
-                    _time.sleep(4 * (2 ** _ha))  # 4s → 8s → 16s
-                    continue
-                break
+        try:
+            hist = obj.history(period="1y", interval="1d", auto_adjust=True)
+            hist = hist.dropna(subset=["Close"])
+            if hist.empty:
+                hist = obj.history(
+                    start=(datetime.today()-timedelta(days=400)).strftime("%Y-%m-%d"),
+                    end=datetime.today().strftime("%Y-%m-%d"),
+                    interval="1d", auto_adjust=True).dropna(subset=["Close"])
+            if not hist.empty:
+                out["hist"] = hist
+                _hist_ok = True
+        except Exception:
+            pass
 
         # Final fallback: yf.download (different endpoint, less rate-limited)
         if not _hist_ok or out["hist"].empty:
