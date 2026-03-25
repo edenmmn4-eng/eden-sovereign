@@ -318,9 +318,36 @@ ALL_INDS      = ["Bollinger Bands", "VWAP", "RSI", "MACD", "Stochastic", "OBV", 
 
 # ── Best Pick Universe ────────────────────────────────────────────────────────
 BEST_PICK_UNIVERSE = [
+    # Mag 7 + core mega-cap
     "AAPL","MSFT","NVDA","AMZN","META","TSLA","GOOG","AVGO",
-    "LLY","JPM","V","MA","UNH","XOM","PLTR","AMD","CRM","COST",
-    "NFLX","ORCL","NOW","ISRG","GS","BX","COIN","SQ","MELI","SE",
+    # Semiconductors
+    "AMD","INTC","QCOM","TXN","MU","MRVL","ARM","SMCI","TSM","ASML",
+    # Software / Cloud / SaaS
+    "CRM","ORCL","ADBE","NOW","INTU","WDAY","SNOW","DDOG","CRWD","PANW",
+    "FTNT","ZS","PLTR","HUBS","MDB","TEAM","GTLB","TTD","OKTA",
+    # Fintech / Payments
+    "V","MA","SQ","PYPL","MELI","NU","HOOD","SOFI","COIN",
+    # Banks / Finance
+    "JPM","GS","MS","BAC","WFC","BX","KKR","APO","SCHW","AXP",
+    "MCO","SPGI","CME","ICE",
+    # Healthcare / Pharma / Biotech
+    "UNH","LLY","JNJ","ABBV","MRK","AMGN","GILD","REGN","ISRG",
+    "TMO","DHR","VRTX","MRNA","DXCM","IDXX","ELV",
+    # Consumer
+    "COST","WMT","AMZN","HD","MCD","SBUX","NKE","LULU","CMG",
+    "BKNG","ABNB","UBER","NFLX","SPOT","SE",
+    # Industrials / Defense
+    "BA","LMT","RTX","GE","HON","CAT","DE","UPS","GD","NOC","AXON",
+    # Energy
+    "XOM","CVX","COP","EOG","OXY","LNG","KMI","WMB",
+    # Materials
+    "LIN","APD","ALB","FCX","NEM","SHW",
+    # Real Estate / REITs
+    "AMT","EQIX","PLD","CCI","DLR","PSA",
+    # Communications
+    "DIS","CMCSA","TMUS","T","VZ",
+    # Emerging / High-growth
+    "RBLX","SHOP","SNAP","PINS","DASH","ROKU",
 ]
 
 # ── Eden Color Palette ────────────────────────────────────────────────────────
@@ -2109,24 +2136,33 @@ _CRYPTO_MINING_EXCLUDE = {
 @st.cache_data(ttl=600, show_spinner=False)
 def find_best_pick(horizon: str) -> list:
     """סורק מניות ומחזיר (ticker, score) ממוין יורד.
-    מכסה: כל מניות ב-Supabase cache + BEST_PICK_UNIVERSE (28 ליבה).
-    מניות שאינן ב-cache ואינן בליבה — מדולגות (אפס בקשות yfinance).
+    מכסה: BEST_PICK_UNIVERSE (~120 ליבה) + כל מניות ב-Supabase cache.
+    8 workers במקביל; yfinance מוגבל ל-3 בו-זמניים למניעת rate-limit.
     """
     # 1. שלוף כל cache בbulk query אחד
     _all_cached = _supabase_get_all()
 
-    # 2. בנה רשימת עבודה: cached ∪ BEST_PICK_UNIVERSE, בסדר TICKER_LIST
+    # 2. בנה רשימת עבודה: BEST_PICK_UNIVERSE ∪ cached, בסדר TICKER_LIST
     _bp_set = set(BEST_PICK_UNIVERSE)
-    _work = [t for t in TICKER_LIST if t in _all_cached or t in _bp_set]
+    _work = list(dict.fromkeys(
+        [t for t in BEST_PICK_UNIVERSE] +
+        [t for t in TICKER_LIST if t in _all_cached and t not in _bp_set]
+    ))
+
+    # 3. semaphore — מגביל ל-3 בקשות yfinance בו-זמניות
+    _yf_sem = threading.Semaphore(3)
 
     def _score_one(t):
         try:
             if t in _CRYPTO_MINING_EXCLUDE:
                 return t, 0
-            # sleep רק לmניות ליבה שאינן ב-cache (יגיעו ל-yfinance)
-            if t in _bp_set and t not in _all_cached:
-                _time.sleep(0.3)
-            d = fetch_data(t)
+            if t not in _all_cached:
+                # מניה שאינה ב-cache → bקשת yfinance מוגבלת
+                with _yf_sem:
+                    _time.sleep(0.25)
+                    d = fetch_data(t)
+            else:
+                d = fetch_data(t)
             if d["hist"].empty or d.get("is_etf"):
                 return t, 0
             if d["mkt_cap"] < 1_000_000_000:
@@ -2159,8 +2195,8 @@ def find_best_pick(horizon: str) -> list:
         except Exception:
             return t, 0
 
-    # 3. הרץ במקביל
-    with ThreadPoolExecutor(max_workers=6) as ex:
+    # 4. הרץ: 8 workers במקביל (yfinance מוגבל ל-3 בו-זמניים ע"י semaphore)
+    with ThreadPoolExecutor(max_workers=8) as ex:
         results = list(ex.map(_score_one, _work))
 
     results.sort(key=lambda x: x[1], reverse=True)
