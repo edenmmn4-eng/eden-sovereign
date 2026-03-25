@@ -675,8 +675,8 @@ def fmt_price(v: float) -> str:
 def _supabase_get(ticker: str) -> dict | None:
     """מחזיר info dict שנשמר ב-Supabase אם קיים ואם לא ישן מ-1 שעה."""
     import threading as _threading
-    if _threading.current_thread() is not _threading.main_thread():
-        return None  # אל תגע ב-Supabase מ-background threads
+    if _threading.current_thread().name == "eden-alert-scheduler":
+        return None  # אל תגע ב-Supabase מ-background thread של התראות
     try:
         url = st.secrets.get("SUPABASE_URL", "")
         key = st.secrets.get("SUPABASE_KEY", "")
@@ -726,6 +726,33 @@ def _supabase_set(ticker: str, info: dict) -> None:
         )
     except Exception:
         pass
+
+
+def _supabase_get_all() -> dict:
+    """מחזיר {ticker: data} לכל המניות הטריות ב-Supabase (< שעה) — bulk query אחד."""
+    try:
+        url = st.secrets.get("SUPABASE_URL", "")
+        key = st.secrets.get("SUPABASE_KEY", "")
+        if not url or not key:
+            return {}
+        from datetime import timezone
+        r = _req.get(
+            f"{url}/rest/v1/ticker_cache",
+            params={"select": "ticker,data,cached_at"},
+            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            timeout=5,
+        )
+        if r.status_code != 200:
+            return {}
+        result = {}
+        now = datetime.now(timezone.utc)
+        for row in r.json():
+            cached_at = datetime.fromisoformat(row["cached_at"].replace("Z", "+00:00"))
+            if now - cached_at < timedelta(hours=1):
+                result[row["ticker"]] = row["data"]
+        return result
+    except Exception:
+        return {}
 
 
 # ── Data Fetching ─────────────────────────────────────────────────────────────
@@ -2081,58 +2108,61 @@ _CRYPTO_MINING_EXCLUDE = {
 
 @st.cache_data(ttl=600, show_spinner=False)
 def find_best_pick(horizon: str) -> list:
-    """Scans all tickers and returns list of (ticker, score) sorted descending.
-    Only includes stocks with sufficient fundamental data quality.
+    """סורק מניות ומחזיר (ticker, score) ממוין יורד.
+    מכסה: כל מניות ב-Supabase cache + BEST_PICK_UNIVERSE (28 ליבה).
+    מניות שאינן ב-cache ואינן בליבה — מדולגות (אפס בקשות yfinance).
     """
+    # 1. שלוף כל cache בbulk query אחד
+    _all_cached = _supabase_get_all()
+
+    # 2. בנה רשימת עבודה: cached ∪ BEST_PICK_UNIVERSE, בסדר TICKER_LIST
+    _bp_set = set(BEST_PICK_UNIVERSE)
+    _work = [t for t in TICKER_LIST if t in _all_cached or t in _bp_set]
+
     def _score_one(t):
         try:
-            # Skip known crypto/mining tickers
             if t in _CRYPTO_MINING_EXCLUDE:
                 return t, 0
-            _time.sleep(0.3)  # 300ms בין בקשות — מניעת rate-limit
+            # sleep רק לmניות ליבה שאינן ב-cache (יגיעו ל-yfinance)
+            if t in _bp_set and t not in _all_cached:
+                _time.sleep(0.3)
             d = fetch_data(t)
             if d["hist"].empty or d.get("is_etf"):
                 return t, 0
-            # ── Data quality gates ────────────────────────────────────────
-            # 1. Require meaningful market cap (≥ $1B)
             if d["mkt_cap"] < 1_000_000_000:
                 return t, 0
-            # 2. Price ≥ $1 (exclude penny stocks and unknown-price stocks)
             _cp = d.get("current_price", 0) or 0
             if _isnan(float(_cp)) or float(_cp) < 1.0:
                 return t, 0
-            # 3. Require ≥ 60 trading days of history
             if len(d["hist"]) < 60:
                 return t, 0
-            # 3b. Require average daily volume ≥ 100K (liquidity filter)
             _avg_vol = d["hist"]["Volume"].tail(30).mean() if "Volume" in d["hist"].columns else 0
             if _avg_vol < 100_000:
                 return t, 0
-            # 4. Must be actual equity, not crypto/commodity ETF
             if d.get("quote_type") not in ("EQUITY", None, ""):
                 return t, 0
-            # 5. Require at least ONE valid fundamental metric
             has_pe     = not _isnan(d["pe_ratio"]) and d["pe_ratio"] > 0
             has_cagr   = d["revenue_cagr"] > 0.01
             has_margin = not _isnan(d["gross_margins"]) and d["gross_margins"] > 0
             if not (has_pe or has_cagr or has_margin):
                 return t, 0
-            # ── Score ─────────────────────────────────────────────────────
             tech = compute_technicals(d["hist"])
             s = compute_score(d, tech, horizon, use_news=True)
-            # 6. Scale penalty for missing fundamentals
             missing = sum([not has_pe, not has_cagr, not has_margin])
             if missing == 1:
-                s = max(0, s - 5)    # 1 missing → -5 pts
+                s = max(0, s - 5)
             elif missing == 2:
-                s = max(0, s - 15)   # 2 missing → -15 pts
-            # 7. Penalize negative revenue CAGR stocks
+                s = max(0, s - 15)
             if d["revenue_cagr"] < -0.05:
                 s = max(0, s - 8)
             return t, s
         except Exception:
             return t, 0
-    results = [_score_one(t) for t in BEST_PICK_UNIVERSE]
+
+    # 3. הרץ במקביל
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        results = list(ex.map(_score_one, _work))
+
     results.sort(key=lambda x: x[1], reverse=True)
     return results
 
@@ -3953,6 +3983,49 @@ def main() -> None:
             label_visibility="collapsed",
             placeholder="Add indicators...",
             key="indicators_multi")
+
+        # ── Best Pick ──────────────────────────────────────────────────────
+        st.markdown("---")
+        st.markdown("**⚡ Best Pick**")
+        if st.button("סרוק מניות מובילות", use_container_width=True,
+                     type="primary", key="bp_btn"):
+            with st.spinner("סורק מניות…"):
+                try:
+                    _bp_raw = find_best_pick(horizon)
+                    _bp_filtered = [(t, s) for t, s in _bp_raw if s > 0]
+                    st.session_state["best_pick_results"] = _bp_filtered
+                    st.session_state["best_pick_done"] = True
+                    try:
+                        _check_and_fire_score_alerts(_bp_raw, horizon)
+                    except Exception:
+                        pass
+                except Exception:
+                    st.session_state["best_pick_results"] = []
+                    st.session_state["best_pick_done"] = True
+
+        if st.session_state.get("best_pick_done"):
+            _top = st.session_state.get("best_pick_results", [])
+            if _top:
+                for _rank, (_t, _s) in enumerate(_top[:5], 1):
+                    if _s >= 80:   _rc, _rl = "#10b981", "STRONG BUY"
+                    elif _s >= 65: _rc, _rl = "#f59e0b", "BUY"
+                    elif _s >= 45: _rc, _rl = "#f97316", "HOLD"
+                    else:          _rc, _rl = "#ef4444", "SELL"
+                    _medal = ["🥇","🥈","🥉","4.","5."][_rank-1]
+                    st.markdown(
+                        f'<div style="background:rgba(99,102,241,.05);border:1px solid '
+                        f'rgba(99,102,241,.12);border-radius:10px;padding:7px 10px;margin:4px 0">'
+                        f'<div style="display:flex;justify-content:space-between">'
+                        f'<span style="font-size:13px">{_medal} <b>{_t}</b></span>'
+                        f'<span style="font-size:11px;color:#6366f1;font-weight:700">{_s}</span>'
+                        f'</div><div style="font-size:10px;font-weight:700;color:{_rc}">{_rl}</div></div>',
+                        unsafe_allow_html=True)
+                if st.button(f"נתח {_top[0][0]}", use_container_width=True, key="bp_analyze_btn"):
+                    st.session_state["pending_ticker"] = _top[0][0]
+                    st.session_state["best_pick_done"] = False
+                    st.rerun()
+            else:
+                st.warning("לא נמצאו מניות — נסה שוב")
 
         # ── 👤 חשבון משתמש + 🔔 התראות מחיר — Telegram ──────────────────────
         st.markdown("---")
