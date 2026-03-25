@@ -4138,6 +4138,7 @@ def main() -> None:
         )
         if _tg_phone != st.session_state["tg_phone"]:
             st.session_state["tg_phone"] = _tg_phone
+            st.rerun()
 
         _tg_configured = bool(_tg_token())
         try:
