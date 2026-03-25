@@ -3992,48 +3992,19 @@ def main() -> None:
         st.markdown("---")
 
         # ── Best Pick ──────────────────────────────────────────────────────
-        with _bp_scan_lock:
-            _bp_is_running = _bp_scan_state["running"]
-            _bp_is_done    = _bp_scan_state["done"]
-
         if st.button("⚡ Best Pick Now", use_container_width=True, type="primary",
-                     key="best_pick_btn", disabled=_bp_is_running):
-            with _bp_scan_lock:
-                _bp_scan_state["running"] = True
-                _bp_scan_state["done"]    = False
-                _bp_scan_state["results"] = []
+                     key="best_pick_btn"):
             st.session_state["best_pick_results"] = []
-            threading.Thread(
-                target=_run_bp_scan, args=(horizon,), daemon=True, name="eden-bp-scan"
-            ).start()
-            st.rerun()
-
-        if _bp_is_running:
-            st.markdown(
-                '<div style="display:flex;align-items:center;gap:8px;'
-                'background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.2);'
-                'border-radius:10px;padding:8px 12px;font-size:12px;color:#6366f1">'
-                '<span style="font-size:16px">🔍</span>'
-                f'<span>סורק {len(TICKER_LIST)} מניות ברקע…<br>'
-                '<b>ניתן להמשיך להשתמש באתר</b></span></div>',
-                unsafe_allow_html=True)
-            _time.sleep(1)
-            st.rerun()
-
-        if _bp_is_done and _bp_scan_state.get("error"):
-            st.error(f"שגיאת סריקה: {_bp_scan_state['error']}")
-
-        if _bp_is_done and _bp_scan_state["results"] and not st.session_state.get("best_pick_results"):
-            with _bp_scan_lock:
-                _fresh = _bp_scan_state["results"][:]
-                _fresh_horizon = _bp_scan_state["horizon"]
-                _bp_scan_state["done"] = False  # reset so it doesn't re-trigger
-            st.session_state["best_pick_results"] = _fresh
-            try:
-                _check_and_fire_score_alerts(_fresh, _fresh_horizon or horizon)
-            except Exception:
-                pass
-            st.rerun()
+            with st.spinner(f"סורק {len(TICKER_LIST)} מניות… (אורך מספר דקות)"):
+                try:
+                    _results = find_best_pick(horizon)
+                    st.session_state["best_pick_results"] = _results
+                    try:
+                        _check_and_fire_score_alerts(_results, horizon)
+                    except Exception:
+                        pass
+                except Exception as _bp_err:
+                    st.error(f"שגיאת סריקה: {_bp_err}")
 
         if st.session_state["best_pick_results"]:
             _top5 = st.session_state["best_pick_results"][:5]
