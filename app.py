@@ -806,24 +806,17 @@ def fetch_data(ticker: str) -> dict:
         # ── Fetch all financial statements ONCE with retry ─────────────────
         # Prevents duplicate calls and cascading rate-limits
         def _stmt_fetch(primary: str, fallback: str | None = None):
-            for _a in range(3):
-                try:
-                    _v = getattr(obj, primary, None)
-                    if _v is not None and not (hasattr(_v, "empty") and _v.empty):
-                        return _v
-                    if fallback:
-                        _v2 = getattr(obj, fallback, None)
-                        if _v2 is not None and not (hasattr(_v2, "empty") and _v2.empty):
-                            return _v2
-                    return _v  # even if empty, stop retrying
-                except Exception as _se:
-                    _sm = str(_se).lower()
-                    if ("too many requests" in _sm or "429" in _sm or "rate limit" in _sm) \
-                            and _a < 2:
-                        _time.sleep(3 * (2 ** _a))
-                        continue
-                    return None
-            return None
+            try:
+                _v = getattr(obj, primary, None)
+                if _v is not None and not (hasattr(_v, "empty") and _v.empty):
+                    return _v
+                if fallback:
+                    _v2 = getattr(obj, fallback, None)
+                    if _v2 is not None and not (hasattr(_v2, "empty") and _v2.empty):
+                        return _v2
+                return _v
+            except Exception:
+                return None
 
         # דלג על בקשות נוספות כשה-info ריק (rate limited)
         if not _info_ok:
@@ -1969,7 +1962,7 @@ def run_monte_carlo(
 
 
 # ── Portfolio & Best Pick helpers ─────────────────────────────────────────────
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def get_usd_ils() -> float:
     import time as _t
     for _a in range(3):
@@ -1992,7 +1985,7 @@ def get_usd_ils() -> float:
     return 3.7
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def fetch_portfolio_prices(tickers: tuple) -> dict:
     import time as _t
 
@@ -2160,7 +2153,7 @@ def find_best_pick(horizon: str) -> list:
             return t, s
         except Exception:
             return t, 0
-    results = [_score_one(t) for t in TICKER_LIST]
+    results = [_score_one(t) for t in BEST_PICK_UNIVERSE]
     results.sort(key=lambda x: x[1], reverse=True)
     return results
 
@@ -2598,7 +2591,7 @@ def get_peers_for(ticker: str) -> list[str]:
     return best[:5]
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def build_peers(ticker: str, self_data: dict | None = None, extra_peers: tuple = ()) -> pd.DataFrame:
     peers = get_peers_for(ticker)
     # Merge extra_peers without duplicates
@@ -2784,7 +2777,7 @@ def fmt_fin_val(v) -> str:
 
 
 # ── News Tab ───────────────────────────────────────────────────────────────────
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def build_news(ticker: str) -> None:
     try:
         articles = yf.Ticker(ticker).news or []
@@ -2910,7 +2903,6 @@ def build_financials(ticker: str) -> None:
 
 
 # ── Earnings Tab ───────────────────────────────────────────────────────────────
-@st.cache_data(ttl=3600, show_spinner=False)
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_earnings(ticker: str):
     obj = yf.Ticker(ticker)
@@ -3988,7 +3980,7 @@ def main() -> None:
         if st.button("⚡ Best Pick Now", use_container_width=True, type="primary",
                      key="best_pick_btn"):
             st.session_state["best_pick_results"] = []
-            with st.spinner(f"סורק {len(TICKER_LIST)} מניות… (אורך מספר דקות)"):
+            with st.spinner(f"סורק {len(BEST_PICK_UNIVERSE)} מניות… (כ-30 שניות)"):
                 try:
                     _results = find_best_pick(horizon)
                     st.session_state["best_pick_results"] = _results
