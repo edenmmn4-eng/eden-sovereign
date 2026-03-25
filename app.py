@@ -143,7 +143,7 @@ TICKER_LIST = sorted(set([
     'SPY','QQQ','IWM','DIA','VTI','VOO','IVV',
     'XLK','XLF','XLE','XLV','XLI','XLU','XLB','XLRE','XLC','XLY','XLP',
     'GLD','SLV','GDX','GDXJ','USO','UNG','TLT','AGG','HYG','LQD',
-    'ARKK','ARKG','ARKW','ARKF','ARKX',
+    'ARKK','ARKG','ARKW','ARKF','ARKX','IGV',
     'SOXL','TQQQ','UPRO','SPXL','TECL','FNGU',
     # Misc / Other
     'BRK-B','BRK-A','MMM','TRMB','GDDY',
