@@ -1687,27 +1687,6 @@ def _check_and_fire_tg_alerts(current_prices: dict) -> int:
 _bg_thread: threading.Thread = None  # type: ignore[assignment]
 _bg_lock = threading.Lock()
 
-# ── Best Pick background scan ──────────────────────────────────────────────────
-_bp_scan_lock = threading.Lock()
-_bp_scan_state: dict = {"running": False, "done": False, "results": [], "horizon": None, "error": None}
-
-
-def _run_bp_scan(horizon: str) -> None:
-    """מריץ סריקת Best Pick ברקע ללא חסימת ה-UI"""
-    _time.sleep(2)
-    try:
-        results = find_best_pick(horizon)
-        with _bp_scan_lock:
-            _bp_scan_state["results"] = results
-            _bp_scan_state["horizon"] = horizon
-            _bp_scan_state["running"] = False
-            _bp_scan_state["done"]    = True
-            _bp_scan_state["error"]   = None
-    except Exception as _e:
-        with _bp_scan_lock:
-            _bp_scan_state["running"] = False
-            _bp_scan_state["done"]    = True
-            _bp_scan_state["error"]   = str(_e)
 
 
 def _bg_worker() -> None:
@@ -3888,6 +3867,7 @@ def main() -> None:
     st.session_state.setdefault("active_ticker", "AAPL")
     st.session_state.setdefault("run_best_pick", False)
     st.session_state.setdefault("best_pick_results", [])
+    st.session_state.setdefault("best_pick_done", False)
     st.session_state.setdefault("tg_phone", "")
     st.session_state.setdefault("current_user_phone", "")
 
@@ -3974,47 +3954,50 @@ def main() -> None:
             placeholder="Add indicators...",
             key="indicators_multi")
 
-        st.markdown("---")
-
         # ── Best Pick ──────────────────────────────────────────────────────
-        if st.button("⚡ Best Pick Now", use_container_width=True, type="primary",
-                     key="best_pick_btn"):
-            st.session_state["best_pick_results"] = []
-            with st.spinner(f"סורק {len(BEST_PICK_UNIVERSE)} מניות… (כ-30 שניות)"):
+        st.markdown("---")
+        if st.button("⚡ Best Pick Now", use_container_width=True,
+                     type="primary", key="bp_btn"):
+            _bp_placeholder = st.empty()
+            _bp_placeholder.info(f"סורק {len(BEST_PICK_UNIVERSE)} מניות…")
+            try:
+                _bp_raw = find_best_pick(horizon)
+                _bp_filtered = [(t, s) for t, s in _bp_raw if s > 0]
+                st.session_state["best_pick_results"] = _bp_filtered
+                st.session_state["best_pick_done"] = True
                 try:
-                    _results = find_best_pick(horizon)
-                    st.session_state["best_pick_results"] = _results
-                    try:
-                        _check_and_fire_score_alerts(_results, horizon)
-                    except Exception:
-                        pass
-                except Exception as _bp_err:
-                    st.error(f"שגיאת סריקה: {_bp_err}")
-
-        if st.session_state["best_pick_results"]:
-            _top5 = st.session_state["best_pick_results"][:5]
-            st.markdown("**Top picks:**")
-            for _rank, (_t, _s) in enumerate(_top5, 1):
-                if _s >= 80:   _rc, _rl = "#10b981", "STRONG BUY"
-                elif _s >= 65: _rc, _rl = "#f59e0b", "BUY"
-                elif _s >= 45: _rc, _rl = "#f97316", "HOLD"
-                else:          _rc, _rl = "#ef4444", "SELL"
-                _medal = "🥇" if _rank == 1 else ("🥈" if _rank == 2 else ("🥉" if _rank == 3 else f"{_rank}."))
-                st.markdown(
-                    f'<div style="background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.12);'
-                    f'border-radius:10px;padding:7px 10px;margin:4px 0">'
-                    f'<div style="display:flex;justify-content:space-between;align-items:center">'
-                    f'<span style="font-size:13px">{_medal} <b>{_t}</b></span>'
-                    f'<span style="font-size:11px;font-family:monospace;color:#6366f1;font-weight:700">{_s}</span>'
-                    f'</div>'
-                    f'<div style="font-size:10px;font-weight:700;color:{_rc};margin-top:2px">{_rl}</div>'
-                    f'</div>',
-                    unsafe_allow_html=True)
-            if st.button(f"Analyze {_top5[0][0]} Now", use_container_width=True,
-                         key="analyze_best_btn"):
-                st.session_state["pending_ticker"] = _top5[0][0]
+                    _check_and_fire_score_alerts(_bp_raw, horizon)
+                except Exception:
+                    pass
+            except Exception as _e:
                 st.session_state["best_pick_results"] = []
-                st.rerun()
+                st.session_state["best_pick_done"] = True
+            finally:
+                _bp_placeholder.empty()
+
+        if st.session_state.get("best_pick_done"):
+            _top = st.session_state.get("best_pick_results", [])
+            if _top:
+                for _rank, (_t, _s) in enumerate(_top[:5], 1):
+                    if _s >= 80:   _rc, _rl = "#10b981", "STRONG BUY"
+                    elif _s >= 65: _rc, _rl = "#f59e0b", "BUY"
+                    elif _s >= 45: _rc, _rl = "#f97316", "HOLD"
+                    else:          _rc, _rl = "#ef4444", "SELL"
+                    _medal = ["🥇","🥈","🥉","4.","5."][_rank-1]
+                    st.markdown(
+                        f'<div style="background:rgba(99,102,241,.05);border:1px solid '
+                        f'rgba(99,102,241,.12);border-radius:10px;padding:7px 10px;margin:4px 0">'
+                        f'<div style="display:flex;justify-content:space-between">'
+                        f'<span style="font-size:13px">{_medal} <b>{_t}</b></span>'
+                        f'<span style="font-size:11px;color:#6366f1;font-weight:700">{_s}</span>'
+                        f'</div><div style="font-size:10px;font-weight:700;color:{_rc}">{_rl}</div></div>',
+                        unsafe_allow_html=True)
+                if st.button(f"נתח {_top[0][0]}", use_container_width=True, key="bp_analyze_btn"):
+                    st.session_state["pending_ticker"] = _top[0][0]
+                    st.session_state["best_pick_done"] = False
+                    st.rerun()
+            else:
+                st.warning("לא נמצאו מניות — נסה שוב מאוחר יותר")
 
         # ── 👤 חשבון משתמש + 🔔 התראות מחיר — Telegram ──────────────────────
         st.markdown("---")
