@@ -720,8 +720,10 @@ def _sb_creds() -> tuple[str, str]:
     return url, key
 
 
-def _supabase_get(ticker: str) -> dict | None:
-    """מחזיר info dict שנשמר ב-Supabase אם קיים ואם לא ישן מ-1 שעה."""
+def _supabase_get(ticker: str, stale_ok: bool = False) -> dict | None:
+    """מחזיר info dict שנשמר ב-Supabase.
+    stale_ok=True — מחזיר גם נתונים ישנים (עד 24 שעות) כשיש rate limit.
+    """
     import threading as _threading
     if _threading.current_thread().name == "eden-alert-scheduler":
         return None  # אל תגע ב-Supabase מ-background thread של התראות
@@ -739,8 +741,11 @@ def _supabase_get(ticker: str) -> dict | None:
             row = r.json()[0]
             from datetime import timezone, timedelta
             cached_at = datetime.fromisoformat(row["cached_at"].replace("Z", "+00:00"))
-            if datetime.now(timezone.utc) - cached_at < timedelta(hours=1):
+            age = datetime.now(timezone.utc) - cached_at
+            if age < timedelta(hours=4):
                 return row["data"]
+            if stale_ok and age < timedelta(hours=24):
+                return row["data"]   # נתונים ישנים — עדיף על כלום
     except Exception:
         pass
     return None
@@ -833,6 +838,11 @@ def fetch_data(ticker: str) -> dict:
                 pass
             if info:
                 _supabase_set(ticker, info)
+            elif not info:
+                # rate limited — נסה cache ישן (עד 24 שעות)
+                _stale = _supabase_get(ticker, stale_ok=True)
+                if _stale:
+                    info = _stale
         _info_ok = bool(info)
         out["info"] = info
 
