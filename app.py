@@ -2351,28 +2351,28 @@ def build_chart(
     if ma1 > 0:
         s1 = compute_ma_series(df, ma1)
         if not s1.empty:
-            fig.add_trace(go.Scatter(
+            fig.add_trace(go.Scattergl(
                 x=df.index, y=s1.values, mode="lines",
-                name=f"MA {ma1}", line=dict(color="#f59e0b", width=1.8)), row=1, col=1)
+                name=f"MA {ma1}", line=dict(color="#f59e0b", width=1.5)), row=1, col=1)
 
     if ma2 > 0 and ma2 != ma1:
         s2 = compute_ma_series(df, ma2)
         if not s2.empty:
-            fig.add_trace(go.Scatter(
+            fig.add_trace(go.Scattergl(
                 x=df.index, y=s2.values, mode="lines",
-                name=f"MA {ma2}", line=dict(color="#ef4444", width=1.8)), row=1, col=1)
+                name=f"MA {ma2}", line=dict(color="#ef5350", width=1.5)), row=1, col=1)
 
     if "Bollinger Bands" in overlay_inds and not tech["bb_upper"].empty:
-        fig.add_trace(go.Scatter(
+        fig.add_trace(go.Scattergl(
             x=df.index, y=tech["bb_upper"].values, mode="lines",
             name="BB Upper", line=dict(color="rgba(99,102,241,.5)", width=1, dash="dash")), row=1, col=1)
-        fig.add_trace(go.Scatter(
+        fig.add_trace(go.Scattergl(
             x=df.index, y=tech["bb_lower"].values, mode="lines",
             name="BB Lower", line=dict(color="rgba(99,102,241,.5)", width=1, dash="dash"),
             fill="tonexty", fillcolor="rgba(99,102,241,.06)"), row=1, col=1)
 
     if "VWAP" in overlay_inds and not tech["vwap"].empty:
-        fig.add_trace(go.Scatter(
+        fig.add_trace(go.Scattergl(
             x=df.index, y=tech["vwap"].values, mode="lines",
             name="VWAP", line=dict(color="#8b5cf6", width=1.5, dash="dot")), row=1, col=1)
 
@@ -2382,12 +2382,12 @@ def build_chart(
         if ind == "RSI":
             rsi_s = tech["rsi_series"].dropna()
             if not rsi_s.empty:
-                fig.add_trace(go.Scatter(
+                fig.add_trace(go.Scattergl(
                     x=rsi_s.index, y=rsi_s.values,
                     name="RSI (14)", line=dict(color="#6366f1", width=1.5)), row=row_idx, col=1)
-            fig.add_hline(y=70, line_dash="dash", line_color="#ef4444",
+            fig.add_hline(y=70, line_dash="dash", line_color="#ef5350",
                           opacity=0.5, row=row_idx, col=1)
-            fig.add_hline(y=30, line_dash="dash", line_color="#10b981",
+            fig.add_hline(y=30, line_dash="dash", line_color="#26a69a",
                           opacity=0.5, row=row_idx, col=1)
             fig.add_hline(y=50, line_dash="dot", line_color="rgba(0,0,0,0.15)",
                           row=row_idx, col=1)
@@ -2400,18 +2400,18 @@ def build_chart(
             macd_l = tech["macd_line"]
             sig_l  = tech["macd_signal"]
             if not hist_s.empty:
-                hcolors = ["#10b981" if v >= 0 else "#ef4444"
+                hcolors = ["#26a69a" if v >= 0 else "#ef5350"
                            for v in hist_s.fillna(0)]
                 fig.add_trace(go.Bar(
                     x=df.index, y=hist_s.values,
                     marker_color=hcolors, opacity=0.7,
                     name="MACD Hist", showlegend=True), row=row_idx, col=1)
             if not macd_l.empty:
-                fig.add_trace(go.Scatter(
+                fig.add_trace(go.Scattergl(
                     x=df.index, y=macd_l.values,
                     name="MACD", line=dict(color="#6366f1", width=1.2)), row=row_idx, col=1)
             if not sig_l.empty:
-                fig.add_trace(go.Scatter(
+                fig.add_trace(go.Scattergl(
                     x=df.index, y=sig_l.values,
                     name="Signal", line=dict(color="#f59e0b", width=1.2)), row=row_idx, col=1)
             fig.add_hline(y=0, line_color="rgba(0,0,0,0.2)",
@@ -2422,16 +2422,16 @@ def build_chart(
         elif ind == "Stochastic":
             sk, sd = tech["stoch_k"], tech["stoch_d"]
             if not sk.empty:
-                fig.add_trace(go.Scatter(
+                fig.add_trace(go.Scattergl(
                     x=df.index, y=sk.values,
                     name="%K", line=dict(color="#6366f1", width=1.2)), row=row_idx, col=1)
             if not sd.empty:
-                fig.add_trace(go.Scatter(
+                fig.add_trace(go.Scattergl(
                     x=df.index, y=sd.values,
                     name="%D", line=dict(color="#f59e0b", width=1.2, dash="dot")), row=row_idx, col=1)
-            fig.add_hline(y=80, line_dash="dash", line_color="#ef4444",
+            fig.add_hline(y=80, line_dash="dash", line_color="#ef5350",
                           opacity=0.5, row=row_idx, col=1)
-            fig.add_hline(y=20, line_dash="dash", line_color="#10b981",
+            fig.add_hline(y=20, line_dash="dash", line_color="#26a69a",
                           opacity=0.5, row=row_idx, col=1)
             fig.update_yaxes(title_text="Stoch", range=[0, 100],
                              row=row_idx, col=1,
@@ -2440,7 +2440,7 @@ def build_chart(
         elif ind == "OBV":
             obv_s = tech["obv"]
             if not obv_s.empty:
-                fig.add_trace(go.Scatter(
+                fig.add_trace(go.Scattergl(
                     x=df.index, y=obv_s.values,
                     name="OBV", line=dict(color="#6366f1", width=1.2),
                     fill="tozeroy", fillcolor="rgba(99,102,241,0.07)"), row=row_idx, col=1)
@@ -2450,7 +2450,7 @@ def build_chart(
         elif ind == "ATR":
             atr_s = tech["atr"]
             if not atr_s.empty:
-                fig.add_trace(go.Scatter(
+                fig.add_trace(go.Scattergl(
                     x=df.index, y=atr_s.values,
                     name="ATR (14)", line=dict(color="#f97316", width=1.5)), row=row_idx, col=1)
             fig.update_yaxes(title_text="ATR", row=row_idx, col=1,
