@@ -2337,11 +2337,11 @@ def build_chart(
     fig.add_trace(go.Candlestick(
         x=df.index, open=df["Open"], high=df["High"],
         low=df["Low"], close=df["Close"], name="Price",
-        increasing_line_color="#10b981", decreasing_line_color="#ef4444",
-        increasing_fillcolor="#10b981", decreasing_fillcolor="#ef4444"), row=1, col=1)
+        increasing_line_color="#26a69a", decreasing_line_color="#ef5350",
+        increasing_fillcolor="#26a69a", decreasing_fillcolor="#ef5350"), row=1, col=1)
 
     # ── Row 2: Volume ─────────────────────────────────────────────────────
-    vol_colors = ["#10b981" if float(c) >= float(o) else "#ef4444"
+    vol_colors = ["#26a69a" if float(c) >= float(o) else "#ef5350"
                   for c, o in zip(df["Close"], df["Open"])]
     fig.add_trace(go.Bar(
         x=df.index, y=df["Volume"], marker_color=vol_colors,
@@ -2456,13 +2456,13 @@ def build_chart(
             fig.update_yaxes(title_text="ATR", row=row_idx, col=1,
                              title_font=dict(size=10), tickfont=dict(size=9))
 
-    # ── Global layout — TradingView dark theme ────────────────────────────
-    _TV_BG       = "#131722"   # main background
-    _TV_PLOT     = "#131722"   # plot area background
-    _TV_GRID     = "rgba(255,255,255,0.05)"  # subtle grid lines
-    _TV_SPIKE    = "#9598a1"   # crosshair color
-    _TV_TEXT     = "#b2b5be"   # axis label text
-    _TV_BORDER   = "rgba(255,255,255,0.08)"
+    # ── Global layout — TradingView light theme ───────────────────────────
+    _TV_BG     = "#ffffff"              # white background (TradingView default)
+    _TV_PLOT   = "#ffffff"
+    _TV_GRID   = "rgba(42,46,57,0.06)" # very subtle grid
+    _TV_SPIKE  = "#9598a1"             # crosshair
+    _TV_TEXT   = "#131722"             # dark axis labels
+    _TV_BORDER = "rgba(42,46,57,0.12)"
 
     x_spike = dict(showspikes=True, spikemode="across", spikesnap="cursor",
                    spikecolor=_TV_SPIKE, spikethickness=1, spikedash="solid")
@@ -2472,8 +2472,8 @@ def build_chart(
     _ax_style = dict(
         gridcolor=_TV_GRID,
         linecolor=_TV_BORDER,
-        tickfont=dict(color=_TV_TEXT, size=10),
-        title_font=dict(color=_TV_TEXT),
+        tickfont=dict(color="#787b86", size=10),
+        title_font=dict(color="#787b86"),
         zerolinecolor=_TV_BORDER,
     )
 
@@ -2483,17 +2483,17 @@ def build_chart(
         margin=dict(l=10, r=10, t=20, b=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.01,
                     xanchor="left", x=0, font=dict(size=10, color=_TV_TEXT),
-                    bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)"),
+                    bgcolor="rgba(255,255,255,0)", bordercolor="rgba(0,0,0,0)"),
         hovermode="x",
-        hoverlabel=dict(bgcolor="#1e222d", font=dict(color="#d1d4dc", size=12),
-                        bordercolor="#363a45"),
+        hoverlabel=dict(bgcolor="#ffffff", font=dict(color="#131722", size=12),
+                        bordercolor="#e0e3eb"),
         xaxis_rangeslider_visible=False,
         xaxis=dict(**x_spike, **_ax_style),
         yaxis=dict(**y_spike, **_ax_style),
         xaxis2=dict(**x_spike, **_ax_style),
         yaxis2=dict(**y_spike, **_ax_style),
         font=dict(family="Inter, sans-serif", size=11, color=_TV_TEXT))
-    # Apply dark style + spikes to all indicator axes
+    # Apply TradingView light style + spikes to all indicator axes
     for i in range(3, n_rows+1):
         fig.update_xaxes(dict(**x_spike, **_ax_style), row=i, col=1)
         fig.update_yaxes(dict(**y_spike, **_ax_style), row=i, col=1)
