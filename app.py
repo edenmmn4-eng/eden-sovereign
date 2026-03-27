@@ -2456,28 +2456,47 @@ def build_chart(
             fig.update_yaxes(title_text="ATR", row=row_idx, col=1,
                              title_font=dict(size=10), tickfont=dict(size=9))
 
-    # ── Global layout ─────────────────────────────────────────────────────
+    # ── Global layout — TradingView dark theme ────────────────────────────
+    _TV_BG       = "#131722"   # main background
+    _TV_PLOT     = "#131722"   # plot area background
+    _TV_GRID     = "rgba(255,255,255,0.05)"  # subtle grid lines
+    _TV_SPIKE    = "#9598a1"   # crosshair color
+    _TV_TEXT     = "#b2b5be"   # axis label text
+    _TV_BORDER   = "rgba(255,255,255,0.08)"
+
     x_spike = dict(showspikes=True, spikemode="across", spikesnap="cursor",
-                   spikecolor="#6366f1", spikethickness=1, spikedash="solid")
+                   spikecolor=_TV_SPIKE, spikethickness=1, spikedash="solid")
     y_spike = dict(showspikes=True, spikemode="across", spikesnap="cursor",
-                   spikecolor="#6366f1", spikethickness=1, spikedash="solid")
+                   spikecolor=_TV_SPIKE, spikethickness=1, spikedash="solid")
+
+    _ax_style = dict(
+        gridcolor=_TV_GRID,
+        linecolor=_TV_BORDER,
+        tickfont=dict(color=_TV_TEXT, size=10),
+        title_font=dict(color=_TV_TEXT),
+        zerolinecolor=_TV_BORDER,
+    )
+
     fig.update_layout(
         height=chart_height,
-        paper_bgcolor="#fcfcfc", plot_bgcolor="#fcfcfc",
+        paper_bgcolor=_TV_BG, plot_bgcolor=_TV_PLOT,
         margin=dict(l=10, r=10, t=20, b=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.01,
-                    xanchor="left", x=0, font=dict(size=10)),
+                    xanchor="left", x=0, font=dict(size=10, color=_TV_TEXT),
+                    bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)"),
         hovermode="x",
+        hoverlabel=dict(bgcolor="#1e222d", font=dict(color="#d1d4dc", size=12),
+                        bordercolor="#363a45"),
         xaxis_rangeslider_visible=False,
-        xaxis=dict(**x_spike, gridcolor="rgba(0,0,0,.04)"),
-        yaxis=dict(**y_spike, gridcolor="rgba(0,0,0,.04)"),
-        xaxis2=dict(**x_spike),
-        yaxis2=dict(**y_spike, gridcolor="rgba(0,0,0,.04)"),
-        font=dict(family="Inter, sans-serif", size=11))
-    # Apply gridcolor + spikes to all indicator axes
+        xaxis=dict(**x_spike, **_ax_style),
+        yaxis=dict(**y_spike, **_ax_style),
+        xaxis2=dict(**x_spike, **_ax_style),
+        yaxis2=dict(**y_spike, **_ax_style),
+        font=dict(family="Inter, sans-serif", size=11, color=_TV_TEXT))
+    # Apply dark style + spikes to all indicator axes
     for i in range(3, n_rows+1):
-        fig.update_xaxes(dict(**x_spike), row=i, col=1)
-        fig.update_yaxes(dict(**y_spike, gridcolor="rgba(0,0,0,.04)"), row=i, col=1)
+        fig.update_xaxes(dict(**x_spike, **_ax_style), row=i, col=1)
+        fig.update_yaxes(dict(**y_spike, **_ax_style), row=i, col=1)
 
     fig.update_traces(xaxis="x1")
     return fig
