@@ -2366,7 +2366,7 @@ def build_chart(
         fig.add_trace(go.Scattergl(
             x=df.index, y=tech["bb_upper"].values, mode="lines",
             name="BB Upper", line=dict(color="rgba(99,102,241,.5)", width=1, dash="dash")), row=1, col=1)
-        fig.add_trace(go.Scattergl(
+        fig.add_trace(go.Scatter(
             x=df.index, y=tech["bb_lower"].values, mode="lines",
             name="BB Lower", line=dict(color="rgba(99,102,241,.5)", width=1, dash="dash"),
             fill="tonexty", fillcolor="rgba(99,102,241,.06)"), row=1, col=1)
@@ -2440,7 +2440,7 @@ def build_chart(
         elif ind == "OBV":
             obv_s = tech["obv"]
             if not obv_s.empty:
-                fig.add_trace(go.Scattergl(
+                fig.add_trace(go.Scatter(
                     x=df.index, y=obv_s.values,
                     name="OBV", line=dict(color="#6366f1", width=1.2),
                     fill="tozeroy", fillcolor="rgba(99,102,241,0.07)"), row=row_idx, col=1)
