@@ -3055,7 +3055,7 @@ def _fetch_financials(ticker: str) -> tuple:
 def build_financials(ticker: str) -> None:
     with st.spinner("Loading financial statements..."):
         inc, bal, cf = _fetch_financials(ticker)
-    choice = st.radio("", ["Income Statement", "Balance Sheet", "Cash Flow"],
+    choice = st.radio("Financial Statement", ["Income Statement", "Balance Sheet", "Cash Flow"],
                       horizontal=True, label_visibility="collapsed")
     df_raw = {"Income Statement": inc, "Balance Sheet": bal, "Cash Flow": cf}[choice]
     if df_raw is None or df_raw.empty:
