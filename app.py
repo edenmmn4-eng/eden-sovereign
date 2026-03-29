@@ -779,6 +779,87 @@ def _supabase_set(ticker: str, info: dict) -> None:
         pass
 
 
+def _fmp_get_info(ticker: str) -> dict:
+    """מושך פונדמנטלים מ-Financial Modeling Prep כ-fallback כשYahoo Finance נחסם.
+    משתמש ב-3 endpoints: quote + profile + income-statement.
+    """
+    try:
+        try:
+            fmp_key = st.secrets.get("FMP_KEY", "") or os.environ.get("FMP_KEY", "")
+        except Exception:
+            fmp_key = os.environ.get("FMP_KEY", "")
+        if not fmp_key:
+            return {}
+        base = "https://financialmodelingprep.com/api/v3"
+
+        r_q = _req.get(f"{base}/quote/{ticker}?apikey={fmp_key}", timeout=5)
+        q = r_q.json()[0] if r_q.status_code == 200 and r_q.json() else {}
+
+        r_p = _req.get(f"{base}/profile/{ticker}?apikey={fmp_key}", timeout=5)
+        p = r_p.json()[0] if r_p.status_code == 200 and r_p.json() else {}
+
+        r_i = _req.get(
+            f"{base}/income-statement/{ticker}?period=annual&limit=5&apikey={fmp_key}",
+            timeout=5,
+        )
+        inc = r_i.json() if r_i.status_code == 200 and r_i.json() else []
+
+        if not q and not p:
+            return {}
+
+        info: dict = {}
+        info["longName"]  = p.get("companyName") or q.get("name") or ticker
+        info["shortName"] = info["longName"]
+        info["sector"]    = p.get("sector", "")
+        info["industry"]  = p.get("industry", "")
+        info["website"]   = p.get("website", "")
+        info["longBusinessSummary"] = p.get("description", "")
+        info["country"]   = p.get("country", "")
+        try:
+            info["fullTimeEmployees"] = int(p["fullTimeEmployees"]) if p.get("fullTimeEmployees") else None
+        except Exception:
+            info["fullTimeEmployees"] = None
+
+        is_etf = p.get("isEtf", False) or p.get("isFund", False)
+        info["quoteType"] = "ETF" if is_etf else "EQUITY"
+
+        info["currentPrice"]       = q.get("price")
+        info["regularMarketPrice"] = q.get("price")
+        info["previousClose"]      = q.get("previousClose")
+        info["marketCap"]          = q.get("marketCap") or p.get("mktCap")
+        info["fiftyTwoWeekHigh"]   = q.get("yearHigh")
+        info["fiftyTwoWeekLow"]    = q.get("yearLow")
+        info["averageVolume"]      = q.get("avgVolume")
+        info["sharesOutstanding"]  = q.get("sharesOutstanding")
+        info["beta"]               = p.get("beta")
+        info["trailingPE"]         = q.get("pe")
+        info["trailingEps"]        = q.get("eps")
+        _dy = q.get("dividendYield")
+        info["dividendYield"]      = _dy if _dy else None
+
+        if inc:
+            _lat = inc[0]
+            _rev = _lat.get("revenue") or 0
+            _gp  = _lat.get("grossProfit") or 0
+            _ni  = _lat.get("netIncome") or 0
+            _oi  = _lat.get("operatingIncome") or 0
+            info["totalRevenue"] = _rev
+            if _rev > 0:
+                info["grossMargins"]    = _gp / _rev
+                info["profitMargins"]   = _ni / _rev
+                info["operatingMargins"] = _oi / _rev
+            if len(inc) >= 3:
+                _old = inc[-1].get("revenue") or 0
+                _new = inc[0].get("revenue") or 0
+                _yrs = len(inc) - 1
+                if _old > 0 and _new > 0:
+                    info["revenueGrowth"] = (_new / _old) ** (1 / _yrs) - 1
+
+        return info
+    except Exception:
+        return {}
+
+
 def _supabase_get_all() -> dict:
     """מחזיר {ticker: data} לכל המניות הטריות ב-Supabase (< שעה) — bulk query אחד."""
     try:
@@ -845,10 +926,16 @@ def fetch_data(ticker: str) -> dict:
             if info:
                 _supabase_set(ticker, info)
             elif not info:
-                # rate limited — נסה cache ישן (עד 7 ימים, מכסה חגים וסופי שבוע)
-                _stale = _supabase_get(ticker, stale_ok=True)
-                if _stale:
-                    info = _stale
+                # Yahoo נחסם — נסה FMP כ-fallback ראשון
+                _fmp = _fmp_get_info(ticker)
+                if _fmp:
+                    info = _fmp
+                    _supabase_set(ticker, info)  # שמור ב-cache לשימוש עתידי
+                else:
+                    # FMP נכשל גם — נסה cache ישן (עד 7 ימים)
+                    _stale = _supabase_get(ticker, stale_ok=True)
+                    if _stale:
+                        info = _stale
         _info_ok = bool(info)
         out["info"] = info
 
