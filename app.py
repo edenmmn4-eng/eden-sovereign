@@ -4609,10 +4609,17 @@ def main() -> None:
             fig = build_compare_chart(_pairs, period_days=_days)
             st.plotly_chart(fig, config={"displayModeBar": False}, use_container_width=True)
         else:
-            # ── % תשואה לתקופה הנבחרת ─────────────────────────────────────
+            # ── חיתוך לפי Time Range ──────────────────────────────────────
             _period_map_main = {"1M": 21, "3M": 63, "6M": 126, "1Y": 252, "5Y": 1260}
             _main_days = _period_map_main.get(compare_period, 252)
-            _hist_slice = hist.tail(_main_days)
+            if compare_period == "5Y":
+                _hist_full = fetch_hist_extended(ticker, "5y")
+            elif compare_period == "1Y":
+                _hist_full = fetch_hist_extended(ticker, "2y")
+            else:
+                _hist_full = hist
+            _hist_slice = _hist_full.tail(_main_days) if not _hist_full.empty else hist
+            # ── % תשואה לתקופה הנבחרת ─────────────────────────────────────
             if len(_hist_slice) >= 2 and "Close" in _hist_slice.columns:
                 _ret = (_hist_slice["Close"].iloc[-1] / _hist_slice["Close"].iloc[0] - 1) * 100
                 _ret_color = "#26a69a" if _ret >= 0 else "#ef5350"
@@ -4624,7 +4631,7 @@ def main() -> None:
                     f'{_ret_sign}{_ret:.1f}% ({compare_period})</span></div>',
                     unsafe_allow_html=True)
             _ct = "line" if chart_type == "📈 Line" else "candlestick"
-            fig = build_chart(hist, tech, int(ma1), int(ma2), selected_indicators, chart_type=_ct)
+            fig = build_chart(_hist_slice, tech, int(ma1), int(ma2), selected_indicators, chart_type=_ct)
             st.plotly_chart(fig, config={"displayModeBar": False, "scrollZoom": False}, use_container_width=True)
 
     with tab_rep:
