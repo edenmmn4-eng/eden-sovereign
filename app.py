@@ -744,8 +744,8 @@ def _supabase_get(ticker: str, stale_ok: bool = False) -> dict | None:
             age = datetime.now(timezone.utc) - cached_at
             if age < timedelta(hours=4):
                 return row["data"]
-            if stale_ok and age < timedelta(hours=72):
-                return row["data"]   # נתונים ישנים — עדיף על כלום (מכסה סוף שבוע/חג)
+            if stale_ok and age < timedelta(hours=168):
+                return row["data"]   # נתונים ישנים — עדיף על כלום (מכסה עד שבוע)
     except Exception:
         pass
     return None
@@ -832,14 +832,20 @@ def fetch_data(ticker: str) -> dict:
             info = _cached_info
         else:
             info = {}
-            try:
-                info = obj.info or {}
-            except Exception:
-                pass
+            # נסה עד 3 פעמים עם backoff — מתאושש מ-rate limit תוך שניות
+            for _attempt in range(3):
+                try:
+                    info = obj.info or {}
+                    if info:
+                        break
+                except Exception:
+                    pass
+                if _attempt < 2:
+                    _time.sleep(2 ** _attempt)  # 1s אחר כך 2s
             if info:
                 _supabase_set(ticker, info)
             elif not info:
-                # rate limited — נסה cache ישן (עד 24 שעות)
+                # rate limited — נסה cache ישן (עד 7 ימים, מכסה חגים וסופי שבוע)
                 _stale = _supabase_get(ticker, stale_ok=True)
                 if _stale:
                     info = _stale
