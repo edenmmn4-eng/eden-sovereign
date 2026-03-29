@@ -2418,7 +2418,8 @@ def find_best_pick(horizon: str) -> list:
 def build_chart(
     df: pd.DataFrame, tech: dict,
     ma1: int, ma2: int,
-    selected_indicators: list[str]) -> go.Figure:
+    selected_indicators: list[str],
+    chart_type: str = "candlestick") -> go.Figure:
     subplot_inds = [i for i in SUBPLOT_INDS if i in selected_indicators]
     overlay_inds = [i for i in selected_indicators if i in OVERLAY_INDS]
     n_sub = len(subplot_inds)
@@ -2436,12 +2437,21 @@ def build_chart(
         rows=n_rows, cols=1, shared_xaxes=True,
         row_heights=row_heights, vertical_spacing=0.02)
 
-    # ── Row 1: Candlestick ────────────────────────────────────────────────
-    fig.add_trace(go.Candlestick(
-        x=df.index, open=df["Open"], high=df["High"],
-        low=df["Low"], close=df["Close"], name="Price",
-        increasing_line_color="#26a69a", decreasing_line_color="#ef5350",
-        increasing_fillcolor="#26a69a", decreasing_fillcolor="#ef5350"), row=1, col=1)
+    # ── Row 1: Candlestick or Glowing Line ───────────────────────────────
+    if chart_type == "line":
+        for _lw, _la in [(10, 0.06), (6, 0.12), (3, 0.35), (1.5, 1.0)]:
+            fig.add_trace(go.Scatter(
+                x=df.index, y=df["Close"].values, mode="lines",
+                name="Price" if _lw == 1.5 else None,
+                showlegend=(_lw == 1.5),
+                line=dict(color=f"rgba(16,185,129,{_la})", width=_lw)
+            ), row=1, col=1)
+    else:
+        fig.add_trace(go.Candlestick(
+            x=df.index, open=df["Open"], high=df["High"],
+            low=df["Low"], close=df["Close"], name="Price",
+            increasing_line_color="#26a69a", decreasing_line_color="#ef5350",
+            increasing_fillcolor="#26a69a", decreasing_fillcolor="#ef5350"), row=1, col=1)
 
     # ── Row 2: Volume ─────────────────────────────────────────────────────
     vol_colors = ["#26a69a" if float(c) >= float(o) else "#ef5350"
@@ -2604,6 +2614,52 @@ def build_chart(
     fig.update_traces(xaxis="x1")
     return fig
 
+
+# ── Compare Chart ──────────────────────────────────────────────────────────────
+def build_compare_chart(
+    df1: pd.DataFrame, df2: pd.DataFrame,
+    ticker1: str, ticker2: str) -> go.Figure:
+    """גרף השוואה: שני קווים זוהרים מנורמלים ל-100 בנקודת ההתחלה."""
+    fig = go.Figure()
+    for df, name, base_color in [
+        (df1, ticker1, "rgba(16,185,129,"),
+        (df2, ticker2, "rgba(99,102,241,"),
+    ]:
+        if df.empty or "Close" not in df.columns:
+            continue
+        _base = df["Close"].iloc[0]
+        if not _base or _base == 0:
+            continue
+        _norm = (df["Close"] / _base) * 100
+        for _lw, _la in [(10, 0.06), (6, 0.12), (3, 0.35), (1.5, 1.0)]:
+            fig.add_trace(go.Scatter(
+                x=df.index, y=_norm.values, mode="lines",
+                name=name if _lw == 1.5 else None,
+                showlegend=(_lw == 1.5),
+                line=dict(color=f"{base_color}{_la})", width=_lw)
+            ))
+    fig.update_layout(
+        paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+        hovermode="x unified",
+        yaxis=dict(
+            gridcolor="rgba(42,46,57,0.06)",
+            linecolor="rgba(42,46,57,0.12)",
+            tickfont=dict(color="#787b86", size=10),
+            zerolinecolor="rgba(42,46,57,0.12)",
+            ticksuffix="%",
+        ),
+        xaxis=dict(
+            gridcolor="rgba(42,46,57,0.06)",
+            linecolor="rgba(42,46,57,0.12)",
+            tickfont=dict(color="#787b86", size=10),
+        ),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                    font=dict(size=13)),
+        margin=dict(t=40, b=20, l=0, r=0), height=440,
+        hoverlabel=dict(bgcolor="#ffffff", font=dict(color="#131722", size=12),
+                        bordercolor="#e0e3eb"),
+    )
+    return fig
 
 
 # ── Financial term tooltip helper ─────────────────────────────────────────────
@@ -4254,6 +4310,16 @@ def main() -> None:
             placeholder="Add indicators...",
             key="indicators_multi")
 
+        st.markdown("**Chart Type**")
+        chart_type = st.radio("Chart Type", ["🕯 Candlestick", "📈 Line"],
+                              horizontal=True, key="chart_type_radio",
+                              label_visibility="collapsed")
+
+        st.markdown("**Compare**")
+        compare_ticker = st.selectbox(
+            "Compare with", options=["—"] + TICKER_LIST,
+            key="compare_ticker_sel", label_visibility="collapsed")
+
 
         # ── 👤 חשבון משתמש + 🔔 התראות מחיר — Telegram ──────────────────────
         st.markdown("---")
@@ -4472,8 +4538,17 @@ def main() -> None:
     with tab_chart:
         if len(hist) < 5:
             st.warning("Not enough price history to render chart.")
+        elif compare_ticker and compare_ticker != "—":
+            with st.spinner(f"Loading {compare_ticker}..."):
+                _cmp_data = fetch_data(compare_ticker)
+            if _cmp_data["hist"].empty:
+                st.warning(f"No price data for {compare_ticker}")
+            else:
+                fig = build_compare_chart(hist, _cmp_data["hist"], ticker, compare_ticker)
+                st.plotly_chart(fig, config={"displayModeBar": False}, use_container_width=True)
         else:
-            fig = build_chart(hist, tech, int(ma1), int(ma2), selected_indicators)
+            _ct = "line" if chart_type == "📈 Line" else "candlestick"
+            fig = build_chart(hist, tech, int(ma1), int(ma2), selected_indicators, chart_type=_ct)
             st.plotly_chart(fig, config={"displayModeBar": False, "scrollZoom": False}, use_container_width=True)
 
     with tab_rep:
