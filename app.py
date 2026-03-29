@@ -2229,7 +2229,19 @@ def get_usd_ils() -> float:
     return 3.7
 
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_hist_extended(ticker: str, yf_period: str = "5y") -> pd.DataFrame:
+    """מושך היסטוריה ארוכה (2Y/5Y) לגרף Compare."""
+    try:
+        h = yf.Ticker(ticker).history(period=yf_period, interval="1d", auto_adjust=True)
+        if h.empty:
+            h = yf.download(ticker, period=yf_period, interval="1d",
+                            auto_adjust=True, progress=False)
+        return h
+    except Exception:
+        return pd.DataFrame()
+
+
 def fetch_portfolio_prices(tickers: tuple) -> dict:
     import time as _t
 
@@ -2629,11 +2641,33 @@ def build_compare_chart(
     """גרף השוואה: קווים זוהרים מנורמלים ל-100, עם % תשואה בשם.
     pairs: [(df, ticker_name), ...]
     """
+    import datetime as _dt
     fig = go.Figure()
+
+    # מציאת תאריך התחלה משותף לכל המניות לדיוק בחישוב % תשואה
+    cutoff_date = None
+    for df, _ in pairs:
+        if df.empty or "Close" not in df.columns:
+            continue
+        _idx = df.index.tz_localize(None) if hasattr(df.index, "tz") and df.index.tz is not None else df.index
+        # tail(period_days) to get candidate window
+        _sliced = _idx[-period_days:] if len(_idx) >= period_days else _idx
+        _start = _sliced[0] if len(_sliced) > 0 else None
+        if _start is not None:
+            _start = pd.Timestamp(_start).normalize()
+            if cutoff_date is None or _start > cutoff_date:
+                cutoff_date = _start  # latest first-available date = common start
+
     for idx, (df, name) in enumerate(pairs):
         if df.empty or "Close" not in df.columns:
             continue
-        _df = df.tail(period_days)
+        _idx = df.index.tz_localize(None) if hasattr(df.index, "tz") and df.index.tz is not None else df.index
+        df2 = df.copy()
+        df2.index = _idx
+        if cutoff_date is not None:
+            _df = df2[df2.index >= cutoff_date]
+        else:
+            _df = df2.tail(period_days)
         if _df.empty:
             continue
         _base = _df["Close"].iloc[0]
@@ -4334,9 +4368,9 @@ def main() -> None:
             placeholder="הוסף מניה/מדד...", max_selections=3)
 
         st.markdown("**Time Range**")
-        compare_period = st.radio("Time Range", ["1M", "3M", "6M", "1Y"],
-                                  horizontal=True, key="compare_period_radio",
-                                  index=3, label_visibility="collapsed")
+        compare_period = st.selectbox("Time Range", ["1M", "3M", "6M", "1Y", "5Y"],
+                                      index=3, key="compare_period_sel",
+                                      label_visibility="collapsed")
 
 
         # ── 👤 חשבון משתמש + 🔔 התראות מחיר — Telegram ──────────────────────
@@ -4557,17 +4591,38 @@ def main() -> None:
         if len(hist) < 5:
             st.warning("Not enough price history to render chart.")
         elif compare_tickers:
-            _period_map = {"1M": 21, "3M": 63, "6M": 126, "1Y": 252}
+            _period_map = {"1M": 21, "3M": 63, "6M": 126, "1Y": 252, "5Y": 1260}
             _days = _period_map.get(compare_period, 252)
-            _pairs = [(hist, ticker)]
+            _use_extended = compare_period in ("1Y", "5Y")
+            _yf_period = "5y" if compare_period == "5Y" else "2y"
             with st.spinner("Loading comparison data..."):
+                _main_hist = fetch_hist_extended(ticker, _yf_period) if _use_extended else hist
+                _pairs = [(_main_hist, ticker)]
                 for _ct in compare_tickers:
-                    _cd = fetch_data(_ct)
-                    if not _cd["hist"].empty:
-                        _pairs.append((_cd["hist"], _ct))
+                    if _use_extended:
+                        _ch = fetch_hist_extended(_ct, _yf_period)
+                    else:
+                        _cd = fetch_data(_ct)
+                        _ch = _cd["hist"]
+                    if not _ch.empty:
+                        _pairs.append((_ch, _ct))
             fig = build_compare_chart(_pairs, period_days=_days)
             st.plotly_chart(fig, config={"displayModeBar": False}, use_container_width=True)
         else:
+            # ── % תשואה לתקופה הנבחרת ─────────────────────────────────────
+            _period_map_main = {"1M": 21, "3M": 63, "6M": 126, "1Y": 252, "5Y": 1260}
+            _main_days = _period_map_main.get(compare_period, 252)
+            _hist_slice = hist.tail(_main_days)
+            if len(_hist_slice) >= 2 and "Close" in _hist_slice.columns:
+                _ret = (_hist_slice["Close"].iloc[-1] / _hist_slice["Close"].iloc[0] - 1) * 100
+                _ret_color = "#26a69a" if _ret >= 0 else "#ef5350"
+                _ret_sign = "+" if _ret >= 0 else ""
+                st.markdown(
+                    f'<div style="font-size:13px;color:{_ret_color};font-weight:600;'
+                    f'margin-bottom:4px">{ticker} &nbsp;'
+                    f'<span style="background:{_ret_color}22;padding:2px 8px;border-radius:4px">'
+                    f'{_ret_sign}{_ret:.1f}% ({compare_period})</span></div>',
+                    unsafe_allow_html=True)
             _ct = "line" if chart_type == "📈 Line" else "candlestick"
             fig = build_chart(hist, tech, int(ma1), int(ma2), selected_indicators, chart_type=_ct)
             st.plotly_chart(fig, config={"displayModeBar": False, "scrollZoom": False}, use_container_width=True)
