@@ -4705,10 +4705,7 @@ def main() -> None:
         _is_demo = (_port_mode == "🎯 דמו")
 
         _port_key = "demo_portfolio" if _is_demo else "portfolio"
-        if _is_demo:
-            st.caption("🎯 תיק וירטואלי — ניתן לעריכה מלאה, ללא כסף אמיתי")
 
-        # Add stock row (זהה לשני המצבים)
         _pc1, _pc2, _pc3, _pc4 = st.columns([2, 1, 1.5, 1])
         with _pc1:
             _port_ticker = st.selectbox("מניה", options=TICKER_LIST,
@@ -4738,15 +4735,13 @@ def main() -> None:
                 else:
                     st.warning(f"{_port_ticker} כבר בתיק.")
 
-        _reset_cols = st.columns([1, 3])
-        with _reset_cols[0]:
-            if st.button("&#9851; Reset", use_container_width=True, key=f"port_reset_{_port_key}"):
-                if _is_demo:
-                    st.session_state["demo_portfolio"] = [dict(h) for h in DEMO_PORTFOLIO]
-                else:
-                    st.session_state["portfolio"] = []
-                    _save_portfolio([])
-                st.rerun()
+        if st.button("&#9851; Reset Portfolio", use_container_width=False, key=f"port_reset_{_port_key}"):
+            if _is_demo:
+                st.session_state["demo_portfolio"] = [dict(h) for h in DEMO_PORTFOLIO]
+            else:
+                st.session_state["portfolio"] = []
+                _save_portfolio([])
+            st.rerun()
 
         _portfolio = st.session_state[_port_key]
 
