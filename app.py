@@ -4187,7 +4187,7 @@ def main() -> None:
     elif "portfolio" not in st.session_state:
         st.session_state["portfolio"] = _load_portfolio()
     if "demo_portfolio" not in st.session_state:
-        st.session_state["demo_portfolio"] = [dict(h) for h in DEMO_PORTFOLIO]
+        st.session_state["demo_portfolio"] = []
 
     # ── בדיקת התראות מחיר Telegram (כל רענון) ────────────────────────────────
     try:
@@ -4737,7 +4737,7 @@ def main() -> None:
 
         if st.button("&#9851; Reset Portfolio", use_container_width=False, key=f"port_reset_{_port_key}"):
             if _is_demo:
-                st.session_state["demo_portfolio"] = [dict(h) for h in DEMO_PORTFOLIO]
+                st.session_state["demo_portfolio"] = []
             else:
                 st.session_state["portfolio"] = []
                 _save_portfolio([])
