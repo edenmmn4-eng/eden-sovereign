@@ -4186,6 +4186,8 @@ def main() -> None:
             st.session_state["portfolio"] = _load_portfolio()
     elif "portfolio" not in st.session_state:
         st.session_state["portfolio"] = _load_portfolio()
+    if "demo_portfolio" not in st.session_state:
+        st.session_state["demo_portfolio"] = [dict(h) for h in DEMO_PORTFOLIO]
 
     # ── בדיקת התראות מחיר Telegram (כל רענון) ────────────────────────────────
     try:
@@ -4702,45 +4704,51 @@ def main() -> None:
                               label_visibility="collapsed")
         _is_demo = (_port_mode == "🎯 דמו")
 
+        _port_key = "demo_portfolio" if _is_demo else "portfolio"
         if _is_demo:
-            st.caption("📊 תיק דמו לדוגמה — לא ניתן לעריכה")
-            _portfolio = DEMO_PORTFOLIO
-        else:
-            # Add stock row
-            _pc1, _pc2, _pc3, _pc4 = st.columns([2, 1, 1.5, 1])
-            with _pc1:
-                _port_ticker = st.selectbox("מניה", options=TICKER_LIST,
-                                            label_visibility="collapsed",
-                                            key="port_ticker_sel",
-                                            placeholder="בחר מניה...")
-            with _pc2:
-                _port_qty = st.number_input("כמות", min_value=0.01, value=1.0,
-                                            step=1.0, label_visibility="collapsed",
-                                            key="port_qty")
-            with _pc3:
-                _port_buy = st.number_input("מחיר קנייה $", min_value=0.01, value=100.0,
-                                            step=1.0, label_visibility="collapsed",
-                                            key="port_buy")
-            with _pc4:
-                if st.button("+ הוסף", use_container_width=True, key="port_add"):
-                    _existing = [h["ticker"] for h in st.session_state["portfolio"]]
-                    if _port_ticker not in _existing:
-                        st.session_state["portfolio"].append({
-                            "ticker": _port_ticker,
-                            "quantity": _port_qty,
-                            "buy_price": _port_buy,
-                        })
-                        _save_portfolio(st.session_state["portfolio"])
-                        st.rerun()
-                    else:
-                        st.warning(f"{_port_ticker} כבר בתיק.")
+            st.caption("🎯 תיק וירטואלי — ניתן לעריכה מלאה, ללא כסף אמיתי")
 
-            if st.button("&#9851; Reset Portfolio", use_container_width=False, key="port_reset"):
-                st.session_state["portfolio"] = []
-                _save_portfolio([])
+        # Add stock row (זהה לשני המצבים)
+        _pc1, _pc2, _pc3, _pc4 = st.columns([2, 1, 1.5, 1])
+        with _pc1:
+            _port_ticker = st.selectbox("מניה", options=TICKER_LIST,
+                                        label_visibility="collapsed",
+                                        key=f"port_ticker_sel_{_port_key}",
+                                        placeholder="בחר מניה...")
+        with _pc2:
+            _port_qty = st.number_input("כמות", min_value=0.01, value=1.0,
+                                        step=1.0, label_visibility="collapsed",
+                                        key=f"port_qty_{_port_key}")
+        with _pc3:
+            _port_buy = st.number_input("מחיר קנייה $", min_value=0.01, value=100.0,
+                                        step=1.0, label_visibility="collapsed",
+                                        key=f"port_buy_{_port_key}")
+        with _pc4:
+            if st.button("+ הוסף", use_container_width=True, key=f"port_add_{_port_key}"):
+                _existing = [h["ticker"] for h in st.session_state[_port_key]]
+                if _port_ticker not in _existing:
+                    st.session_state[_port_key].append({
+                        "ticker": _port_ticker,
+                        "quantity": _port_qty,
+                        "buy_price": _port_buy,
+                    })
+                    if not _is_demo:
+                        _save_portfolio(st.session_state[_port_key])
+                    st.rerun()
+                else:
+                    st.warning(f"{_port_ticker} כבר בתיק.")
+
+        _reset_cols = st.columns([1, 3])
+        with _reset_cols[0]:
+            if st.button("&#9851; Reset", use_container_width=True, key=f"port_reset_{_port_key}"):
+                if _is_demo:
+                    st.session_state["demo_portfolio"] = [dict(h) for h in DEMO_PORTFOLIO]
+                else:
+                    st.session_state["portfolio"] = []
+                    _save_portfolio([])
                 st.rerun()
 
-            _portfolio = st.session_state["portfolio"]
+        _portfolio = st.session_state[_port_key]
 
         if not _portfolio:
             st.info("התיק ריק — הוסף מניות למעלה.")
