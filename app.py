@@ -744,8 +744,8 @@ def _supabase_get(ticker: str, stale_ok: bool = False) -> dict | None:
             age = datetime.now(timezone.utc) - cached_at
             if age < timedelta(hours=4):
                 return row["data"]
-            if stale_ok and age < timedelta(hours=24):
-                return row["data"]   # נתונים ישנים — עדיף על כלום
+            if stale_ok and age < timedelta(hours=72):
+                return row["data"]   # נתונים ישנים — עדיף על כלום (מכסה סוף שבוע/חג)
     except Exception:
         pass
     return None
