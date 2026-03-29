@@ -2616,27 +2616,39 @@ def build_chart(
 
 
 # ── Compare Chart ──────────────────────────────────────────────────────────────
+_COMPARE_COLORS = [
+    "rgba(16,185,129,",   # ירוק — מניה ראשית
+    "rgba(99,102,241,",   # סגול
+    "rgba(245,158,11,",   # כתום
+    "rgba(239,68,68,",    # אדום
+]
+
 def build_compare_chart(
-    df1: pd.DataFrame, df2: pd.DataFrame,
-    ticker1: str, ticker2: str) -> go.Figure:
-    """גרף השוואה: שני קווים זוהרים מנורמלים ל-100 בנקודת ההתחלה."""
+    pairs: list,
+    period_days: int = 252) -> go.Figure:
+    """גרף השוואה: קווים זוהרים מנורמלים ל-100, עם % תשואה בשם.
+    pairs: [(df, ticker_name), ...]
+    """
     fig = go.Figure()
-    for df, name, base_color in [
-        (df1, ticker1, "rgba(16,185,129,"),
-        (df2, ticker2, "rgba(99,102,241,"),
-    ]:
+    for idx, (df, name) in enumerate(pairs):
         if df.empty or "Close" not in df.columns:
             continue
-        _base = df["Close"].iloc[0]
+        _df = df.tail(period_days)
+        if _df.empty:
+            continue
+        _base = _df["Close"].iloc[0]
         if not _base or _base == 0:
             continue
-        _norm = (df["Close"] / _base) * 100
+        _norm = (_df["Close"] / _base) * 100
+        _pct = _norm.iloc[-1] - 100
+        _label = f"{name}  {_pct:+.1f}%"
+        _color = _COMPARE_COLORS[idx % len(_COMPARE_COLORS)]
         for _lw, _la in [(10, 0.06), (6, 0.12), (3, 0.35), (1.5, 1.0)]:
             fig.add_trace(go.Scatter(
-                x=df.index, y=_norm.values, mode="lines",
-                name=name if _lw == 1.5 else None,
+                x=_df.index, y=_norm.values, mode="lines",
+                name=_label if _lw == 1.5 else None,
                 showlegend=(_lw == 1.5),
-                line=dict(color=f"{base_color}{_la})", width=_lw)
+                line=dict(color=f"{_color}{_la})", width=_lw)
             ))
     fig.update_layout(
         paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
@@ -2654,7 +2666,7 @@ def build_compare_chart(
             tickfont=dict(color="#787b86", size=10),
         ),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
-                    font=dict(size=13)),
+                    font=dict(size=13, color="#131722")),
         margin=dict(t=40, b=20, l=0, r=0), height=440,
         hoverlabel=dict(bgcolor="#ffffff", font=dict(color="#131722", size=12),
                         bordercolor="#e0e3eb"),
@@ -4316,9 +4328,15 @@ def main() -> None:
                               label_visibility="collapsed")
 
         st.markdown("**Compare**")
-        compare_ticker = st.selectbox(
-            "Compare with", options=["—"] + TICKER_LIST,
-            key="compare_ticker_sel", label_visibility="collapsed")
+        compare_tickers = st.multiselect(
+            "Compare with", options=TICKER_LIST,
+            key="compare_tickers_sel", label_visibility="collapsed",
+            placeholder="הוסף מניה/מדד...", max_selections=3)
+
+        st.markdown("**Time Range**")
+        compare_period = st.radio("Time Range", ["1M", "3M", "6M", "1Y"],
+                                  horizontal=True, key="compare_period_radio",
+                                  index=3, label_visibility="collapsed")
 
 
         # ── 👤 חשבון משתמש + 🔔 התראות מחיר — Telegram ──────────────────────
@@ -4538,14 +4556,17 @@ def main() -> None:
     with tab_chart:
         if len(hist) < 5:
             st.warning("Not enough price history to render chart.")
-        elif compare_ticker and compare_ticker != "—":
-            with st.spinner(f"Loading {compare_ticker}..."):
-                _cmp_data = fetch_data(compare_ticker)
-            if _cmp_data["hist"].empty:
-                st.warning(f"No price data for {compare_ticker}")
-            else:
-                fig = build_compare_chart(hist, _cmp_data["hist"], ticker, compare_ticker)
-                st.plotly_chart(fig, config={"displayModeBar": False}, use_container_width=True)
+        elif compare_tickers:
+            _period_map = {"1M": 21, "3M": 63, "6M": 126, "1Y": 252}
+            _days = _period_map.get(compare_period, 252)
+            _pairs = [(hist, ticker)]
+            with st.spinner("Loading comparison data..."):
+                for _ct in compare_tickers:
+                    _cd = fetch_data(_ct)
+                    if not _cd["hist"].empty:
+                        _pairs.append((_cd["hist"], _ct))
+            fig = build_compare_chart(_pairs, period_days=_days)
+            st.plotly_chart(fig, config={"displayModeBar": False}, use_container_width=True)
         else:
             _ct = "line" if chart_type == "📈 Line" else "candlestick"
             fig = build_chart(hist, tech, int(ma1), int(ma2), selected_indicators, chart_type=_ct)
