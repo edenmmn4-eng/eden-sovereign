@@ -925,32 +925,31 @@ def fetch_data(ticker: str) -> dict:
     import time as _time
     try:
         obj = yf.Ticker(ticker)
-        # ── obj.info — בדוק Supabase תחילה, אחרי כן yfinance ──────────────────
+        # ── obj.info — סדר עדיפויות: Supabase → FMP → Yahoo → Supabase stale ──
+        # Yahoo Finance חוסם את ה-IP של Streamlit Cloud — FMP הוא המקור הראשי
         _cached_info = _supabase_get(ticker)
         if _cached_info is not None:
             info = _cached_info
         else:
-            # נסה stale cache לפני Yahoo — עדיף נתונים ישנים על שגיאה
-            _stale_early = _supabase_get(ticker, stale_ok=True)
-
             info = {}
-            # ניסיון אחד בלבד ל-Yahoo (Streamlit Cloud IP נחסם — retries בזבוז זמן)
-            try:
-                info = obj.info or {}
-            except Exception:
-                pass
-
-            if info:
+            # 1. נסה FMP ראשון — לא נחסם על ידי Streamlit Cloud
+            _fmp = _fmp_get_info(ticker)
+            if _fmp:
+                info = _fmp
                 _supabase_set(ticker, info)
             else:
-                # Yahoo נחסם — נסה FMP כ-fallback
-                _fmp = _fmp_get_info(ticker)
-                if _fmp:
-                    info = _fmp
+                # 2. FMP נכשל — נסה Yahoo (עלול להיחסם אבל שווה ניסיון)
+                try:
+                    info = obj.info or {}
+                except Exception:
+                    pass
+                if info:
                     _supabase_set(ticker, info)
-                elif _stale_early:
-                    # FMP נכשל גם — השתמש ב-cache ישן (עד 30 ימים)
-                    info = _stale_early
+                else:
+                    # 3. גם Yahoo נכשל — השתמש ב-cache ישן (עד 30 ימים)
+                    _stale = _supabase_get(ticker, stale_ok=True)
+                    if _stale:
+                        info = _stale
         _info_ok = bool(info)
         out["info"] = info
 
