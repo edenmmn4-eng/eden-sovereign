@@ -793,13 +793,16 @@ def _fmp_get_info(ticker: str) -> dict:
     """מושך פונדמנטלים מ-Financial Modeling Prep כ-fallback כשYahoo Finance נחסם.
     משתמש ב-3 endpoints: quote + profile + income-statement.
     """
+    # קרא את המפתח לפני ה-try כדי שנוכל לדווח על כשל
+    fmp_key = ""
     try:
-        try:
-            fmp_key = st.secrets.get("FMP_KEY", "") or os.environ.get("FMP_KEY", "")
-        except Exception:
-            fmp_key = os.environ.get("FMP_KEY", "")
-        if not fmp_key:
-            return {}
+        fmp_key = st.secrets["FMP_KEY"]
+    except Exception:
+        fmp_key = os.environ.get("FMP_KEY", "")
+    if not fmp_key:
+        print("[FMP] FMP_KEY לא נמצא ב-secrets ולא ב-env — FMP מושבת")
+        return {}
+    try:
         base = "https://financialmodelingprep.com/api/v3"
 
         r_q = _req.get(f"{base}/quote/{ticker}?apikey={fmp_key}", timeout=8)
@@ -873,8 +876,10 @@ def _fmp_get_info(ticker: str) -> dict:
                 if _old > 0 and _new > 0:
                     info["revenueGrowth"] = (_new / _old) ** (1 / _yrs) - 1
 
+        print(f"[FMP] הצלחה — {ticker} נטען מ-FMP")
         return info
-    except Exception:
+    except Exception as _fmp_err:
+        print(f"[FMP] שגיאה עבור {ticker}: {_fmp_err}")
         return {}
 
 
