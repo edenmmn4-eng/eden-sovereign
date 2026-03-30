@@ -933,6 +933,7 @@ def fetch_data(ticker: str) -> dict:
         # ── obj.info — סדר עדיפויות: Supabase → FMP → Yahoo → Supabase stale ──
         # Yahoo Finance חוסם את ה-IP של Streamlit Cloud — FMP הוא המקור הראשי
         _cached_info = _supabase_get(ticker)
+        _info_from_yahoo = False
         if _cached_info is not None:
             info = _cached_info
         else:
@@ -949,6 +950,7 @@ def fetch_data(ticker: str) -> dict:
                 except Exception:
                     pass
                 if info:
+                    _info_from_yahoo = True
                     _supabase_set(ticker, info)
                 else:
                     # 3. גם Yahoo נכשל — השתמש ב-cache ישן (עד 30 ימים)
@@ -1012,15 +1014,20 @@ def fetch_data(ticker: str) -> dict:
             except Exception:
                 return None
 
-        # דלג על בקשות נוספות כשה-info ריק (rate limited)
+        # דלג על בקשות נוספות כשה-info ריק, או כשמגיע מFMP/Supabase (Yahoo חסום)
         if not _info_ok:
             out["rate_limited"] = True
             _ann_income = _q_income = _cf_stmt = None
-        else:
+        elif _info_from_yahoo:
+            # Yahoo עבד — אפשר למשוך גם דוחות כספיים
             out["rate_limited"] = False
-            _ann_income = _stmt_fetch("income_stmt", "financials")       # annual income stmt
+            _ann_income = _stmt_fetch("income_stmt", "financials")
             _q_income   = _stmt_fetch("quarterly_income_stmt", "quarterly_financials")
-            _cf_stmt    = _stmt_fetch("cashflow", "cash_flow")            # annual cash flow
+            _cf_stmt    = _stmt_fetch("cashflow", "cash_flow")
+        else:
+            # FMP/Supabase — אל תנסה דוחות מYahoo, הוא חסום
+            out["rate_limited"] = False
+            _ann_income = _q_income = _cf_stmt = None
         _ann_fin    = _ann_income  # same data; reuse
 
         # ── P/E fallback: multiple sources ───────────────────────────────────
