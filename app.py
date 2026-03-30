@@ -752,10 +752,10 @@ def _supabase_get(ticker: str, stale_ok: bool = False) -> dict | None:
             from datetime import timezone, timedelta
             cached_at = datetime.fromisoformat(row["cached_at"].replace("Z", "+00:00"))
             age = datetime.now(timezone.utc) - cached_at
-            if age < timedelta(hours=4):
+            if age < timedelta(hours=24):
                 return row["data"]
-            if stale_ok and age < timedelta(hours=168):
-                return row["data"]   # נתונים ישנים — עדיף על כלום (מכסה עד שבוע)
+            if stale_ok and age < timedelta(hours=720):
+                return row["data"]   # נתונים ישנים — עדיף על כלום (מכסה עד 30 ימים)
     except Exception:
         pass
     return None
@@ -802,19 +802,27 @@ def _fmp_get_info(ticker: str) -> dict:
             return {}
         base = "https://financialmodelingprep.com/api/v3"
 
-        r_q = _req.get(f"{base}/quote/{ticker}?apikey={fmp_key}", timeout=5)
-        q = r_q.json()[0] if r_q.status_code == 200 and r_q.json() else {}
+        r_q = _req.get(f"{base}/quote/{ticker}?apikey={fmp_key}", timeout=8)
+        _qj = r_q.json() if r_q.status_code == 200 else None
+        if not _qj:
+            print(f"[FMP] quote failed status={r_q.status_code} body={r_q.text[:300]}")
+        q = _qj[0] if isinstance(_qj, list) and _qj else {}
 
-        r_p = _req.get(f"{base}/profile/{ticker}?apikey={fmp_key}", timeout=5)
-        p = r_p.json()[0] if r_p.status_code == 200 and r_p.json() else {}
+        r_p = _req.get(f"{base}/profile/{ticker}?apikey={fmp_key}", timeout=8)
+        _pj = r_p.json() if r_p.status_code == 200 else None
+        if not _pj:
+            print(f"[FMP] profile failed status={r_p.status_code} body={r_p.text[:300]}")
+        p = _pj[0] if isinstance(_pj, list) and _pj else {}
 
         r_i = _req.get(
             f"{base}/income-statement/{ticker}?period=annual&limit=5&apikey={fmp_key}",
-            timeout=5,
+            timeout=8,
         )
-        inc = r_i.json() if r_i.status_code == 200 and r_i.json() else []
+        _ij = r_i.json() if r_i.status_code == 200 else []
+        inc = _ij if isinstance(_ij, list) else []
 
         if not q and not p:
+            print(f"[FMP] both empty for {ticker} — key may be invalid or limit reached")
             return {}
 
         info: dict = {}
@@ -922,30 +930,27 @@ def fetch_data(ticker: str) -> dict:
         if _cached_info is not None:
             info = _cached_info
         else:
+            # נסה stale cache לפני Yahoo — עדיף נתונים ישנים על שגיאה
+            _stale_early = _supabase_get(ticker, stale_ok=True)
+
             info = {}
-            # נסה עד 3 פעמים עם backoff — מתאושש מ-rate limit תוך שניות
-            for _attempt in range(3):
-                try:
-                    info = obj.info or {}
-                    if info:
-                        break
-                except Exception:
-                    pass
-                if _attempt < 2:
-                    _time.sleep(2 ** _attempt)  # 1s אחר כך 2s
+            # ניסיון אחד בלבד ל-Yahoo (Streamlit Cloud IP נחסם — retries בזבוז זמן)
+            try:
+                info = obj.info or {}
+            except Exception:
+                pass
+
             if info:
                 _supabase_set(ticker, info)
-            elif not info:
-                # Yahoo נחסם — נסה FMP כ-fallback ראשון
+            else:
+                # Yahoo נחסם — נסה FMP כ-fallback
                 _fmp = _fmp_get_info(ticker)
                 if _fmp:
                     info = _fmp
-                    _supabase_set(ticker, info)  # שמור ב-cache לשימוש עתידי
-                else:
-                    # FMP נכשל גם — נסה cache ישן (עד 7 ימים)
-                    _stale = _supabase_get(ticker, stale_ok=True)
-                    if _stale:
-                        info = _stale
+                    _supabase_set(ticker, info)
+                elif _stale_early:
+                    # FMP נכשל גם — השתמש ב-cache ישן (עד 30 ימים)
+                    info = _stale_early
         _info_ok = bool(info)
         out["info"] = info
 
