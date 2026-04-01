@@ -1637,25 +1637,70 @@ def _normalize_phone(phone: str) -> str:
     return digits
 
 
+def _supabase_load_tg_db() -> dict | None:
+    """טוען את מסד Telegram מ-Supabase (ללא TTL — נתוני משתמש קבועים)."""
+    try:
+        url, key = _sb_creds()
+        if not url or not key:
+            return None
+        r = _req.get(
+            f"{url}/rest/v1/ticker_cache",
+            params={"ticker": "eq._tg_db", "select": "data"},
+            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            timeout=4,
+        )
+        if r.status_code == 200 and r.json():
+            return r.json()[0]["data"]
+    except Exception:
+        pass
+    return None
+
+
+def _supabase_save_tg_db(db: dict) -> None:
+    """שומר את מסד Telegram ב-Supabase."""
+    try:
+        url, key = _sb_creds()
+        if not url or not key:
+            return
+        _to_save = {k: v for k, v in db.items() if not k.startswith("_last_")}
+        _req.post(
+            f"{url}/rest/v1/ticker_cache",
+            json={"ticker": "_tg_db", "data": _to_save,
+                  "cached_at": datetime.utcnow().isoformat()},
+            headers={"apikey": key, "Authorization": f"Bearer {key}",
+                     "Prefer": "resolution=merge-duplicates"},
+            timeout=4,
+        )
+    except Exception:
+        pass
+
+
 def _load_alerts_db() -> dict:
+    _defaults = {"registrations": {}, "alerts": [], "score_alerts": [],
+                 "check_interval_hours": 1, "_last_poll": None, "_last_bg_check": None}
+    # 1. Supabase — persistent גם אחרי restart
+    sb = _supabase_load_tg_db()
+    if sb and isinstance(sb, dict):
+        for k, v in _defaults.items():
+            sb.setdefault(k, v)
+        return sb
+    # 2. fallback — קובץ מקומי
     try:
         if os.path.exists(_ALERTS_FILE):
             data = json.load(open(_ALERTS_FILE, encoding="utf-8"))
             if isinstance(data, dict):
-                data.setdefault("registrations", {})
-                data.setdefault("alerts", [])
-                data.setdefault("score_alerts", [])
-                data.setdefault("check_interval_hours", 1)
-                data.setdefault("_last_poll", None)
-                data.setdefault("_last_bg_check", None)
+                for k, v in _defaults.items():
+                    data.setdefault(k, v)
                 return data
     except Exception:
         pass
-    return {"registrations": {}, "alerts": [], "score_alerts": [],
-            "check_interval_hours": 1, "_last_poll": None, "_last_bg_check": None}
+    return _defaults
 
 
 def _save_alerts_db(db: dict) -> None:
+    # שמור ב-Supabase (persistent)
+    _supabase_save_tg_db(db)
+    # שמור גם לקובץ מקומי (fallback)
     try:
         json.dump(db, open(_ALERTS_FILE, "w", encoding="utf-8"),
                   ensure_ascii=False, indent=2)
@@ -4287,6 +4332,15 @@ def main() -> None:
     st.session_state.setdefault("tg_phone", "")
     st.session_state.setdefault("current_user_phone", "")
 
+    # Auto-login: שחזר phone מה-URL אם קיים ורשום (שורד refresh + סגירה/פתיחה)
+    if not st.session_state.get("tg_phone"):
+        try:
+            _qp_phone = st.query_params.get("u", "")
+            if _qp_phone and _is_phone_registered(_qp_phone):
+                st.session_state["tg_phone"] = _qp_phone
+        except Exception:
+            pass
+
     # ── הפעל סוכן רקע לבדיקת התראות (פעם אחת לתהליך) ──────────────────────
     if not st.session_state.get("_bg_scheduler_started"):
         _ensure_bg_scheduler()
@@ -4299,8 +4353,16 @@ def main() -> None:
         # שינוי מצב התחברות — טען portfolio מתאים
         st.session_state["current_user_phone"] = _expected_user
         if _expected_user:
+            try:
+                st.query_params["u"] = _expected_user
+            except Exception:
+                pass
             st.session_state["portfolio"] = _load_user_portfolio(_expected_user)
         else:
+            try:
+                st.query_params.clear()
+            except Exception:
+                pass
             st.session_state["portfolio"] = _load_portfolio()
     elif "portfolio" not in st.session_state:
         st.session_state["portfolio"] = _load_portfolio()
@@ -4404,6 +4466,10 @@ def main() -> None:
                     st.session_state["tg_phone"] = ""
                     st.session_state["current_user_phone"] = ""
                     st.session_state["portfolio"] = _load_portfolio()
+                    try:
+                        st.query_params.clear()
+                    except Exception:
+                        pass
                     st.rerun()
             st.markdown("**🔔 התראות מחיר**")
         else:
