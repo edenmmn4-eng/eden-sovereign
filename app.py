@@ -1566,6 +1566,8 @@ def compute_score(data: dict, tech: dict, horizon: str, use_news: bool = True) -
             margin_score = np.float64(np.clip(float(margins)/0.40*15.0, 0.0, 15.0))
 
         tech_score   = np.float64(np.clip((float(rsi)-20.0)/60.0*20.0, 0.0, 20.0))
+        if float(rsi) > 75.0: tech_score = np.float64(max(0.0, float(tech_score) - 5.0))
+        if float(rsi) < 25.0: tech_score = np.float64(max(0.0, float(tech_score) - 3.0))
         total = cagr_score + peg_score + fcf_score + margin_score + tech_score
         # No mega-cap floor guarantee
 
@@ -2056,10 +2058,6 @@ def _run_bp_scan(horizon: str) -> None:
                     return t, 0
                 tech = compute_technicals(d["hist"])
                 s = compute_score(d, tech, horizon, use_news=True)
-                missing = sum([not has_pe, not has_cagr, not has_margin])
-                if missing == 1: s = max(0, s - 5)
-                elif missing == 2: s = max(0, s - 15)
-                if d["revenue_cagr"] < -0.05: s = max(0, s - 8)
                 return t, s
             except Exception:
                 return t, 0
@@ -2498,13 +2496,6 @@ def find_best_pick(horizon: str) -> list:
                 return t, 0
             tech = compute_technicals(d["hist"])
             s = compute_score(d, tech, horizon, use_news=True)
-            missing = sum([not has_pe, not has_cagr, not has_margin])
-            if missing == 1:
-                s = max(0, s - 5)
-            elif missing == 2:
-                s = max(0, s - 15)
-            if d["revenue_cagr"] < -0.05:
-                s = max(0, s - 8)
             return t, s
         except Exception:
             return t, 0
