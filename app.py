@@ -2099,33 +2099,38 @@ def _supabase_save_portfolio(phone: str, portfolio: list) -> bool:
 
 
 def _load_user_portfolio(phone: str) -> list:
-    """טוען את ה-Portfolio מ-Supabase, fallback ל-JSON מקומי."""
+    """טוען את ה-Portfolio — ראשית מ-_tg_db (אמין), אחר כך user_portfolios."""
     norm = _normalize_phone(phone)
-    sb = _supabase_load_portfolio(norm)
-    if sb is not None:
-        return sb
+    # 1. PRIMARY: _tg_db — אותה טבלה כמו ההרשמות, תמיד עובדת
     try:
         db = _load_alerts_db()
         reg = db.get("registrations", {}).get(norm, {})
-        data = reg.get("portfolio", [])
-        if isinstance(data, list):
-            return data
+        if "portfolio" in reg and isinstance(reg["portfolio"], list):
+            return reg["portfolio"]
     except Exception:
         pass
+    # 2. SECONDARY: user_portfolios — אם הטבלה קיימת ב-Supabase
+    sb = _supabase_load_portfolio(norm)
+    if sb is not None:
+        return sb
     return []
 
 
 def _save_user_portfolio(phone: str, portfolio: list) -> None:
-    """שומר את ה-Portfolio ב-Supabase (עמיד לdeploy)."""
+    """שומר את ה-Portfolio — ראשית ב-_tg_db (אמין), גם ב-user_portfolios."""
     norm = _normalize_phone(phone)
-    _supabase_save_portfolio(norm, portfolio)
+    # 1. PRIMARY: שמור ב-_tg_db — תמיד, גם אם המשתמש לא ברשימת ההרשמות
     try:
         db = _load_alerts_db()
-        if norm in db.get("registrations", {}):
-            db["registrations"][norm]["portfolio"] = portfolio
-            _save_alerts_db(db)
+        regs = db.setdefault("registrations", {})
+        if norm not in regs:
+            regs[norm] = {}
+        regs[norm]["portfolio"] = portfolio
+        _save_alerts_db(db)
     except Exception:
         pass
+    # 2. SECONDARY: שמור גם ב-user_portfolios (אם הטבלה קיימת)
+    _supabase_save_portfolio(norm, portfolio)
 
 
 # ── Monte Carlo Price Simulation ──────────────────────────────────────────────
