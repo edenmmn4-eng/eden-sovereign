@@ -1624,7 +1624,16 @@ def _load_portfolio() -> list:
 
 
 # ── Telegram Price Alerts ──────────────────────────────────────────────────────
-_ALERTS_FILE = os.path.join(os.path.dirname(__file__), "telegram_chats.json")
+# /tmp/ שורד deployments חדשים — לא מוחלף כשגיט מפרסם גרסה חדשה
+_ALERTS_FILE = "/tmp/telegram_chats.json"
+_ALERTS_FILE_LEGACY = os.path.join(os.path.dirname(__file__), "telegram_chats.json")
+# העברת נתונים מהמיקום הישן אם הקובץ החדש עדיין לא קיים
+if not os.path.exists(_ALERTS_FILE) and os.path.exists(_ALERTS_FILE_LEGACY):
+    try:
+        import shutil as _shutil
+        _shutil.copy2(_ALERTS_FILE_LEGACY, _ALERTS_FILE)
+    except Exception:
+        pass
 
 
 def _normalize_phone(phone: str) -> str:
@@ -1678,23 +1687,39 @@ def _supabase_save_tg_db(db: dict) -> None:
 def _load_alerts_db() -> dict:
     _defaults = {"registrations": {}, "alerts": [], "score_alerts": [],
                  "check_interval_hours": 1, "_last_poll": None, "_last_bg_check": None}
-    # 1. Supabase — persistent גם אחרי restart
+
+    # 1. Supabase — persistent גם אחרי container restart
     sb = _supabase_load_tg_db()
-    if sb and isinstance(sb, dict):
-        for k, v in _defaults.items():
-            sb.setdefault(k, v)
-        return sb
-    # 2. fallback — קובץ מקומי
+
+    # 2. קובץ מקומי ב-/tmp/ — שורד deployments, לא שורד container restart
+    local = None
     try:
         if os.path.exists(_ALERTS_FILE):
-            data = json.load(open(_ALERTS_FILE, encoding="utf-8"))
-            if isinstance(data, dict):
-                for k, v in _defaults.items():
-                    data.setdefault(k, v)
-                return data
+            _d = json.load(open(_ALERTS_FILE, encoding="utf-8"))
+            if isinstance(_d, dict):
+                local = _d
     except Exception:
         pass
-    return _defaults
+
+    # 3. בחר את המקור העשיר יותר (יותר נתונים = נשמר לאחרונה)
+    #    זה מגן על המקרה שבו שמירה ל-Supabase נכשלה וה-local file עדכני יותר
+    if sb and isinstance(sb, dict) and local and isinstance(local, dict):
+        def _richness(d: dict) -> int:
+            score = len(d.get("alerts", [])) + len(d.get("score_alerts", []))
+            for reg in d.get("registrations", {}).values():
+                score += len(reg.get("portfolio", []))
+            return score
+        data = local if _richness(local) > _richness(sb) else sb
+    elif sb and isinstance(sb, dict):
+        data = sb
+    elif local:
+        data = local
+    else:
+        return dict(_defaults)
+
+    for k, v in _defaults.items():
+        data.setdefault(k, v)
+    return data
 
 
 def _save_alerts_db(db: dict) -> None:
