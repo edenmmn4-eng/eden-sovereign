@@ -634,36 +634,8 @@ def inject_css() -> None:
         <div class="eden-toggle"><div class="eden-toggle-knob"></div></div>
       </label>
       <div class="eden-panel-sep"></div>
-      <div class="eden-panel-item" onclick="document.getElementById('eden-settings-modal').style.display='flex'" style="cursor:pointer">
-        <span>&#9881;&#65039; Settings</span>
-      </div>
-      <div class="eden-panel-sep"></div>
       <div class="eden-panel-item" style="color:#6b7280;font-size:11px;cursor:default">
         <span>Eden Sovereign v1.0</span>
-      </div>
-    </div>
-
-    <!-- Settings Modal -->
-    <div id="eden-settings-modal" style="display:none;position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.5);align-items:center;justify-content:center">
-      <div style="background:#fff;border-radius:18px;padding:28px 32px;min-width:320px;max-width:420px;box-shadow:0 12px 48px rgba(0,0,0,.2);position:relative">
-        <div style="font-size:16px;font-weight:700;color:#1a1a2e;margin-bottom:20px">&#9881;&#65039; הגדרות מערכת</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151">
-          <span>שפת ממשק</span>
-          <span style="color:#6366f1;font-weight:600">עברית</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151">
-          <span>מטבע ברירת מחדל</span>
-          <span style="color:#6366f1;font-weight:600">USD $</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151">
-          <span>גרסת מנוע</span>
-          <span style="color:#6366f1;font-weight:600">Quantum v2026</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;font-size:13px;color:#374151">
-          <span>עדכון אחרון</span>
-          <span style="color:#6b7280;font-size:12px">אפריל 2026</span>
-        </div>
-        <button onclick="document.getElementById('eden-settings-modal').style.display='none'" style="margin-top:20px;width:100%;padding:10px;background:#6366f1;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">סגור</button>
       </div>
     </div>
     """, unsafe_allow_html=True)
