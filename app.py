@@ -1672,9 +1672,32 @@ def _supabase_save_tg_db(db: dict) -> None:
     try:
         url, key = _sb_creds()
         if not url or not key:
+            print("[WARNING] _supabase_save_tg_db: Supabase credentials missing")
             return
         _to_save = {k: v for k, v in db.items() if not k.startswith("_last_")}
-        _req.post(
+
+        # הגן על פורטפוליו: אם יש רשומות ללא portfolio — השלם מהגרסה הנוכחית ב-Supabase לפני שנדרוס
+        _regs_missing = [p for p, r in _to_save.get("registrations", {}).items() if not r.get("portfolio")]
+        if _regs_missing:
+            try:
+                _curr_r = _req.get(
+                    f"{url}/rest/v1/ticker_cache",
+                    params={"ticker": "eq._tg_db", "select": "data"},
+                    headers={"apikey": key, "Authorization": f"Bearer {key}"},
+                    timeout=4,
+                )
+                if _curr_r.status_code == 200 and _curr_r.json():
+                    _curr = _curr_r.json()[0]["data"]
+                    if isinstance(_curr, dict):
+                        for _p in _regs_missing:
+                            _saved_portfolio = _curr.get("registrations", {}).get(_p, {}).get("portfolio")
+                            if _saved_portfolio:
+                                _to_save["registrations"][_p]["portfolio"] = _saved_portfolio
+                                print(f"[INFO] _supabase_save_tg_db: שוחזר פורטפוליו עבור {_p}")
+            except Exception as _pe:
+                print(f"[WARNING] _supabase_save_tg_db: קריאת הגנה נכשלה: {_pe}")
+
+        r = _req.post(
             f"{url}/rest/v1/ticker_cache",
             json={"ticker": "_tg_db", "data": _to_save,
                   "cached_at": datetime.utcnow().isoformat()},
@@ -1682,8 +1705,10 @@ def _supabase_save_tg_db(db: dict) -> None:
                      "Prefer": "resolution=merge-duplicates"},
             timeout=4,
         )
-    except Exception:
-        pass
+        if not r.ok:
+            print(f"[WARNING] _supabase_save_tg_db failed: HTTP {r.status_code} — {r.text[:200]}")
+    except Exception as e:
+        print(f"[ERROR] _supabase_save_tg_db exception: {e}")
 
 
 def _load_alerts_db() -> dict:
@@ -1703,21 +1728,28 @@ def _load_alerts_db() -> dict:
     except Exception:
         pass
 
-    # 3. בחר את המקור העשיר יותר (יותר נתונים = נשמר לאחרונה)
-    #    זה מגן על המקרה שבו שמירה ל-Supabase נכשלה וה-local file עדכני יותר
+    # 3. בחר לפי חותמת saved_at — המקור שנשמר לאחרונה מנצח.
+    #    מונע מקובץ גיט מיושן לדרוס נתוני Supabase עדכניים.
     if sb and isinstance(sb, dict) and local and isinstance(local, dict):
-        def _richness(d: dict) -> int:
-            score = len(d.get("alerts", [])) + len(d.get("score_alerts", []))
-            for reg in d.get("registrations", {}).values():
-                score += len(reg.get("portfolio", []))
-            return score
-        data = local if _richness(local) > _richness(sb) else sb
+        def _ts(d: dict) -> str:
+            return d.get("saved_at") or ""
+        data = local if _ts(local) > _ts(sb) else sb
+        other = local if data is sb else sb
     elif sb and isinstance(sb, dict):
         data = sb
+        other = None
     elif local:
         data = local
+        other = None
     else:
         return dict(_defaults)
+
+    # 4. השלמת רשומות חסרות מהמקור המשני — מגן מפני אובדן פורטפוליו
+    for phone, reg in (other or {}).get("registrations", {}).items():
+        if phone not in data["registrations"]:
+            data["registrations"][phone] = reg
+        elif "portfolio" in reg and not data["registrations"][phone].get("portfolio"):
+            data["registrations"][phone]["portfolio"] = reg["portfolio"]
 
     for k, v in _defaults.items():
         data.setdefault(k, v)
@@ -1725,6 +1757,8 @@ def _load_alerts_db() -> dict:
 
 
 def _save_alerts_db(db: dict) -> None:
+    # חותמת זמן לבחירת המקור העדכני ביותר בטעינה
+    db["saved_at"] = datetime.utcnow().isoformat()
     # שמור ב-Supabase (persistent)
     _supabase_save_tg_db(db)
     # שמור גם לקובץ מקומי (fallback)
@@ -1781,7 +1815,15 @@ def _poll_telegram_registrations() -> int:
                 }
                 new += 1
         db["_last_poll"] = datetime.now().isoformat(timespec="seconds")
-        _save_alerts_db(db)
+        if new > 0:
+            _save_alerts_db(db)  # שמור הכל כולל Supabase — נוסף רישום חדש
+        else:
+            # throttle בלבד — אל תדרוס Supabase עם DB שעלול להיות חסר פורטפוליו
+            try:
+                json.dump(db, open(_ALERTS_FILE, "w", encoding="utf-8"),
+                          ensure_ascii=False, indent=2)
+            except Exception:
+                pass
         return new
     except Exception:
         return 0
@@ -1983,10 +2025,15 @@ def _bg_worker() -> None:
                         pass
                 if _prices:
                     _check_and_fire_tg_alerts(_prices)
-            # עדכן זמן בדיקה אחרון
+            # עדכן זמן בדיקה אחרון — קובץ מקומי בלבד
+            # _last_bg_check מסונן מ-Supabase ממילא, אין שום סיבה לכתוב Supabase עם DB שעלול להיות חסר פורטפוליו
             db2 = _load_alerts_db()
             db2["_last_bg_check"] = datetime.now().isoformat(timespec="seconds")
-            _save_alerts_db(db2)
+            try:
+                json.dump(db2, open(_ALERTS_FILE, "w", encoding="utf-8"),
+                          ensure_ascii=False, indent=2)
+            except Exception:
+                pass
         except Exception:
             pass
 
