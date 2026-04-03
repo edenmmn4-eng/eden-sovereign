@@ -1677,7 +1677,7 @@ def _supabase_save_tg_db(db: dict) -> None:
         _to_save = {k: v for k, v in db.items() if not k.startswith("_last_")}
 
         # הגן על פורטפוליו: אם יש רשומות ללא portfolio — השלם מהגרסה הנוכחית ב-Supabase לפני שנדרוס
-        _regs_missing = [p for p, r in _to_save.get("registrations", {}).items() if not r.get("portfolio")]
+        _regs_missing = [p for p, r in _to_save.get("registrations", {}).items() if r.get("portfolio") is None]
         if _regs_missing:
             try:
                 _curr_r = _req.get(
@@ -1757,8 +1757,8 @@ def _load_alerts_db() -> dict:
 
 
 def _save_alerts_db(db: dict) -> None:
-    # חותמת זמן לבחירת המקור העדכני ביותר בטעינה
-    db["saved_at"] = datetime.utcnow().isoformat()
+    # חותמת זמן לבחירת המקור העדכני ביותר בטעינה — עותק כדי לא למטייט את ה-dict המקורי
+    db = {**db, "saved_at": datetime.utcnow().isoformat()}
     # שמור ב-Supabase (persistent)
     _supabase_save_tg_db(db)
     # שמור גם לקובץ מקומי (fallback)
