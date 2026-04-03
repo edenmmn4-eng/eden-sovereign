@@ -617,6 +617,38 @@ def inject_css() -> None:
       .ticker-symbol{font-size:20px}
       .score-badge{font-size:12px;padding:4px 10px}
     }
+
+    /* ── Score Badge: pulse glow for STRONG BUY ──────────────────── */
+    @keyframes eden-score-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
+      50%       { box-shadow: 0 0 0 8px rgba(16,185,129,0); }
+    }
+    .score-badge-strong-buy {
+      animation: eden-score-pulse 2s ease-in-out infinite;
+    }
+
+    /* ── Metric Cards: stronger hover ────────────────────────────── */
+    .metric-card:hover {
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: 0 12px 40px rgba(99,102,241,0.25);
+      border-color: rgba(99,102,241,0.4);
+      transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    /* ── Active Tab: gradient text ───────────────────────────────── */
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      border-bottom: 2px solid #6366f1;
+      font-weight: 600;
+    }
+
+    /* ── Verdict Box: colored left border by signal ───────────────── */
+    .verdict-strong-buy { border-left: 4px solid #22c55e; }
+    .verdict-buy        { border-left: 4px solid #84cc16; }
+    .verdict-hold       { border-left: 4px solid #f59e0b; }
+    .verdict-sell       { border-left: 4px solid #ef4444; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -3256,11 +3288,11 @@ def score_badge_html(score: int, is_etf: bool = False) -> str:
         return ('<span class="score-badge" style="background:rgba(99,102,241,.1);'
                 'color:#6366f1;border:1px solid rgba(99,102,241,.3);">'
                 '&#9673; ETF / FUND</span>')
-    if score>=80:   bg,c,l = "rgba(16,185,129,.12)","#10b981","STRONG BUY"
-    elif score>=65: bg,c,l = "rgba(245,158,11,.12)", "#f59e0b","BUY"
-    elif score>=45: bg,c,l = "rgba(249,115,22,.12)", "#f97316","HOLD"
-    else:           bg,c,l = "rgba(239,68,68,.12)",  "#ef4444","SELL"
-    return (f'<span class="score-badge" style="background:{bg};color:{c};border:1px solid {c}40;">'
+    if score>=80:   bg,c,l,extra = "rgba(16,185,129,.12)","#10b981","STRONG BUY"," score-badge-strong-buy"
+    elif score>=65: bg,c,l,extra = "rgba(245,158,11,.12)", "#f59e0b","BUY",""
+    elif score>=45: bg,c,l,extra = "rgba(249,115,22,.12)", "#f97316","HOLD",""
+    else:           bg,c,l,extra = "rgba(239,68,68,.12)",  "#ef4444","SELL",""
+    return (f'<span class="score-badge{extra}" style="background:{bg};color:{c};border:1px solid {c}40;">'
             f'&#9889; {score} &middot; {l}</span>')
 
 EDEN_LOGO = """
@@ -4378,6 +4410,311 @@ def render_stock_video(ticker: str, data: dict, tech: dict, score: int, hist: pd
         raise RuntimeError(result.stderr or result.stdout or "Render failed")
     return str(out_file)
 
+# ── Fragment components ────────────────────────────────────────────────────────
+@st.fragment
+def _render_monte_carlo_section(ticker: str, horizon: str, hist, data: dict):
+    # ── Monte Carlo Price Simulation ─────────────────────────────────
+    st.markdown("---")
+    st.markdown(
+        '<div style="font-size:13px;font-weight:700;color:#6366f1;'
+        'letter-spacing:.08em;margin-bottom:4px;">&#127922; MONTE CARLO PRICE SIMULATION</div>'
+        '<div style="font-size:11px;color:#9ca3af;margin-bottom:12px;">'
+        '1,000 Geometric Brownian Motion paths · Calibrated to 1-year historical volatility</div>',
+        unsafe_allow_html=True,
+    )
+    with st.spinner("מריץ סימולציה..."):
+        _mc = run_monte_carlo(hist, data.get("current_price", 0))
+
+    if _mc:
+        _s30  = _mc["s30"]
+        _s365 = _mc["s365"]
+        _vol  = _mc["vol_annual"] * 100
+
+        # Summary cards
+        _mc1, _mc2, _mc3 = st.columns(3)
+        with _mc1:
+            st.markdown(
+                f'<div style="background:rgba(99,102,241,.07);border-radius:12px;padding:14px 18px;">'
+                f'<div style="font-size:11px;color:#9ca3af;font-weight:600;letter-spacing:.06em;">30-DAY MEDIAN</div>'
+                f'<div style="font-size:22px;font-weight:700;color:#f8fafc;margin:4px 0;">'
+                f'${_s30["median"]:,.2f}</div>'
+                f'<div style="font-size:11px;color:#6b7280;">Range: ${_s30["p10"]:,.0f} – ${_s30["p90"]:,.0f}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        with _mc2:
+            _chg = (_s365["median"] / data.get("current_price", 1) - 1) * 100
+            _chg_color = "#22c55e" if _chg >= 0 else "#ef4444"
+            st.markdown(
+                f'<div style="background:rgba(99,102,241,.07);border-radius:12px;padding:14px 18px;">'
+                f'<div style="font-size:11px;color:#9ca3af;font-weight:600;letter-spacing:.06em;">1-YEAR MEDIAN</div>'
+                f'<div style="font-size:22px;font-weight:700;color:#f8fafc;margin:4px 0;">'
+                f'${_s365["median"]:,.2f}</div>'
+                f'<div style="font-size:11px;color:{_chg_color};">{"▲" if _chg>=0 else "▼"} '
+                f'{abs(_chg):.1f}% expected</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        with _mc3:
+            st.markdown(
+                f'<div style="background:rgba(99,102,241,.07);border-radius:12px;padding:14px 18px;">'
+                f'<div style="font-size:11px;color:#9ca3af;font-weight:600;letter-spacing:.06em;">IMPLIED VOLATILITY</div>'
+                f'<div style="font-size:22px;font-weight:700;color:#f8fafc;margin:4px 0;">'
+                f'{_vol:.1f}%</div>'
+                f'<div style="font-size:11px;color:#6b7280;">Annualized · Historical</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
+        st.plotly_chart(_mc["fig"], config={"displayModeBar": False},
+                        use_container_width=True)
+        st.caption(
+            "⚠️ סימולציה זו מבוססת על תנועת מחיר היסטורית בלבד ואינה מהווה המלצת השקעה."
+        )
+    else:
+        st.info("אין מספיק נתוני מחיר לסימולציה.")
+
+
+@st.fragment
+def _render_portfolio_tab(horizon: str):
+    st.markdown("### 💼 Portfolio Builder")
+    usd_ils = get_usd_ils()
+
+    # ── Demo / My Portfolio toggle ────────────────────────────────────────
+    _port_mode = st.radio("מצב תיק", ["התיק שלי", "🎯 דמו"],
+                          horizontal=True, key="port_mode_radio",
+                          label_visibility="collapsed")
+    _is_demo = (_port_mode == "🎯 דמו")
+
+    _port_key = "demo_portfolio" if _is_demo else "portfolio"
+
+    _pc1, _pc2, _pc3, _pc4 = st.columns([2, 1, 1.5, 1])
+    with _pc1:
+        _port_ticker = st.selectbox("מניה", options=TICKER_LIST,
+                                    label_visibility="collapsed",
+                                    key=f"port_ticker_sel_{_port_key}",
+                                    placeholder="בחר מניה...")
+    with _pc2:
+        _port_qty = st.number_input("כמות", min_value=0.01, value=1.0,
+                                    step=1.0, label_visibility="collapsed",
+                                    key=f"port_qty_{_port_key}")
+    with _pc3:
+        _port_buy = st.number_input("מחיר קנייה $", min_value=0.01, value=100.0,
+                                    step=1.0, label_visibility="collapsed",
+                                    key=f"port_buy_{_port_key}")
+    with _pc4:
+        if st.button("+ הוסף", use_container_width=True, key=f"port_add_{_port_key}"):
+            _existing = [h["ticker"] for h in st.session_state[_port_key]]
+            if _port_ticker not in _existing:
+                st.session_state[_port_key].append({
+                    "ticker": _port_ticker,
+                    "quantity": _port_qty,
+                    "buy_price": _port_buy,
+                })
+                if not _is_demo:
+                    _save_portfolio(st.session_state[_port_key])
+                st.rerun()
+            else:
+                st.warning(f"{_port_ticker} כבר בתיק.")
+
+    if st.button("&#9851; Reset Portfolio", use_container_width=False, key=f"port_reset_{_port_key}"):
+        if _is_demo:
+            st.session_state["demo_portfolio"] = []
+        else:
+            st.session_state["portfolio"] = []
+            _save_portfolio([])
+        st.rerun()
+
+    _portfolio = st.session_state[_port_key]
+
+    if not _portfolio:
+        st.info("התיק ריק — הוסף מניות למעלה.")
+    else:
+        _tickers_tuple = tuple(h["ticker"] for h in _portfolio)
+        with st.spinner("מעדכן מחירים..."):
+            _prices = fetch_portfolio_prices(_tickers_tuple)
+
+        _rows = []
+        _ai_holdings = []
+        _pl_rows = []  # לסעיף רווח/הפסד
+        for _h in _portfolio:
+            _t = _h["ticker"]
+            _cur = _prices.get(_t, 0.0)
+            _qty = _h["quantity"]
+            _buy = _h["buy_price"]
+            _val_usd = _cur * _qty
+            _val_ils = _val_usd * usd_ils
+            _pl = (_cur - _buy) * _qty
+            _pl_pct = ((_cur / _buy) - 1) * 100 if _buy else 0
+            _pl_ils = _pl * usd_ils
+            _rows.append({
+                "Ticker": _t,
+                "Qty": _qty,
+                "Buy $": f"${_buy:,.2f}",
+                "Current $": f"${_cur:,.2f}" if _cur else "N/A",
+                "Value ($)": f"${_val_usd:,.0f}",
+                "Value (₪)": f"₪{_val_ils:,.0f}",
+                "P&L ($)": f"{'+'if _pl>=0 else ''}${_pl:,.0f}",
+                "P&L %": f"{'+'if _pl_pct>=0 else ''}{_pl_pct:.1f}%",
+            })
+            _pl_rows.append((_t, _buy, _cur, _qty, _pl_pct, _pl, _pl_ils))
+            _prev_close = float("nan")
+            try:
+                _d = fetch_data(_t)
+                _sc = compute_score(_d, compute_technicals(_d["hist"]), horizon, use_news=True) if not _d["hist"].empty else 50
+                _sector = _d.get("sector", "Unknown")
+                _prev_close = float(_d.get("prev_close") or float("nan"))
+            except Exception:
+                _sc = 50
+                _sector = "Unknown"
+            _ai_holdings.append({
+                "ticker": _t, "sector": _sector, "qty": _qty,
+                "value_usd": _val_usd, "score": _sc,
+                "current_price": _cur, "prev_close": _prev_close,
+                "buy_price": _buy,
+            })
+
+        st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
+
+        _pie_labels = [r["Ticker"] for r in _rows]
+        _pie_vals   = [_prices.get(h["ticker"], 0) * h["quantity"] for h in _portfolio]
+        if any(v > 0 for v in _pie_vals):
+            _pie_fig = go.Figure(go.Pie(
+                labels=_pie_labels, values=_pie_vals,
+                marker_colors=EDEN_COLORS[:len(_pie_labels)],
+                hole=0.45, textinfo="label+percent", textfont_size=13,
+            ))
+            _pie_fig.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                showlegend=False, margin=dict(t=20, b=20, l=20, r=20), height=320,
+            )
+            st.plotly_chart(_pie_fig, config={"displayModeBar": False},
+                            use_container_width=True)
+
+        st.markdown("---")
+
+        # ── טבלת שינוי יומי ──────────────────────────────────────────
+        _daily_rows = []
+        _total_daily_usd = 0.0
+        _total_val_prev = 0.0
+        for _h in _ai_holdings:
+            _cur  = _h.get("current_price", 0.0) or 0.0
+            _prev = _h.get("prev_close", float("nan"))
+            _qty  = _h.get("qty", 0)
+            if _cur and _prev and not _isnan(_prev) and _prev > 0:
+                _d_usd = (_cur - _prev) * _qty
+                _d_pct = (_cur / _prev - 1) * 100
+                _d_ils = _d_usd * usd_ils
+                _total_daily_usd += _d_usd
+                _total_val_prev  += _prev * _qty
+                _daily_rows.append((_h["ticker"], _d_pct, _d_usd, _d_ils))
+
+        if _daily_rows:
+            _tot_pct = (_total_daily_usd / _total_val_prev * 100) if _total_val_prev > 0 else 0.0
+            _tot_ils = _total_daily_usd * usd_ils
+            _tot_color = "#10b981" if _total_daily_usd >= 0 else "#ef4444"
+            _tot_sign  = "+" if _total_daily_usd >= 0 else ""
+
+            _rows_html = ""
+            for _tk, _dp, _du, _di in sorted(_daily_rows, key=lambda x: x[1], reverse=True):
+                _c = "#10b981" if _dp >= 0 else "#ef4444"
+                _s = "+" if _dp >= 0 else ""
+                _bg_row = "rgba(16,185,129,.06)" if _dp >= 0 else "rgba(239,68,68,.06)"
+                _rows_html += (
+                    f'<tr style="border-bottom:1px solid #f1f5f9;background:{_bg_row}">'
+                    f'<td style="font-weight:700;color:#1e293b;padding:8px 10px">{_tk}</td>'
+                    f'<td style="color:{_c};font-weight:700;text-align:right;padding:8px 10px">{_s}{_dp:.2f}%</td>'
+                    f'<td style="color:{_c};text-align:right;padding:8px 10px">{_s}${_du:,.0f}</td>'
+                    f'<td style="color:{_c};text-align:right;padding:8px 10px">{_s}₪{_di:,.0f}</td>'
+                    f'</tr>'
+                )
+
+            st.markdown(f"""
+<div style="margin-bottom:18px">
+  <div style="font-size:13px;font-weight:700;color:#6366f1;margin-bottom:8px;
+              letter-spacing:.04em">📊 שינוי יומי</div>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:'Inter',sans-serif">
+    <thead>
+      <tr style="border-bottom:2px solid #e2e8f0">
+        <th style="text-align:left;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">מניה</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">שינוי %</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">USD</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">ILS</th>
+      </tr>
+    </thead>
+    <tbody>
+      {_rows_html}
+    </tbody>
+    <tfoot>
+      <tr style="border-top:2px solid #e2e8f0">
+        <td style="padding:8px 10px;font-weight:700;color:#1e293b">סה״כ תיק</td>
+        <td style="text-align:right;padding:8px 10px;font-weight:700;font-size:14px;color:{_tot_color}">{_tot_sign}{_tot_pct:.2f}%</td>
+        <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_color}">{_tot_sign}${_total_daily_usd:,.0f}</td>
+        <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_color}">{_tot_sign}₪{_tot_ils:,.0f}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+""", unsafe_allow_html=True)
+
+        # ── רווח/הפסד כולל מאז שער קנייה ─────────────────────────────
+        if _pl_rows:
+            _total_cost   = sum(b * q for _, b, _, q, *_ in _pl_rows)
+            _total_pl_usd = sum(pl for *_, pl, _ in _pl_rows)
+            _total_pl_ils = sum(pi for *_, pi in _pl_rows)
+            _total_pl_pct = (_total_pl_usd / _total_cost * 100) if _total_cost else 0
+            _tot_pl_color = "#10b981" if _total_pl_usd >= 0 else "#ef4444"
+            _tot_pl_sign  = "+" if _total_pl_usd >= 0 else ""
+
+            _pl_html_rows = ""
+            for _tk, _bp, _cp, _qq, _pp, _pu, _pi in sorted(_pl_rows, key=lambda x: x[4], reverse=True):
+                _c  = "#10b981" if _pp >= 0 else "#ef4444"
+                _sg = "+" if _pp >= 0 else ""
+                _bg = "rgba(16,185,129,.06)" if _pp >= 0 else "rgba(239,68,68,.06)"
+                _pl_html_rows += (
+                    f'<tr style="border-bottom:1px solid #f1f5f9;background:{_bg}">'
+                    f'<td style="font-weight:700;color:#1e293b;padding:8px 10px">{_tk}</td>'
+                    f'<td style="text-align:right;padding:8px 10px;color:#64748b">${_bp:,.2f}</td>'
+                    f'<td style="text-align:right;padding:8px 10px;color:#64748b">${_cp:,.2f}</td>'
+                    f'<td style="color:{_c};font-weight:700;text-align:right;padding:8px 10px">{_sg}{_pp:.2f}%</td>'
+                    f'<td style="color:{_c};text-align:right;padding:8px 10px">{_sg}${_pu:,.0f}</td>'
+                    f'<td style="color:{_c};text-align:right;padding:8px 10px">{_sg}₪{_pi:,.0f}</td>'
+                    f'</tr>'
+                )
+
+            st.markdown(f"""
+<div style="margin-bottom:18px">
+  <div style="font-size:13px;font-weight:700;color:#6366f1;margin-bottom:8px;
+              letter-spacing:.04em">💰 רווח/הפסד כולל (מאז קנייה)</div>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:'Inter',sans-serif">
+    <thead>
+      <tr style="border-bottom:2px solid #e2e8f0">
+        <th style="text-align:left;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">מניה</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">שער קנייה</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">מחיר נוכחי</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">רווח %</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">USD</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">ILS</th>
+      </tr>
+    </thead>
+    <tbody>{_pl_html_rows}</tbody>
+    <tfoot>
+      <tr style="border-top:2px solid #e2e8f0">
+        <td colspan="3" style="padding:8px 10px;font-weight:700;color:#1e293b">סה״כ תיק</td>
+        <td style="text-align:right;padding:8px 10px;font-weight:700;font-size:14px;color:{_tot_pl_color}">{_tot_pl_sign}{_total_pl_pct:.2f}%</td>
+        <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_pl_color}">{_tot_pl_sign}${_total_pl_usd:,.0f}</td>
+        <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_pl_color}">{_tot_pl_sign}₪{_total_pl_ils:,.0f}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+""", unsafe_allow_html=True)
+
+        st.markdown("#### &#129302; ניתוח תיק")
+        st.markdown(portfolio_ai_analysis(_ai_holdings, usd_ils))
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main() -> None:
     # ── Google Login (graceful fallback) ───────────────────────────────────
@@ -4817,67 +5154,7 @@ def main() -> None:
         else:
             st.markdown(build_report(ticker, data, tech, score, horizon), unsafe_allow_html=True)
 
-            # ── Monte Carlo Price Simulation ─────────────────────────────────
-            st.markdown("---")
-            st.markdown(
-                '<div style="font-size:13px;font-weight:700;color:#6366f1;'
-                'letter-spacing:.08em;margin-bottom:4px;">&#127922; MONTE CARLO PRICE SIMULATION</div>'
-                '<div style="font-size:11px;color:#9ca3af;margin-bottom:12px;">'
-                '1,000 Geometric Brownian Motion paths · Calibrated to 1-year historical volatility</div>',
-                unsafe_allow_html=True,
-            )
-            with st.spinner("מריץ סימולציה..."):
-                _mc = run_monte_carlo(hist, data.get("current_price", 0))
-
-            if _mc:
-                _s30  = _mc["s30"]
-                _s365 = _mc["s365"]
-                _vol  = _mc["vol_annual"] * 100
-
-                # Summary cards
-                _mc1, _mc2, _mc3 = st.columns(3)
-                with _mc1:
-                    st.markdown(
-                        f'<div style="background:rgba(99,102,241,.07);border-radius:12px;padding:14px 18px;">'
-                        f'<div style="font-size:11px;color:#9ca3af;font-weight:600;letter-spacing:.06em;">30-DAY MEDIAN</div>'
-                        f'<div style="font-size:22px;font-weight:700;color:#f8fafc;margin:4px 0;">'
-                        f'${_s30["median"]:,.2f}</div>'
-                        f'<div style="font-size:11px;color:#6b7280;">Range: ${_s30["p10"]:,.0f} – ${_s30["p90"]:,.0f}</div>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-                with _mc2:
-                    _chg = (_s365["median"] / data.get("current_price", 1) - 1) * 100
-                    _chg_color = "#22c55e" if _chg >= 0 else "#ef4444"
-                    st.markdown(
-                        f'<div style="background:rgba(99,102,241,.07);border-radius:12px;padding:14px 18px;">'
-                        f'<div style="font-size:11px;color:#9ca3af;font-weight:600;letter-spacing:.06em;">1-YEAR MEDIAN</div>'
-                        f'<div style="font-size:22px;font-weight:700;color:#f8fafc;margin:4px 0;">'
-                        f'${_s365["median"]:,.2f}</div>'
-                        f'<div style="font-size:11px;color:{_chg_color};">{"▲" if _chg>=0 else "▼"} '
-                        f'{abs(_chg):.1f}% expected</div>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-                with _mc3:
-                    st.markdown(
-                        f'<div style="background:rgba(99,102,241,.07);border-radius:12px;padding:14px 18px;">'
-                        f'<div style="font-size:11px;color:#9ca3af;font-weight:600;letter-spacing:.06em;">IMPLIED VOLATILITY</div>'
-                        f'<div style="font-size:22px;font-weight:700;color:#f8fafc;margin:4px 0;">'
-                        f'{_vol:.1f}%</div>'
-                        f'<div style="font-size:11px;color:#6b7280;">Annualized · Historical</div>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-
-                st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
-                st.plotly_chart(_mc["fig"], config={"displayModeBar": False},
-                                use_container_width=True)
-                st.caption(
-                    "⚠️ סימולציה זו מבוססת על תנועת מחיר היסטורית בלבד ואינה מהווה המלצת השקעה."
-                )
-            else:
-                st.info("אין מספיק נתוני מחיר לסימולציה.")
+            _render_monte_carlo_section(ticker, horizon, hist, data)
 
     with tab_peers:
         # Session-state key for custom peers per ticker
@@ -5003,241 +5280,7 @@ def main() -> None:
 
     # ── Portfolio Tab (far right) ────────────────────────────────────────────
     with tab_portfolio:
-        st.markdown("### 💼 Portfolio Builder")
-        usd_ils = get_usd_ils()
-
-        # ── Demo / My Portfolio toggle ────────────────────────────────────────
-        _port_mode = st.radio("מצב תיק", ["התיק שלי", "🎯 דמו"],
-                              horizontal=True, key="port_mode_radio",
-                              label_visibility="collapsed")
-        _is_demo = (_port_mode == "🎯 דמו")
-
-        _port_key = "demo_portfolio" if _is_demo else "portfolio"
-
-        _pc1, _pc2, _pc3, _pc4 = st.columns([2, 1, 1.5, 1])
-        with _pc1:
-            _port_ticker = st.selectbox("מניה", options=TICKER_LIST,
-                                        label_visibility="collapsed",
-                                        key=f"port_ticker_sel_{_port_key}",
-                                        placeholder="בחר מניה...")
-        with _pc2:
-            _port_qty = st.number_input("כמות", min_value=0.01, value=1.0,
-                                        step=1.0, label_visibility="collapsed",
-                                        key=f"port_qty_{_port_key}")
-        with _pc3:
-            _port_buy = st.number_input("מחיר קנייה $", min_value=0.01, value=100.0,
-                                        step=1.0, label_visibility="collapsed",
-                                        key=f"port_buy_{_port_key}")
-        with _pc4:
-            if st.button("+ הוסף", use_container_width=True, key=f"port_add_{_port_key}"):
-                _existing = [h["ticker"] for h in st.session_state[_port_key]]
-                if _port_ticker not in _existing:
-                    st.session_state[_port_key].append({
-                        "ticker": _port_ticker,
-                        "quantity": _port_qty,
-                        "buy_price": _port_buy,
-                    })
-                    if not _is_demo:
-                        _save_portfolio(st.session_state[_port_key])
-                    st.rerun()
-                else:
-                    st.warning(f"{_port_ticker} כבר בתיק.")
-
-        if st.button("&#9851; Reset Portfolio", use_container_width=False, key=f"port_reset_{_port_key}"):
-            if _is_demo:
-                st.session_state["demo_portfolio"] = []
-            else:
-                st.session_state["portfolio"] = []
-                _save_portfolio([])
-            st.rerun()
-
-        _portfolio = st.session_state[_port_key]
-
-        if not _portfolio:
-            st.info("התיק ריק — הוסף מניות למעלה.")
-        else:
-            _tickers_tuple = tuple(h["ticker"] for h in _portfolio)
-            with st.spinner("מעדכן מחירים..."):
-                _prices = fetch_portfolio_prices(_tickers_tuple)
-
-            _rows = []
-            _ai_holdings = []
-            _pl_rows = []  # לסעיף רווח/הפסד
-            for _h in _portfolio:
-                _t = _h["ticker"]
-                _cur = _prices.get(_t, 0.0)
-                _qty = _h["quantity"]
-                _buy = _h["buy_price"]
-                _val_usd = _cur * _qty
-                _val_ils = _val_usd * usd_ils
-                _pl = (_cur - _buy) * _qty
-                _pl_pct = ((_cur / _buy) - 1) * 100 if _buy else 0
-                _pl_ils = _pl * usd_ils
-                _rows.append({
-                    "Ticker": _t,
-                    "Qty": _qty,
-                    "Buy $": f"${_buy:,.2f}",
-                    "Current $": f"${_cur:,.2f}" if _cur else "N/A",
-                    "Value ($)": f"${_val_usd:,.0f}",
-                    "Value (₪)": f"₪{_val_ils:,.0f}",
-                    "P&L ($)": f"{'+'if _pl>=0 else ''}${_pl:,.0f}",
-                    "P&L %": f"{'+'if _pl_pct>=0 else ''}{_pl_pct:.1f}%",
-                })
-                _pl_rows.append((_t, _buy, _cur, _qty, _pl_pct, _pl, _pl_ils))
-                _prev_close = float("nan")
-                try:
-                    _d = fetch_data(_t)
-                    _sc = compute_score(_d, compute_technicals(_d["hist"]), horizon, use_news=True) if not _d["hist"].empty else 50
-                    _sector = _d.get("sector", "Unknown")
-                    _prev_close = float(_d.get("prev_close") or float("nan"))
-                except Exception:
-                    _sc = 50
-                    _sector = "Unknown"
-                _ai_holdings.append({
-                    "ticker": _t, "sector": _sector, "qty": _qty,
-                    "value_usd": _val_usd, "score": _sc,
-                    "current_price": _cur, "prev_close": _prev_close,
-                    "buy_price": _buy,
-                })
-
-            st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
-
-            _pie_labels = [r["Ticker"] for r in _rows]
-            _pie_vals   = [_prices.get(h["ticker"], 0) * h["quantity"] for h in _portfolio]
-            if any(v > 0 for v in _pie_vals):
-                _pie_fig = go.Figure(go.Pie(
-                    labels=_pie_labels, values=_pie_vals,
-                    marker_colors=EDEN_COLORS[:len(_pie_labels)],
-                    hole=0.45, textinfo="label+percent", textfont_size=13,
-                ))
-                _pie_fig.update_layout(
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    showlegend=False, margin=dict(t=20, b=20, l=20, r=20), height=320,
-                )
-                st.plotly_chart(_pie_fig, config={"displayModeBar": False},
-                                use_container_width=True)
-
-            st.markdown("---")
-
-            # ── טבלת שינוי יומי ──────────────────────────────────────────
-            _daily_rows = []
-            _total_daily_usd = 0.0
-            _total_val_prev = 0.0
-            for _h in _ai_holdings:
-                _cur  = _h.get("current_price", 0.0) or 0.0
-                _prev = _h.get("prev_close", float("nan"))
-                _qty  = _h.get("qty", 0)
-                if _cur and _prev and not _isnan(_prev) and _prev > 0:
-                    _d_usd = (_cur - _prev) * _qty
-                    _d_pct = (_cur / _prev - 1) * 100
-                    _d_ils = _d_usd * usd_ils
-                    _total_daily_usd += _d_usd
-                    _total_val_prev  += _prev * _qty
-                    _daily_rows.append((_h["ticker"], _d_pct, _d_usd, _d_ils))
-
-            if _daily_rows:
-                _tot_pct = (_total_daily_usd / _total_val_prev * 100) if _total_val_prev > 0 else 0.0
-                _tot_ils = _total_daily_usd * usd_ils
-                _tot_color = "#10b981" if _total_daily_usd >= 0 else "#ef4444"
-                _tot_sign  = "+" if _total_daily_usd >= 0 else ""
-
-                _rows_html = ""
-                for _tk, _dp, _du, _di in sorted(_daily_rows, key=lambda x: x[1], reverse=True):
-                    _c = "#10b981" if _dp >= 0 else "#ef4444"
-                    _s = "+" if _dp >= 0 else ""
-                    _bg_row = "rgba(16,185,129,.06)" if _dp >= 0 else "rgba(239,68,68,.06)"
-                    _rows_html += (
-                        f'<tr style="border-bottom:1px solid #f1f5f9;background:{_bg_row}">'
-                        f'<td style="font-weight:700;color:#1e293b;padding:8px 10px">{_tk}</td>'
-                        f'<td style="color:{_c};font-weight:700;text-align:right;padding:8px 10px">{_s}{_dp:.2f}%</td>'
-                        f'<td style="color:{_c};text-align:right;padding:8px 10px">{_s}${_du:,.0f}</td>'
-                        f'<td style="color:{_c};text-align:right;padding:8px 10px">{_s}₪{_di:,.0f}</td>'
-                        f'</tr>'
-                    )
-
-                st.markdown(f"""
-<div style="margin-bottom:18px">
-  <div style="font-size:13px;font-weight:700;color:#6366f1;margin-bottom:8px;
-              letter-spacing:.04em">📊 שינוי יומי</div>
-  <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:'Inter',sans-serif">
-    <thead>
-      <tr style="border-bottom:2px solid #e2e8f0">
-        <th style="text-align:left;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">מניה</th>
-        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">שינוי %</th>
-        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">USD</th>
-        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">ILS</th>
-      </tr>
-    </thead>
-    <tbody>
-      {_rows_html}
-    </tbody>
-    <tfoot>
-      <tr style="border-top:2px solid #e2e8f0">
-        <td style="padding:8px 10px;font-weight:700;color:#1e293b">סה״כ תיק</td>
-        <td style="text-align:right;padding:8px 10px;font-weight:700;font-size:14px;color:{_tot_color}">{_tot_sign}{_tot_pct:.2f}%</td>
-        <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_color}">{_tot_sign}${_total_daily_usd:,.0f}</td>
-        <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_color}">{_tot_sign}₪{_tot_ils:,.0f}</td>
-      </tr>
-    </tfoot>
-  </table>
-</div>
-""", unsafe_allow_html=True)
-
-            # ── רווח/הפסד כולל מאז שער קנייה ─────────────────────────────
-            if _pl_rows:
-                _total_cost   = sum(b * q for _, b, _, q, *_ in _pl_rows)
-                _total_pl_usd = sum(pl for *_, pl, _ in _pl_rows)
-                _total_pl_ils = sum(pi for *_, pi in _pl_rows)
-                _total_pl_pct = (_total_pl_usd / _total_cost * 100) if _total_cost else 0
-                _tot_pl_color = "#10b981" if _total_pl_usd >= 0 else "#ef4444"
-                _tot_pl_sign  = "+" if _total_pl_usd >= 0 else ""
-
-                _pl_html_rows = ""
-                for _tk, _bp, _cp, _qq, _pp, _pu, _pi in sorted(_pl_rows, key=lambda x: x[4], reverse=True):
-                    _c  = "#10b981" if _pp >= 0 else "#ef4444"
-                    _sg = "+" if _pp >= 0 else ""
-                    _bg = "rgba(16,185,129,.06)" if _pp >= 0 else "rgba(239,68,68,.06)"
-                    _pl_html_rows += (
-                        f'<tr style="border-bottom:1px solid #f1f5f9;background:{_bg}">'
-                        f'<td style="font-weight:700;color:#1e293b;padding:8px 10px">{_tk}</td>'
-                        f'<td style="text-align:right;padding:8px 10px;color:#64748b">${_bp:,.2f}</td>'
-                        f'<td style="text-align:right;padding:8px 10px;color:#64748b">${_cp:,.2f}</td>'
-                        f'<td style="color:{_c};font-weight:700;text-align:right;padding:8px 10px">{_sg}{_pp:.2f}%</td>'
-                        f'<td style="color:{_c};text-align:right;padding:8px 10px">{_sg}${_pu:,.0f}</td>'
-                        f'<td style="color:{_c};text-align:right;padding:8px 10px">{_sg}₪{_pi:,.0f}</td>'
-                        f'</tr>'
-                    )
-
-                st.markdown(f"""
-<div style="margin-bottom:18px">
-  <div style="font-size:13px;font-weight:700;color:#6366f1;margin-bottom:8px;
-              letter-spacing:.04em">💰 רווח/הפסד כולל (מאז קנייה)</div>
-  <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:'Inter',sans-serif">
-    <thead>
-      <tr style="border-bottom:2px solid #e2e8f0">
-        <th style="text-align:left;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">מניה</th>
-        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">שער קנייה</th>
-        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">מחיר נוכחי</th>
-        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">רווח %</th>
-        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">USD</th>
-        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">ILS</th>
-      </tr>
-    </thead>
-    <tbody>{_pl_html_rows}</tbody>
-    <tfoot>
-      <tr style="border-top:2px solid #e2e8f0">
-        <td colspan="3" style="padding:8px 10px;font-weight:700;color:#1e293b">סה״כ תיק</td>
-        <td style="text-align:right;padding:8px 10px;font-weight:700;font-size:14px;color:{_tot_pl_color}">{_tot_pl_sign}{_total_pl_pct:.2f}%</td>
-        <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_pl_color}">{_tot_pl_sign}${_total_pl_usd:,.0f}</td>
-        <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_pl_color}">{_tot_pl_sign}₪{_total_pl_ils:,.0f}</td>
-      </tr>
-    </tfoot>
-  </table>
-</div>
-""", unsafe_allow_html=True)
-
-            st.markdown("#### &#129302; ניתוח תיק")
-            st.markdown(portfolio_ai_analysis(_ai_holdings, usd_ils))
+        _render_portfolio_tab(horizon)
 
 
 if __name__ == "__main__":
