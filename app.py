@@ -1840,11 +1840,23 @@ def _poll_telegram_registrations() -> int:
                 continue
             norm = _normalize_phone(m.group(1))
             if len(norm) >= 7 and norm not in db["registrations"]:
-                db["registrations"][norm] = {
-                    "chat_id": chat_id,
-                    "registered_at": datetime.now().isoformat(timespec="seconds"),
-                    "display_phone": m.group(1).strip(),
-                }
+                # phone לא ב-DB המקומי — Supabase עשוי היה כשל בטעינה.
+                # בדוק Supabase ישירות לפני יצירת רישום ריק, כדי לא למחוק portfolio קיים.
+                _sb_now = _supabase_load_tg_db()
+                _sb_existing = (
+                    _sb_now.get("registrations", {}).get(norm)
+                    if isinstance(_sb_now, dict) else None
+                )
+                if _sb_existing:
+                    # קיים ב-Supabase — שחזר רישום מלא (עם portfolio), רק רענן chat_id
+                    db["registrations"][norm] = {**_sb_existing, "chat_id": chat_id}
+                else:
+                    # רישום חדש באמת
+                    db["registrations"][norm] = {
+                        "chat_id": chat_id,
+                        "registered_at": datetime.now().isoformat(timespec="seconds"),
+                        "display_phone": m.group(1).strip(),
+                    }
                 new += 1
         db["_last_poll"] = datetime.now().isoformat(timespec="seconds")
         if new > 0:
@@ -4754,22 +4766,26 @@ def main() -> None:
     # ── זיהוי משתמש מחובר / התנתקות ──────────────────────────────────────────
     _tg_ph = st.session_state.get("tg_phone", "")
     _expected_user = _tg_ph if (_tg_ph and _is_phone_registered(_tg_ph)) else ""
-    if _expected_user != st.session_state["current_user_phone"]:
-        # שינוי מצב התחברות — טען portfolio מתאים
-        st.session_state["current_user_phone"] = _expected_user
-        if _expected_user:
+    if _expected_user:
+        # Supabase אימת בהצלחה — עדכן session
+        if _expected_user != st.session_state["current_user_phone"]:
+            st.session_state["current_user_phone"] = _expected_user
             try:
                 st.query_params["u"] = _expected_user
             except Exception:
                 pass
             st.session_state["portfolio"] = _load_user_portfolio(_expected_user)
-        else:
+    elif not _tg_ph or _tg_ph != st.session_state.get("current_user_phone"):
+        # טלפון נוקה או הוחלף — אפס session
+        # אבל אל תאפס אם Supabase פשוט כשל זמנית ואותו טלפון עדיין מוקלד
+        if st.session_state.get("current_user_phone"):
+            st.session_state["current_user_phone"] = ""
             try:
                 st.query_params.clear()
             except Exception:
                 pass
             st.session_state["portfolio"] = _load_portfolio()
-    elif "portfolio" not in st.session_state:
+    if "portfolio" not in st.session_state:
         st.session_state["portfolio"] = _load_portfolio()
     if "demo_portfolio" not in st.session_state:
         st.session_state["demo_portfolio"] = []
@@ -4908,7 +4924,7 @@ def main() -> None:
             )
         elif _tg_phone and len(_normalize_phone(_tg_phone)) >= 7:
             _norm = _normalize_phone(_tg_phone)
-            if _is_phone_registered(_tg_phone):
+            if st.session_state.get("current_user_phone") == _tg_phone or _expected_user:
                 st.success(f"✅ {_tg_phone} — מחובר לטלגרם")
                 # ── בדוק אם יש הודעות רישום חדשות ─────────────────────────
                 _poll_telegram_registrations()
