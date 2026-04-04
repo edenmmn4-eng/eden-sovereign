@@ -1,5 +1,5 @@
 """
-Eden Sovereign Intelligence Terminal v2026
+Eden Sovereign Intelligence Terminal V2.0
 Institutional-grade equity research terminal.
 """
 
@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Eden Sovereign | v2026",
+    page_title="Eden Sovereign | V2.0",
     page_icon="E",
     layout="wide",
     initial_sidebar_state="expanded")
@@ -667,7 +667,7 @@ def inject_css() -> None:
       </label>
       <div class="eden-panel-sep"></div>
       <div class="eden-panel-item" style="color:#6b7280;font-size:11px;cursor:default">
-        <span>Eden Sovereign v1.0</span>
+        <span>Eden Sovereign V2.0</span>
       </div>
     </div>
     """, unsafe_allow_html=True)
