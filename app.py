@@ -2008,7 +2008,7 @@ def _check_and_fire_tg_alerts(current_prices: dict) -> int:
     try:
         db = _load_alerts_db()
         fired = 0
-        changed = False
+        fired_keys: list = []  # (phone, ticker, target_price) של ההתראות שהופעלו
         for alert in db.get("alerts", []):
             if alert.get("triggered"):
                 continue
@@ -2021,8 +2021,6 @@ def _check_and_fire_tg_alerts(current_prices: dict) -> int:
                 (alert["condition"] == "below" and price <= target) or
                 (alert["condition"] == "equals" and abs(price - target) / target <= 0.005)
             )
-            alert["last_checked"] = datetime.now().isoformat(timespec="seconds")
-            changed = True
             if hit:
                 direction = "עלה מעל" if alert["condition"] == "above" else ("הגיע ל" if alert["condition"] == "equals" else "ירד מתחת")
                 body = (
@@ -2034,9 +2032,15 @@ def _check_and_fire_tg_alerts(current_prices: dict) -> int:
                 ok = _send_telegram_msg(alert["phone"], body)
                 if ok:
                     alert["triggered"] = True
+                    fired_keys.append((alert.get("phone"), alert.get("ticker"), target))
                     fired += 1
-        if changed:
-            _save_alerts_db(db)
+        if fired > 0:
+            # טען DB עדכני לפני השמירה — מונע דריסת שינויים מקבילים (portfolio וכד')
+            db_save = _load_alerts_db()
+            for a in db_save.get("alerts", []):
+                if (a.get("phone"), a.get("ticker"), float(a.get("target_price", 0))) in fired_keys:
+                    a["triggered"] = True
+            _save_alerts_db(db_save)
         return fired
     except Exception:
         return 0
