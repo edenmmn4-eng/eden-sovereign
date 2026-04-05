@@ -719,32 +719,39 @@ def inject_css() -> None:
         bindAll();
 
         // ── חץ ימני/שמאלי: ניווט בין שדות קלט ──
-        // ArrowRight = שדה הבא | ArrowLeft = שדה הקודם
-        // בתוך input טקסט: מנווט רק כשהסמן בקצה השדה
         doc.addEventListener('keydown', function(e) {
             if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
             var active = doc.activeElement;
             if (!active) return;
-            var tag = active.tagName;
-            // קבל את כל שדות הקלט הגלויים (input + Streamlit selectbox input)
-            var inputs = Array.from(doc.querySelectorAll('input[type="number"], input[type="text"]'))
-                .filter(function(el) { return el.offsetParent !== null; });
-            var idx = inputs.indexOf(active);
-            if (idx === -1) return;
-            // בתוך input: נווט רק כשהסמן בקצה הרלוונטי
-            if (tag === 'INPUT') {
-                var atEnd   = (active.selectionStart === active.value.length);
-                var atStart = (active.selectionStart === 0 && active.selectionEnd === 0);
-                if (e.key === 'ArrowRight' && !atEnd)   return;
-                if (e.key === 'ArrowLeft'  && !atStart) return;
-            }
-            e.preventDefault();
-            if (e.key === 'ArrowRight' && idx < inputs.length - 1) {
-                inputs[idx + 1].focus();
-                inputs[idx + 1].select();
-            } else if (e.key === 'ArrowLeft' && idx > 0) {
-                inputs[idx - 1].focus();
-                inputs[idx - 1].select();
+            // אל תפריע לתפריט פתוח (listbox/option)
+            var role = active.getAttribute('role') || '';
+            if (role === 'option' || role === 'listbox') return;
+            // כל שדות number הגלויים
+            var numInputs = Array.from(doc.querySelectorAll('input[type="number"]'))
+                .filter(function(el) { return el.offsetParent !== null && !el.disabled; });
+            if (numInputs.length === 0) return;
+            var idx = numInputs.indexOf(active);
+            if (idx !== -1) {
+                // נמצאים בתוך number input — נווט רק בקצה
+                var atEnd   = active.selectionStart >= active.value.length;
+                var atStart = active.selectionStart === 0;
+                if (e.key === 'ArrowRight' && atEnd && idx < numInputs.length - 1) {
+                    e.preventDefault();
+                    numInputs[idx + 1].focus();
+                    try { numInputs[idx + 1].select(); } catch(_){}
+                } else if (e.key === 'ArrowLeft' && atStart && idx > 0) {
+                    e.preventDefault();
+                    numInputs[idx - 1].focus();
+                    try { numInputs[idx - 1].select(); } catch(_){}
+                }
+            } else {
+                // נמצאים מחוץ לשדות (למשל div של selectbox אחרי Enter)
+                // ArrowRight → שדה number ראשון
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    numInputs[0].focus();
+                    try { numInputs[0].select(); } catch(_){}
+                }
             }
         }, true);
     })();
