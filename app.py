@@ -1900,8 +1900,6 @@ def _is_phone_registered(phone: str) -> bool:
 
 def _add_tg_alert(phone: str, ticker: str, condition: str, target_price: float) -> bool:
     try:
-        if not _is_phone_registered(phone):
-            return False
         db = _load_alerts_db()
         db["alerts"].append({
             "phone": _normalize_phone(phone),
@@ -1934,8 +1932,6 @@ def _delete_tg_alert(phone: str, idx: int) -> None:
 
 def _add_score_alert(phone: str, min_score: int) -> bool:
     try:
-        if not _is_phone_registered(phone):
-            return False
         norm = _normalize_phone(phone)
         db = _load_alerts_db()
         # מחק אם כבר קיים אחד עם אותו ציון
