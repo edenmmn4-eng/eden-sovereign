@@ -717,6 +717,27 @@ def inject_css() -> None:
         }
 
         bindAll();
+
+        // ── Home/End ניווט בין שדות קלט ──
+        // End = שדה הבא | Home = שדה הקודם
+        doc.addEventListener('keydown', function(e) {
+            if (e.key !== 'End' && e.key !== 'Home') return;
+            var active = doc.activeElement;
+            if (!active || active.tagName !== 'INPUT') return;
+            var inputs = Array.from(doc.querySelectorAll(
+                'input[type="number"], input[type="text"]'
+            )).filter(function(el) { return el.offsetParent !== null; });
+            var idx = inputs.indexOf(active);
+            if (idx === -1) return;
+            e.preventDefault();
+            if (e.key === 'End' && idx < inputs.length - 1) {
+                inputs[idx + 1].focus();
+                inputs[idx + 1].select();
+            } else if (e.key === 'Home' && idx > 0) {
+                inputs[idx - 1].focus();
+                inputs[idx - 1].select();
+            }
+        }, true);
     })();
     </script>
     """, height=0)
