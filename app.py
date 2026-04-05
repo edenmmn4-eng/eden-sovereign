@@ -718,40 +718,42 @@ def inject_css() -> None:
 
         bindAll();
 
-        // ── חץ ימני/שמאלי: ניווט בין שדות קלט ──
+        // ── חץ ימני/שמאלי: ניווט מרחבי בין שדות קלט באותה שורה ──
+        function spatialNext(fromEl, dir) {
+            // dir: 1 = ימין, -1 = שמאל
+            var r0 = fromEl.getBoundingClientRect();
+            var numInputs = Array.from(doc.querySelectorAll('input[type="number"]'))
+                .filter(function(el) { return el.offsetParent !== null && !el.disabled && el !== fromEl; });
+            var best = null, bestDist = Infinity;
+            numInputs.forEach(function(el) {
+                var r = el.getBoundingClientRect();
+                var dy = Math.abs(r.top - r0.top);
+                if (dy > 80) return; // לא באותה שורה
+                var dx = dir === 1 ? r.left - r0.right : r0.left - r.right;
+                if (dx >= -10 && dx < bestDist) { bestDist = dx; best = el; }
+            });
+            return best;
+        }
         doc.addEventListener('keydown', function(e) {
             if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
             var active = doc.activeElement;
             if (!active) return;
-            // אל תפריע לתפריט פתוח (listbox/option)
             var role = active.getAttribute('role') || '';
             if (role === 'option' || role === 'listbox') return;
-            // כל שדות number הגלויים
-            var numInputs = Array.from(doc.querySelectorAll('input[type="number"]'))
-                .filter(function(el) { return el.offsetParent !== null && !el.disabled; });
-            if (numInputs.length === 0) return;
-            var idx = numInputs.indexOf(active);
-            if (idx !== -1) {
-                // נמצאים בתוך number input — נווט רק בקצה
-                var atEnd   = active.selectionStart >= active.value.length;
-                var atStart = active.selectionStart === 0;
-                if (e.key === 'ArrowRight' && atEnd && idx < numInputs.length - 1) {
-                    e.preventDefault();
-                    numInputs[idx + 1].focus();
-                    try { numInputs[idx + 1].select(); } catch(_){}
-                } else if (e.key === 'ArrowLeft' && atStart && idx > 0) {
-                    e.preventDefault();
-                    numInputs[idx - 1].focus();
-                    try { numInputs[idx - 1].select(); } catch(_){}
-                }
+            var dir = e.key === 'ArrowRight' ? 1 : -1;
+            if (active.tagName === 'INPUT' && active.type === 'number') {
+                // בתוך שדה מספר — נווט רק בקצה
+                var atEdge = dir === 1
+                    ? active.selectionStart >= active.value.length
+                    : active.selectionStart === 0;
+                if (!atEdge) return;
+                var next = spatialNext(active, dir);
+                if (next) { e.preventDefault(); next.focus(); try{next.select();}catch(_){} }
             } else {
-                // נמצאים מחוץ לשדות (למשל div של selectbox אחרי Enter)
-                // ArrowRight → שדה number ראשון
-                if (e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    numInputs[0].focus();
-                    try { numInputs[0].select(); } catch(_){}
-                }
+                // מחוץ לשדות (div selectbox אחרי Enter) — מצא הכי קרוב מימין
+                if (dir !== 1) return;
+                var next = spatialNext(active, 1);
+                if (next) { e.preventDefault(); next.focus(); try{next.select();}catch(_){} }
             }
         }, true);
     })();
