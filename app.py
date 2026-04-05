@@ -719,16 +719,18 @@ def inject_css() -> None:
         bindAll();
 
         // ── חץ ימני/שמאלי: ניווט מרחבי בין שדות קלט באותה שורה ──
+        // כולל: selectbox (text input) ← כמות (number) ← מחיר (number) ← כפתור הוסף
         function spatialNext(fromEl, dir) {
-            // dir: 1 = ימין, -1 = שמאל
             var r0 = fromEl.getBoundingClientRect();
-            var numInputs = Array.from(doc.querySelectorAll('input[type="number"]'))
-                .filter(function(el) { return el.offsetParent !== null && !el.disabled && el !== fromEl; });
+            var candidates = Array.from(doc.querySelectorAll(
+                'input[type="number"], input[type="text"], button'
+            )).filter(function(el) {
+                return el.offsetParent !== null && !el.disabled && el !== fromEl;
+            });
             var best = null, bestDist = Infinity;
-            numInputs.forEach(function(el) {
+            candidates.forEach(function(el) {
                 var r = el.getBoundingClientRect();
-                var dy = Math.abs(r.top - r0.top);
-                if (dy > 80) return; // לא באותה שורה
+                if (Math.abs(r.top - r0.top) > 80) return; // לא באותה שורה
                 var dx = dir === 1 ? r.left - r0.right : r0.left - r.right;
                 if (dx >= -10 && dx < bestDist) { bestDist = dx; best = el; }
             });
@@ -741,20 +743,21 @@ def inject_css() -> None:
             var role = active.getAttribute('role') || '';
             if (role === 'option' || role === 'listbox') return;
             var dir = e.key === 'ArrowRight' ? 1 : -1;
-            if (active.tagName === 'INPUT' && active.type === 'number') {
-                // input[type=number] לא תמיד תומך ב-selectionStart (מחזיר null)
-                // במקרה כזה — תמיד אפשר לנווט
+            var tag = active.tagName, typ = active.type || '';
+            if (tag === 'INPUT' && typ === 'number') {
+                // input[type=number]: selectionStart עשוי להחזיר null — מטפלים בזה
                 var sel = active.selectionStart;
-                var atEdge = (sel === null) || (dir === 1
-                    ? sel >= active.value.length
-                    : sel === 0);
+                var atEdge = sel === null || (dir === 1 ? sel >= active.value.length : sel === 0);
                 if (!atEdge) return;
                 var next = spatialNext(active, dir);
                 if (next) { e.preventDefault(); next.focus(); try{next.select();}catch(_){} }
+            } else if (tag === 'BUTTON') {
+                // מכפתור — חץ שמאלה חוזר לשדה הקודם
+                var next = spatialNext(active, dir);
+                if (next) { e.preventDefault(); next.focus(); try{next.select();}catch(_){} }
             } else {
-                // מחוץ לשדות (div selectbox אחרי Enter) — מצא הכי קרוב מימין
-                if (dir !== 1) return;
-                var next = spatialNext(active, 1);
+                // div/selectbox container — חץ ימינה קדימה, שמאלה אחורה
+                var next = spatialNext(active, dir);
                 if (next) { e.preventDefault(); next.focus(); try{next.select();}catch(_){} }
             }
         }, true);
