@@ -4614,21 +4614,25 @@ def _render_portfolio_tab(horizon: str):
                 "buy_price": _buy,
             })
 
-        # ── כפתורי מחיקה + טבלה מקורית ──────────────────────────────────
-        _btn_col, _tbl_col = st.columns([0.07, 0.93])
-        with _tbl_col:
-            st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
-        with _btn_col:
-            st.markdown("<div style='height:38px'></div>", unsafe_allow_html=True)  # offset header
-            for _ri, _row in enumerate(_rows):
-                if st.button("🗑", key=f"del_stock_{_port_key}_{_ri}", help=f"הסר {_row['Ticker']}"):
-                    st.session_state[_port_key] = [
-                        h for h in st.session_state[_port_key] if h["ticker"] != _row["Ticker"]
-                    ]
-                    if not _is_demo:
-                        _save_portfolio(st.session_state[_port_key])
-                    st.rerun()
-                st.markdown("<div style='height:9px'></div>", unsafe_allow_html=True)
+        # ── טבלה עם עמודת מחיקה מובנית ──────────────────────────────────
+        _df_edit = pd.DataFrame(_rows)
+        _df_edit.insert(0, "🗑", False)
+        _edited = st.data_editor(
+            _df_edit,
+            column_config={"🗑": st.column_config.CheckboxColumn("🗑", default=False, width="small")},
+            disabled=["Ticker", "Qty", "Buy $", "Current $", "Value ($)", "Value (₪)", "P&L ($)", "P&L %"],
+            hide_index=True,
+            use_container_width=True,
+            key=f"port_editor_{_port_key}",
+        )
+        _to_delete = _edited[_edited["🗑"] == True]["Ticker"].tolist()
+        if _to_delete:
+            st.session_state[_port_key] = [
+                h for h in st.session_state[_port_key] if h["ticker"] not in _to_delete
+            ]
+            if not _is_demo:
+                _save_portfolio(st.session_state[_port_key])
+            st.rerun()
 
         _pie_labels = [r["Ticker"] for r in _rows]
         _pie_vals   = [_prices.get(h["ticker"], 0) * h["quantity"] for h in _portfolio]
