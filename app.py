@@ -4969,30 +4969,29 @@ def main() -> None:
                 _poll_telegram_registrations()
 
                 # ── טופס הוספת התראה ──────────────────────────────────────
-                _ac1, _ac2 = st.columns(2)
-                with _ac1:
-                    _alert_ticker = st.text_input(
-                        "טיקר", placeholder="NVDA",
-                        key="alert_ticker_input",
-                        label_visibility="visible",
-                    ).strip().upper()
-                with _ac2:
-                    _alert_cond = st.selectbox(
-                        "תנאי", ["מעל", "מתחת", "שווה ל"],
-                        key="alert_cond_select",
-                        label_visibility="visible",
+                with st.form("add_alert_form", clear_on_submit=True):
+                    _ac1, _ac2 = st.columns(2)
+                    with _ac1:
+                        _alert_ticker = st.text_input(
+                            "טיקר", placeholder="NVDA",
+                            key="alert_ticker_input",
+                        ).strip().upper()
+                    with _ac2:
+                        _alert_cond = st.selectbox(
+                            "תנאי", ["מעל", "מתחת", "שווה ל"],
+                            key="alert_cond_select",
+                        )
+                    _alert_price = st.number_input(
+                        "מחיר יעד ($)", min_value=0.01, value=100.0,
+                        step=1.0, key="alert_price_input",
                     )
-                _alert_price = st.number_input(
-                    "מחיר יעד ($)", min_value=0.01, value=100.0,
-                    step=1.0, key="alert_price_input",
-                )
-                if st.button("➕ הוסף התראה", use_container_width=True, key="add_alert_btn"):
-                    if _alert_ticker:
-                        _cond_en = "above" if _alert_cond == "מעל" else ("equals" if _alert_cond == "שווה ל" else "below")
-                        if _add_tg_alert(_tg_phone, _alert_ticker, _cond_en, _alert_price):
-                            st.toast(f"✅ התראה נוספה: {_alert_ticker} {_alert_cond} ${_alert_price:,.2f}")
-                        else:
-                            st.toast("שגיאה בהוספת התראה")
+                    if st.form_submit_button("➕ הוסף התראה", use_container_width=True):
+                        if _alert_ticker:
+                            _cond_en = "above" if _alert_cond == "מעל" else ("equals" if _alert_cond == "שווה ל" else "below")
+                            if _add_tg_alert(_tg_phone, _alert_ticker, _cond_en, _alert_price):
+                                st.toast(f"✅ התראה נוספה: {_alert_ticker} {_alert_cond} ${_alert_price:,.2f}")
+                            else:
+                                st.toast("שגיאה בהוספת התראה")
 
                 # ── רשימת התראות פעילות ───────────────────────────────────
                 _active = [a for a in _list_tg_alerts(_tg_phone) if not a.get("triggered")]
@@ -5012,20 +5011,20 @@ def main() -> None:
                 st.markdown("---")
                 st.markdown("**🏆 התראות ציון**")
                 st.caption("קבל הודעה כאשר מניה חדשה מגיעה לציון מינימלי")
-                _sc1, _sc2 = st.columns([3, 2])
-                with _sc1:
-                    _score_threshold = st.number_input(
-                        "ציון מינימלי", min_value=1, max_value=100, value=80,
-                        step=1, key="score_alert_threshold",
-                        label_visibility="visible",
-                    )
-                with _sc2:
-                    st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
-                    if st.button("➕ הוסף", use_container_width=True, key="add_score_alert_btn"):
-                        if _add_score_alert(_tg_phone, int(_score_threshold)):
-                            st.toast(f"✅ התראה נוספה: ציון ≥{_score_threshold}")
-                        else:
-                            st.toast("שגיאה בהוספת התראת ציון")
+                with st.form("add_score_alert_form", clear_on_submit=False):
+                    _sc1, _sc2 = st.columns([3, 2])
+                    with _sc1:
+                        _score_threshold = st.number_input(
+                            "ציון מינימלי", min_value=1, max_value=100, value=80,
+                            step=1, key="score_alert_threshold",
+                        )
+                    with _sc2:
+                        st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+                        if st.form_submit_button("➕ הוסף", use_container_width=True):
+                            if _add_score_alert(_tg_phone, int(_score_threshold)):
+                                st.toast(f"✅ התראה נוספה: ציון ≥{_score_threshold}")
+                            else:
+                                st.toast("שגיאה בהוספת התראת ציון")
 
                 _active_score = _list_score_alerts(_tg_phone)
                 if _active_score:
