@@ -1671,7 +1671,12 @@ def _save_portfolio(portfolio: list) -> None:
     try:
         _cu = st.session_state.get("current_user_phone", "")
         if _cu:
-            _save_user_portfolio(_cu, portfolio)
+            ok = _save_user_portfolio(_cu, portfolio)
+            if not ok:
+                try:
+                    st.toast("⚠️ שגיאת שמירה — הנתונים לא נשמרו לשרת. בדוק חיבור.", icon="⚠️")
+                except Exception:
+                    pass
             return
     except Exception:
         pass
@@ -1745,13 +1750,13 @@ def _supabase_load_tg_db() -> dict | None:
     return None
 
 
-def _supabase_save_tg_db(db: dict) -> None:
-    """שומר את מסד Telegram ב-Supabase."""
+def _supabase_save_tg_db(db: dict) -> bool:
+    """שומר את מסד Telegram ב-Supabase. מחזיר True אם הצליח."""
     try:
         url, key = _sb_creds()
         if not url or not key:
             print("[WARNING] _supabase_save_tg_db: Supabase credentials missing")
-            return
+            return False
         _to_save = {k: v for k, v in db.items() if not k.startswith("_last_")}
 
         # הגן על פורטפוליו: אם יש רשומות ללא portfolio — השלם מהגרסה הנוכחית ב-Supabase לפני שנדרוס
@@ -1785,8 +1790,11 @@ def _supabase_save_tg_db(db: dict) -> None:
         )
         if not r.ok:
             print(f"[WARNING] _supabase_save_tg_db failed: HTTP {r.status_code} — {r.text[:200]}")
+            return False
+        return True
     except Exception as e:
         print(f"[ERROR] _supabase_save_tg_db exception: {e}")
+        return False
 
 
 def _load_alerts_db() -> dict:
@@ -1834,17 +1842,19 @@ def _load_alerts_db() -> dict:
     return data
 
 
-def _save_alerts_db(db: dict) -> None:
+def _save_alerts_db(db: dict) -> bool:
+    """שומר DB ל-Supabase + קובץ מקומי. מחזיר True אם Supabase הצליח."""
     # חותמת זמן לבחירת המקור העדכני ביותר בטעינה — עותק כדי לא למטייט את ה-dict המקורי
     db = {**db, "saved_at": datetime.utcnow().isoformat()}
     # שמור ב-Supabase (persistent)
-    _supabase_save_tg_db(db)
-    # שמור גם לקובץ מקומי (fallback)
+    sb_ok = _supabase_save_tg_db(db)
+    # שמור גם לקובץ מקומי (fallback) — תמיד, ללא תלות בהצלחת Supabase
     try:
         json.dump(db, open(_ALERTS_FILE, "w", encoding="utf-8"),
                   ensure_ascii=False, indent=2)
     except Exception:
         pass
+    return sb_ok
 
 
 def _tg_token() -> str:
@@ -2276,9 +2286,10 @@ def _load_user_portfolio(phone: str) -> list:
     return []
 
 
-def _save_user_portfolio(phone: str, portfolio: list) -> None:
-    """שומר את ה-Portfolio — ראשית ב-_tg_db (אמין), גם ב-user_portfolios."""
+def _save_user_portfolio(phone: str, portfolio: list) -> bool:
+    """שומר את ה-Portfolio — ראשית ב-_tg_db (אמין), גם ב-user_portfolios. מחזיר True אם Supabase הצליח."""
     norm = _normalize_phone(phone)
+    sb_ok = False
     # 1. PRIMARY: שמור ב-_tg_db — תמיד, גם אם המשתמש לא ברשימת ההרשמות
     try:
         db = _load_alerts_db()
@@ -2286,11 +2297,12 @@ def _save_user_portfolio(phone: str, portfolio: list) -> None:
         if norm not in regs:
             regs[norm] = {}
         regs[norm]["portfolio"] = portfolio
-        _save_alerts_db(db)
+        sb_ok = _save_alerts_db(db)
     except Exception:
         pass
     # 2. SECONDARY: שמור גם ב-user_portfolios (אם הטבלה קיימת)
     _supabase_save_portfolio(norm, portfolio)
+    return sb_ok
 
 
 # ── Monte Carlo Price Simulation ──────────────────────────────────────────────
