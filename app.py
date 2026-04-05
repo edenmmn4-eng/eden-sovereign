@@ -730,7 +730,9 @@ def inject_css() -> None:
             var best = null, bestDist = Infinity;
             candidates.forEach(function(el) {
                 var r = el.getBoundingClientRect();
-                if (Math.abs(r.top - r0.top) > 80) return; // לא באותה שורה
+                // השווה לפי מרכז האלמנט — מדויק יותר מ-top
+                var dy = Math.abs((r.top + r.height/2) - (r0.top + r0.height/2));
+                if (dy > 40) return; // לא באותה שורה
                 var dx = dir === 1 ? r.left - r0.right : r0.left - r.right;
                 if (dx >= -10 && dx < bestDist) { bestDist = dx; best = el; }
             });
