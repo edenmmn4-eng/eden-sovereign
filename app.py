@@ -718,22 +718,31 @@ def inject_css() -> None:
 
         bindAll();
 
-        // ── Home/End ניווט בין שדות קלט ──
-        // End = שדה הבא | Home = שדה הקודם
+        // ── חץ ימני/שמאלי: ניווט בין שדות קלט ──
+        // ArrowRight = שדה הבא | ArrowLeft = שדה הקודם
+        // בתוך input טקסט: מנווט רק כשהסמן בקצה השדה
         doc.addEventListener('keydown', function(e) {
-            if (e.key !== 'End' && e.key !== 'Home') return;
+            if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
             var active = doc.activeElement;
-            if (!active || active.tagName !== 'INPUT') return;
-            var inputs = Array.from(doc.querySelectorAll(
-                'input[type="number"], input[type="text"]'
-            )).filter(function(el) { return el.offsetParent !== null; });
+            if (!active) return;
+            var tag = active.tagName;
+            // קבל את כל שדות הקלט הגלויים (input + Streamlit selectbox input)
+            var inputs = Array.from(doc.querySelectorAll('input[type="number"], input[type="text"]'))
+                .filter(function(el) { return el.offsetParent !== null; });
             var idx = inputs.indexOf(active);
             if (idx === -1) return;
+            // בתוך input: נווט רק כשהסמן בקצה הרלוונטי
+            if (tag === 'INPUT') {
+                var atEnd   = (active.selectionStart === active.value.length);
+                var atStart = (active.selectionStart === 0 && active.selectionEnd === 0);
+                if (e.key === 'ArrowRight' && !atEnd)   return;
+                if (e.key === 'ArrowLeft'  && !atStart) return;
+            }
             e.preventDefault();
-            if (e.key === 'End' && idx < inputs.length - 1) {
+            if (e.key === 'ArrowRight' && idx < inputs.length - 1) {
                 inputs[idx + 1].focus();
                 inputs[idx + 1].select();
-            } else if (e.key === 'Home' && idx > 0) {
+            } else if (e.key === 'ArrowLeft' && idx > 0) {
                 inputs[idx - 1].focus();
                 inputs[idx - 1].select();
             }
