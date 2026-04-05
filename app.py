@@ -742,10 +742,12 @@ def inject_css() -> None:
             if (role === 'option' || role === 'listbox') return;
             var dir = e.key === 'ArrowRight' ? 1 : -1;
             if (active.tagName === 'INPUT' && active.type === 'number') {
-                // בתוך שדה מספר — נווט רק בקצה
-                var atEdge = dir === 1
-                    ? active.selectionStart >= active.value.length
-                    : active.selectionStart === 0;
+                // input[type=number] לא תמיד תומך ב-selectionStart (מחזיר null)
+                // במקרה כזה — תמיד אפשר לנווט
+                var sel = active.selectionStart;
+                var atEdge = (sel === null) || (dir === 1
+                    ? sel >= active.value.length
+                    : sel === 0);
                 if (!atEdge) return;
                 var next = spatialNext(active, dir);
                 if (next) { e.preventDefault(); next.focus(); try{next.select();}catch(_){} }
