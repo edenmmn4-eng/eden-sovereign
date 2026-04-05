@@ -4557,15 +4557,30 @@ def _render_portfolio_tab(horizon: str):
             else:
                 st.warning(f"{_port_ticker} כבר בתיק.")
 
-    if st.button("&#9851; Reset Portfolio", use_container_width=False, key=f"port_reset_{_port_key}"):
-        if _is_demo:
-            st.session_state["demo_portfolio"] = []
-        else:
-            st.session_state["portfolio"] = []
-            _save_portfolio([])
-        st.rerun()
-
     _portfolio = st.session_state[_port_key]
+    _r1, _r2, _r3 = st.columns([2, 1, 1])
+    with _r1:
+        _remove_options = [h["ticker"] for h in _portfolio]
+        _remove_ticker = st.selectbox("הסר מניה", options=_remove_options,
+                                      label_visibility="collapsed",
+                                      placeholder="בחר מניה להסרה...",
+                                      key=f"port_remove_sel_{_port_key}") if _remove_options else None
+    with _r2:
+        if st.button("🗑 הסר", use_container_width=True, key=f"port_remove_{_port_key}",
+                     disabled=not _remove_options):
+            if _remove_ticker:
+                st.session_state[_port_key] = [h for h in _portfolio if h["ticker"] != _remove_ticker]
+                if not _is_demo:
+                    _save_portfolio(st.session_state[_port_key])
+                st.rerun()
+    with _r3:
+        if st.button("&#9851; Reset", use_container_width=True, key=f"port_reset_{_port_key}"):
+            if _is_demo:
+                st.session_state["demo_portfolio"] = []
+            else:
+                st.session_state["portfolio"] = []
+                _save_portfolio([])
+            st.rerun()
 
     if not _portfolio:
         st.info("התיק ריק — הוסף מניות למעלה.")
