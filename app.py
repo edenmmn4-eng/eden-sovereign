@@ -4614,15 +4614,13 @@ def _render_portfolio_tab(horizon: str):
                 "buy_price": _buy,
             })
 
-        # ── טבלה עם כפתור מחיקה לכל מניה ────────────────────────────────
-        _COL_W = [0.35, 0.9, 0.6, 1.0, 1.05, 1.05, 1.05, 0.85, 0.85]
-        _hdr = st.columns(_COL_W)
-        for _c, _h in zip(_hdr, ["", "Ticker", "Qty", "Buy $", "Current $", "Value ($)", "Value (₪)", "P&L ($)", "P&L %"]):
-            _c.markdown(f"<small><b>{_h}</b></small>", unsafe_allow_html=True)
-        st.divider()
-        for _ri, _row in enumerate(_rows):
-            _rc = st.columns(_COL_W)
-            with _rc[0]:
+        # ── כפתורי מחיקה + טבלה מקורית ──────────────────────────────────
+        _btn_col, _tbl_col = st.columns([0.07, 0.93])
+        with _tbl_col:
+            st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
+        with _btn_col:
+            st.markdown("<div style='height:38px'></div>", unsafe_allow_html=True)  # offset header
+            for _ri, _row in enumerate(_rows):
                 if st.button("🗑", key=f"del_stock_{_port_key}_{_ri}", help=f"הסר {_row['Ticker']}"):
                     st.session_state[_port_key] = [
                         h for h in st.session_state[_port_key] if h["ticker"] != _row["Ticker"]
@@ -4630,16 +4628,7 @@ def _render_portfolio_tab(horizon: str):
                     if not _is_demo:
                         _save_portfolio(st.session_state[_port_key])
                     st.rerun()
-            _rc[1].write(_row["Ticker"])
-            _rc[2].write(str(_row["Qty"]))
-            _rc[3].write(_row["Buy $"])
-            _rc[4].write(_row["Current $"])
-            _rc[5].write(_row["Value ($)"])
-            _rc[6].write(_row["Value (₪)"])
-            _pl_c = "color:#10b981" if "+" in _row["P&L ($)"] else "color:#ef4444"
-            _rc[7].markdown(f"<span style='{_pl_c}'>{_row['P&L ($)']}</span>", unsafe_allow_html=True)
-            _rc[8].markdown(f"<span style='{_pl_c}'>{_row['P&L %']}</span>", unsafe_allow_html=True)
-        st.divider()
+                st.markdown("<div style='height:9px'></div>", unsafe_allow_html=True)
 
         _pie_labels = [r["Ticker"] for r in _rows]
         _pie_vals   = [_prices.get(h["ticker"], 0) * h["quantity"] for h in _portfolio]
