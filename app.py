@@ -723,7 +723,7 @@ def inject_css() -> None:
         function spatialNext(fromEl, dir) {
             var r0 = fromEl.getBoundingClientRect();
             var candidates = Array.from(doc.querySelectorAll(
-                'input[type="number"], input[type="text"], button'
+                'input[type="number"], [data-baseweb="select"] input, button'
             )).filter(function(el) {
                 return el.offsetParent !== null && !el.disabled && el !== fromEl;
             });
