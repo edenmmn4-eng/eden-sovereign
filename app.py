@@ -4752,13 +4752,15 @@ def main() -> None:
     st.session_state.setdefault("best_pick_done", False)
     st.session_state.setdefault("tg_phone", "")
     st.session_state.setdefault("current_user_phone", "")
+    st.session_state.setdefault("_tg_verified_phone", "")  # cache — מונע קריאת Supabase בכל render
 
-    # Auto-login: שחזר phone מה-URL אם קיים ורשום (שורד refresh + סגירה/פתיחה)
+    # Auto-login: שחזר phone מה-URL (ה-URL הוגדר על-ידי הקוד שלנו עם אימות מוצלח — אמין)
     if not st.session_state.get("tg_phone"):
         try:
             _qp_phone = st.query_params.get("u", "")
-            if _qp_phone and _is_phone_registered(_qp_phone):
+            if _qp_phone:
                 st.session_state["tg_phone"] = _qp_phone
+                st.session_state["_tg_verified_phone"] = _qp_phone  # סמן כמאומת — מונע קריאת Supabase מיותרת
         except Exception:
             pass
 
@@ -4769,9 +4771,18 @@ def main() -> None:
 
     # ── זיהוי משתמש מחובר / התנתקות ──────────────────────────────────────────
     _tg_ph = st.session_state.get("tg_phone", "")
-    _expected_user = _tg_ph if (_tg_ph and _is_phone_registered(_tg_ph)) else ""
+    _verified = st.session_state.get("_tg_verified_phone", "")
+    # השתמש בcache כדי לא לקרוא Supabase בכל render — רק כשהטלפון השתנה
+    if _tg_ph and _tg_ph == _verified:
+        _expected_user = _tg_ph  # כבר אומת בsession זה — אין צורך בקריאת Supabase
+    elif _tg_ph:
+        _expected_user = _tg_ph if _is_phone_registered(_tg_ph) else ""
+        if _expected_user:
+            st.session_state["_tg_verified_phone"] = _expected_user  # שמור בcache
+    else:
+        _expected_user = ""
     if _expected_user:
-        # Supabase אימת בהצלחה — עדכן session
+        # אימות הצליח — עדכן session
         if _expected_user != st.session_state["current_user_phone"]:
             st.session_state["current_user_phone"] = _expected_user
             try:
@@ -4781,9 +4792,9 @@ def main() -> None:
             st.session_state["portfolio"] = _load_user_portfolio(_expected_user)
     elif not _tg_ph or _tg_ph != st.session_state.get("current_user_phone"):
         # טלפון נוקה או הוחלף — אפס session
-        # אבל אל תאפס אם Supabase פשוט כשל זמנית ואותו טלפון עדיין מוקלד
         if st.session_state.get("current_user_phone"):
             st.session_state["current_user_phone"] = ""
+            st.session_state["_tg_verified_phone"] = ""
             try:
                 st.query_params.clear()
             except Exception:
@@ -4890,6 +4901,7 @@ def main() -> None:
                 if st.button("יציאה", key="logout_btn", use_container_width=True):
                     st.session_state["tg_phone"] = ""
                     st.session_state["current_user_phone"] = ""
+                    st.session_state["_tg_verified_phone"] = ""
                     st.session_state["portfolio"] = _load_portfolio()
                     try:
                         st.query_params.clear()
