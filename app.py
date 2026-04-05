@@ -3192,6 +3192,30 @@ def build_peers(ticker: str, self_data: dict | None = None, extra_peers: tuple =
     return pd.DataFrame(rows)
 
 
+# ── Market State ──────────────────────────────────────────────────────────────
+def _market_state() -> tuple[str, str]:
+    """מחזיר (state, label) לפי שעת NYSE הנוכחית.
+    state: 'REGULAR' | 'PRE' | 'POST' | 'CLOSED'
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        from datetime import datetime
+        now = datetime.now(ZoneInfo("America/New_York"))
+        if now.weekday() >= 5:  # שישי=5, שבת=6 → סגור
+            return "CLOSED", "Market Closed"
+        t = now.hour * 60 + now.minute
+        if 570 <= t < 960:    # 9:30–16:00
+            return "REGULAR", "Market Open"
+        elif 240 <= t < 570:  # 04:00–9:30
+            return "PRE",     "Pre-Market"
+        elif 960 <= t < 1200: # 16:00–20:00
+            return "POST",    "After Hours"
+        else:
+            return "CLOSED", "Market Closed"
+    except Exception:
+        return "REGULAR", ""
+
+
 # ── Metric Cards ──────────────────────────────────────────────────────────────
 def render_metric_cards(data: dict, tech: dict) -> None:
     price = data["current_price"]; prev = data["prev_close"]
@@ -3206,10 +3230,13 @@ def render_metric_cards(data: dict, tech: dict) -> None:
     peg_sub = ("Attractive" if not _isnan(float(peg)) and float(peg)<1.5
                else "Rich" if not _isnan(float(peg)) and float(peg)>2.5
                else "Fair Value" if not _isnan(float(peg)) else "N/A")
+    _mstate, _mlabel = _market_state()
+    _micon = "☀️" if _mstate == "REGULAR" else "🌙"
+    _mcolor = "#10b981" if _mstate == "REGULAR" else "#6366f1"
     st.markdown(f"""
     <div class="metric-grid">
       <div class="metric-card">
-        <div class="metric-label">Price</div>
+        <div class="metric-label">Price &nbsp;<span style="font-size:13px;color:{_mcolor};vertical-align:middle" title="{_mlabel}">{_micon} {_mlabel}</span></div>
         <div class="metric-value">{fmt_price(float(price)) if not _isnan(float(price)) else "N/A"}</div>
         <div class="metric-sub {pct_cls}">{f'{pct_sign}{pct:.2f}%' if not _isnan(pct) else 'N/A'}</div>
       </div>
