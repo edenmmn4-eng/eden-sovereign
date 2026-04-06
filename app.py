@@ -3326,9 +3326,9 @@ def render_metric_cards(data: dict, tech: dict) -> None:
     elif _mstate == "POST":
         _ext_price = float(_safe(data.get("post_market_price"), float("nan")))
     _show_ext = not _isnan(_ext_price)
-    # שינוי % של המחיר המורחב לעומת סגירה קודמת
-    _ext_pct = (((_ext_price - float(prev)) / float(prev)) * 100
-                if _show_ext and not _isnan(float(prev)) and float(prev) != 0
+    # שינוי % לעומת הסגירה הרגילה האחרונה (current_price), לא prev_close
+    _ext_pct = (((_ext_price - float(price)) / float(price)) * 100
+                if _show_ext and not _isnan(float(price)) and float(price) != 0
                 else float("nan"))
     _ext_pct_cls  = "positive" if not _isnan(_ext_pct) and _ext_pct >= 0 else "negative"
     _ext_pct_sign = "+" if not _isnan(_ext_pct) and _ext_pct >= 0 else ""
