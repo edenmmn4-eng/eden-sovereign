@@ -1786,17 +1786,38 @@ def _supabase_save_tg_db(db: dict) -> bool:
             except Exception as _pe:
                 print(f"[WARNING] _supabase_save_tg_db: קריאת הגנה נכשלה: {_pe}")
 
+        _payload = {"ticker": "_tg_db", "data": _to_save,
+                    "cached_at": datetime.utcnow().isoformat()}
+        # נסה upsert עם on_conflict (דורש UNIQUE constraint על ticker)
         r = _req.post(
             f"{url}/rest/v1/ticker_cache?on_conflict=ticker",
-            json={"ticker": "_tg_db", "data": _to_save,
-                  "cached_at": datetime.utcnow().isoformat()},
+            json=_payload,
             headers={"apikey": key, "Authorization": f"Bearer {key}",
                      "Prefer": "resolution=merge-duplicates,return=minimal"},
             timeout=4,
         )
         if not r.ok:
-            print(f"[WARNING] _supabase_save_tg_db failed: HTTP {r.status_code} — {r.text[:200]}")
-            return False
+            # fallback: אם אין UNIQUE constraint — DELETE + INSERT
+            print(f"[INFO] _supabase_save_tg_db: on_conflict failed ({r.status_code}), trying DELETE+INSERT")
+            try:
+                _req.delete(
+                    f"{url}/rest/v1/ticker_cache",
+                    params={"ticker": "eq._tg_db"},
+                    headers={"apikey": key, "Authorization": f"Bearer {key}"},
+                    timeout=4,
+                )
+            except Exception:
+                pass
+            r = _req.post(
+                f"{url}/rest/v1/ticker_cache",
+                json=_payload,
+                headers={"apikey": key, "Authorization": f"Bearer {key}",
+                         "Prefer": "return=minimal"},
+                timeout=4,
+            )
+            if not r.ok:
+                print(f"[WARNING] _supabase_save_tg_db failed: HTTP {r.status_code} — {r.text[:200]}")
+                return False
         return True
     except Exception as e:
         print(f"[ERROR] _supabase_save_tg_db exception: {e}")
