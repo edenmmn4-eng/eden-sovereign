@@ -1801,6 +1801,18 @@ def _load_alerts_db() -> dict:
     _defaults = {"registrations": {}, "alerts": [], "score_alerts": [],
                  "check_interval_hours": 1, "_last_poll": None, "_last_bg_check": None}
 
+    # 0. Cache בsession state — מונע קריאות Supabase מרובות לאותו render ושורד שגיאות זמניות
+    import threading as _thr, time as _t
+    _in_bg = _thr.current_thread().name == "eden-alert-scheduler"
+    if not _in_bg:
+        try:
+            _cached = st.session_state.get("_tg_db_ss_cache")
+            _cached_ts = st.session_state.get("_tg_db_ss_ts", 0)
+            if _cached and isinstance(_cached, dict) and (_t.time() - _cached_ts) < 60:
+                return _cached
+        except Exception:
+            pass
+
     # 1. Supabase — persistent גם אחרי container restart
     sb = _supabase_load_tg_db()
 
@@ -1839,6 +1851,15 @@ def _load_alerts_db() -> dict:
 
     for k, v in _defaults.items():
         data.setdefault(k, v)
+
+    # שמור בcache של session state לשימוש בקריאות הבאות באותו render
+    if not _in_bg:
+        try:
+            import time as _t2
+            st.session_state["_tg_db_ss_cache"] = data
+            st.session_state["_tg_db_ss_ts"] = _t2.time()
+        except Exception:
+            pass
     return data
 
 
@@ -1852,6 +1873,12 @@ def _save_alerts_db(db: dict) -> bool:
     try:
         json.dump(db, open(_ALERTS_FILE, "w", encoding="utf-8"),
                   ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    # בטל cache של session state — הנתונים השתנו
+    try:
+        st.session_state.pop("_tg_db_ss_cache", None)
+        st.session_state.pop("_tg_db_ss_ts", None)
     except Exception:
         pass
     return sb_ok
@@ -5067,6 +5094,7 @@ def main() -> None:
                         _cond_en = "above" if _alert_cond == "מעל" else ("equals" if _alert_cond == "שווה ל" else "below")
                         if _add_tg_alert(_tg_phone, _alert_ticker, _cond_en, _alert_price):
                             st.toast(f"✅ התראה נוספה: {_alert_ticker} {_alert_cond} ${_alert_price:,.2f}")
+                            st.rerun()
                         else:
                             st.toast("שגיאה בהוספת התראה")
 
@@ -5100,6 +5128,7 @@ def main() -> None:
                     if st.button("➕ הוסף", use_container_width=True, key="add_score_alert_btn"):
                         if _add_score_alert(_tg_phone, int(_score_threshold)):
                             st.toast(f"✅ התראה נוספה: ציון ≥{_score_threshold}")
+                            st.rerun()
                         else:
                             st.toast("שגיאה בהוספת התראת ציון")
 
