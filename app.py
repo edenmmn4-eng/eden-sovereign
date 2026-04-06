@@ -5167,6 +5167,16 @@ def main() -> None:
                                 st.rerun()
 
             else:
+                # ── Auto-connect: בדוק פעם אחת בsession (מכסה משתמש רשום שSupabase היה איטי) ──
+                _ap_key = f"_ap_{_norm}"
+                if not st.session_state.get(_ap_key):
+                    st.session_state[_ap_key] = True
+                    with st.spinner("מחפש רישום..."):
+                        _poll_telegram_registrations()
+                    if _is_phone_registered(_tg_phone):
+                        st.session_state["_tg_verified_phone"] = _tg_phone
+                        st.rerun()
+
                 # ── לא רשום — Deep Link אוטומטי ───────────────────────────
                 _bot_username = _bot_name.lstrip("@")
                 _deep_link = f"https://t.me/{_bot_username}?start={_norm}"
@@ -5183,6 +5193,7 @@ def main() -> None:
                     with st.spinner("בודק..."):
                         _poll_telegram_registrations()
                     if _is_phone_registered(_tg_phone):
+                        st.session_state["_tg_verified_phone"] = _tg_phone
                         st.toast("✅ נרשמת בהצלחה!")
                         st.rerun()
                     else:
