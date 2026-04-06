@@ -1743,7 +1743,8 @@ def _supabase_load_tg_db() -> dict | None:
             return None
         r = _req.get(
             f"{url}/rest/v1/ticker_cache",
-            params={"ticker": "eq._tg_db", "select": "data"},
+            params={"ticker": "eq._tg_db", "select": "data",
+                    "order": "cached_at.desc", "limit": "1"},
             headers={"apikey": key, "Authorization": f"Bearer {key}"},
             timeout=4,
         )
@@ -1769,7 +1770,8 @@ def _supabase_save_tg_db(db: dict) -> bool:
             try:
                 _curr_r = _req.get(
                     f"{url}/rest/v1/ticker_cache",
-                    params={"ticker": "eq._tg_db", "select": "data"},
+                    params={"ticker": "eq._tg_db", "select": "data",
+                            "order": "cached_at.desc", "limit": "1"},
                     headers={"apikey": key, "Authorization": f"Bearer {key}"},
                     timeout=4,
                 )
@@ -1785,11 +1787,11 @@ def _supabase_save_tg_db(db: dict) -> bool:
                 print(f"[WARNING] _supabase_save_tg_db: קריאת הגנה נכשלה: {_pe}")
 
         r = _req.post(
-            f"{url}/rest/v1/ticker_cache",
+            f"{url}/rest/v1/ticker_cache?on_conflict=ticker",
             json={"ticker": "_tg_db", "data": _to_save,
                   "cached_at": datetime.utcnow().isoformat()},
             headers={"apikey": key, "Authorization": f"Bearer {key}",
-                     "Prefer": "resolution=merge-duplicates"},
+                     "Prefer": "resolution=merge-duplicates,return=minimal"},
             timeout=4,
         )
         if not r.ok:
