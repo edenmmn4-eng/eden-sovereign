@@ -1068,6 +1068,10 @@ def fetch_data(ticker: str) -> dict:
                  or _fi("previous_close") or _fi("regular_market_previous_close"))
         out["prev_close"] = float(_safe(_prev, float("nan")))
 
+        # Pre/Post market prices (זמינים רק בשעות פעילות)
+        out["pre_market_price"]  = float(_safe(info.get("preMarketPrice"),  float("nan")))
+        out["post_market_price"] = float(_safe(info.get("postMarketPrice"), float("nan")))
+
         # Market cap: info → fast_info
         _mc = info.get("marketCap") or _fi("market_cap")
         out["mkt_cap"] = float(_safe(_mc, 0.0))
@@ -3312,14 +3316,28 @@ def render_metric_cards(data: dict, tech: dict) -> None:
                else "Rich" if not _isnan(float(peg)) and float(peg)>2.5
                else "Fair Value" if not _isnan(float(peg)) else "N/A")
     _mstate, _mlabel = _market_state()
-    _micon = "☀️" if _mstate == "REGULAR" else "🌙"
-    _mcolor = "#10b981" if _mstate == "REGULAR" else "#6366f1"
+    # פרי-מרקט = בוקר → שמש; אחה"צ/סגור = ירח
+    _micon  = "☀️" if _mstate in ("REGULAR", "PRE") else "🌙"
+    _mcolor = "#10b981" if _mstate == "REGULAR" else ("#f59e0b" if _mstate == "PRE" else "#6366f1")
+    # מחיר פרי/פוסט מרקט
+    _ext_price = float("nan")
+    if _mstate == "PRE":
+        _ext_price = float(_safe(data.get("pre_market_price"),  float("nan")))
+    elif _mstate == "POST":
+        _ext_price = float(_safe(data.get("post_market_price"), float("nan")))
+    _show_ext = not _isnan(_ext_price)
+    # שינוי % של המחיר המורחב לעומת סגירה קודמת
+    _ext_pct = (((_ext_price - float(prev)) / float(prev)) * 100
+                if _show_ext and not _isnan(float(prev)) and float(prev) != 0
+                else float("nan"))
+    _ext_pct_cls  = "positive" if not _isnan(_ext_pct) and _ext_pct >= 0 else "negative"
+    _ext_pct_sign = "+" if not _isnan(_ext_pct) and _ext_pct >= 0 else ""
     st.markdown(f"""
     <div class="metric-grid">
       <div class="metric-card">
         <div class="metric-label">Price &nbsp;<span style="font-size:13px;color:{_mcolor};vertical-align:middle" title="{_mlabel}">{_micon} {_mlabel}</span></div>
-        <div class="metric-value">{fmt_price(float(price)) if not _isnan(float(price)) else "N/A"}</div>
-        <div class="metric-sub {pct_cls}">{f'{pct_sign}{pct:.2f}%' if not _isnan(pct) else 'N/A'}</div>
+        <div class="metric-value">{fmt_price(_ext_price) if _show_ext else (fmt_price(float(price)) if not _isnan(float(price)) else "N/A")}</div>
+        <div class="metric-sub {_ext_pct_cls if _show_ext else pct_cls}">{f'{_ext_pct_sign}{_ext_pct:.2f}%' if _show_ext and not _isnan(_ext_pct) else (f'{pct_sign}{pct:.2f}%' if not _isnan(pct) else 'N/A')}</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">52-Week Range</div>
