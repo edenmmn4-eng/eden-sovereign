@@ -4934,6 +4934,9 @@ def main() -> None:
             except Exception:
                 pass
             st.session_state["portfolio"] = _load_user_portfolio(_expected_user)
+        elif not st.session_state.get("_tg_db_ss_cache"):
+            # cache פג תוקף (60 שנ') — טען פורטפוליו עדכני לסנכרון בין מכשירים
+            st.session_state["portfolio"] = _load_user_portfolio(_expected_user)
     elif not _tg_ph or _tg_ph != st.session_state.get("current_user_phone"):
         # טלפון נוקה או הוחלף — אפס session
         if st.session_state.get("current_user_phone"):
