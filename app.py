@@ -5405,16 +5405,28 @@ def main() -> None:
             fig = build_compare_chart(_pairs, period_days=_days)
             st.plotly_chart(fig, config={"displayModeBar": False}, use_container_width=True)
         else:
-            # ── חיתוך לפי Time Range ──────────────────────────────────────
+            # ── חיתוך לפי Time Range — תאריך לוח שנה (תואם Yahoo Finance) ──
             _period_map_main = {"1M": 21, "3M": 63, "6M": 126, "1Y": 252, "5Y": 1260}
-            _main_days = _period_map_main.get(compare_period, 252)
+            _cal_days_map    = {"1M": 30, "3M": 91, "6M": 182, "1Y": 365, "5Y": 1825}
             if compare_period == "5Y":
                 _hist_full = fetch_hist_extended(ticker, "5y")
             elif compare_period == "1Y":
                 _hist_full = fetch_hist_extended(ticker, "2y")
             else:
                 _hist_full = hist
-            _hist_slice = _hist_full.tail(_main_days) if not _hist_full.empty else hist
+            # חיתוך לפי תאריך מדויק כמו Yahoo Finance
+            try:
+                _cutoff = pd.Timestamp.utcnow() - pd.Timedelta(days=_cal_days_map.get(compare_period, 365))
+                _idx = _hist_full.index
+                _idx_naive = _idx.tz_convert(None) if getattr(_idx, "tz", None) else _idx
+                _hist_slice = _hist_full.iloc[(_idx_naive >= _cutoff).values]
+                if len(_hist_slice) < 2:
+                    _hist_slice = _hist_full.tail(_period_map_main.get(compare_period, 252))
+            except Exception:
+                _hist_slice = _hist_full.tail(_period_map_main.get(compare_period, 252))
+            if _hist_slice.empty:
+                _hist_slice = (_hist_full.tail(_period_map_main.get(compare_period, 252))
+                               if not _hist_full.empty else hist)
             # ── % תשואה לתקופה הנבחרת ─────────────────────────────────────
             if len(_hist_slice) >= 2 and "Close" in _hist_slice.columns:
                 _ret = (_hist_slice["Close"].iloc[-1] / _hist_slice["Close"].iloc[0] - 1) * 100
