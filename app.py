@@ -5659,8 +5659,6 @@ def main() -> None:
     if not is_etf:
         render_analyst_card(data)
 
-    render_market_pulse_banner()
-
     # ── Tabs ────────────────────────────────────────────────────────────────
     _video_enabled = _node_available()
     _tab_names = ["📈 Chart", "📋 Report", "🔎 Peers", "📰 News", "📊 Financials",
@@ -5668,14 +5666,17 @@ def main() -> None:
     if _video_enabled:
         _tab_names.append("🎬 Video")
     _tab_names.append("💼 Portfolio")
+    _tab_names.append("🌍 Market Pulse")
     _tabs = st.tabs(_tab_names)
     tab_chart, tab_rep, tab_peers, tab_news, tab_fin, tab_earn, tab_ins = _tabs[:7]
     if _video_enabled:
         tab_slides = _tabs[7]
         tab_portfolio = _tabs[8]
+        tab_pulse = _tabs[9]
     else:
         tab_slides = None
         tab_portfolio = _tabs[7]
+        tab_pulse = _tabs[8]
 
     with tab_chart:
         if len(hist) < 5:
@@ -5893,9 +5894,13 @@ def main() -> None:
                     except Exception:
                         st.warning("Video file not found. Generate again.")
 
-    # ── Portfolio Tab (far right) ────────────────────────────────────────────
+    # ── Portfolio Tab ────────────────────────────────────────────────────────
     with tab_portfolio:
         _render_portfolio_tab(horizon)
+
+    # ── Market Pulse Tab ─────────────────────────────────────────────────────
+    with tab_pulse:
+        render_market_pulse_banner()
 
 
 if __name__ == "__main__":
