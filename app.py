@@ -21,6 +21,18 @@ import time as _time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 
+try:
+    import anthropic as _anthropic
+    _ANTHROPIC_OK = True
+except ImportError:
+    _ANTHROPIC_OK = False
+
+try:
+    import feedparser as _feedparser
+    _FEEDPARSER_OK = True
+except ImportError:
+    _FEEDPARSER_OK = False
+
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Eden Sovereign | V2.0",
@@ -3439,6 +3451,265 @@ def _market_state() -> tuple[str, str]:
         return "REGULAR", ""
 
 
+# ── Market Pulse — דופק השוק (רב-ממדי + Claude AI) ──────────────────────────
+
+@st.cache_data(ttl=3600)
+def fetch_market_pulse_data() -> dict | None:
+    """שולף נתוני שוק (VIX/SPY/QQQ/Gold/Yield), לוח שנה מאקרו, וחדשות גיאופוליטיות."""
+    result = {}
+
+    # ── שכבה 1: מדדי שוק (5 טיקרים) ────────────────────────────────────
+    try:
+        _vix_p = yf.Ticker("^VIX").fast_info.last_price
+        result["vix"] = round(float(_vix_p), 1) if _vix_p else None
+        _time.sleep(0.3)
+
+        _spy_h = yf.Ticker("SPY").history(period="1mo")
+        if not _spy_h.empty and len(_spy_h) >= 10:
+            result["spy_trend"] = round(
+                (_spy_h["Close"].iloc[-1] - _spy_h["Close"].iloc[-10])
+                / _spy_h["Close"].iloc[-10] * 100, 2)
+        _time.sleep(0.3)
+
+        _qqq_h = yf.Ticker("QQQ").history(period="1mo")
+        if not _qqq_h.empty and len(_qqq_h) >= 10:
+            result["qqq_trend"] = round(
+                (_qqq_h["Close"].iloc[-1] - _qqq_h["Close"].iloc[-10])
+                / _qqq_h["Close"].iloc[-10] * 100, 2)
+        _time.sleep(0.3)
+
+        _tnx_p = yf.Ticker("^TNX").fast_info.last_price
+        result["yield_10y"] = round(float(_tnx_p), 2) if _tnx_p else None
+        _time.sleep(0.3)
+
+        _gld_h = yf.Ticker("GLD").history(period="10d")
+        if not _gld_h.empty and len(_gld_h) >= 5:
+            result["gold_trend"] = round(
+                (_gld_h["Close"].iloc[-1] - _gld_h["Close"].iloc[-5])
+                / _gld_h["Close"].iloc[-5] * 100, 2)
+    except Exception:
+        pass
+
+    # ── שכבה 2: Fear & Greed (אופציונלי) ───────────────────────────────
+    try:
+        from fear_and_greed import get as _fg_get
+        _fg = _fg_get()
+        result["fear_greed"] = int(_fg.value)
+        result["fear_greed_label"] = _fg.description
+    except Exception:
+        result["fear_greed"] = None
+
+    # ── שכבה 3: לוח שנה מאקרו — FMP API (key קיים) ──────────────────
+    try:
+        _fmp_key = st.secrets.get("FMP_KEY", "")
+        if _fmp_key:
+            _cal_r = _req.get(
+                "https://financialmodelingprep.com/api/v3/economic_calendar",
+                params={
+                    "apikey": _fmp_key,
+                    "from": datetime.utcnow().strftime("%Y-%m-%d"),
+                    "to": (datetime.utcnow() + pd.Timedelta(days=7)).strftime("%Y-%m-%d"),
+                },
+                timeout=6,
+            )
+            if _cal_r.ok:
+                _high_events = [
+                    e for e in _cal_r.json()
+                    if e.get("impact") in ("High", "Medium") and e.get("country") == "US"
+                ][:5]
+                result["macro_events"] = [
+                    f"{e.get('date','')[:10]} — {e.get('event','')}"
+                    for e in _high_events
+                ]
+    except Exception:
+        pass
+    if "macro_events" not in result:
+        result["macro_events"] = []
+
+    # ── שכבה 4: כותרות גיאופוליטיות (Reuters + AP RSS) ─────────────
+    result["headlines"] = []
+    if _FEEDPARSER_OK:
+        for _feed_url in [
+            "https://feeds.reuters.com/reuters/businessNews",
+            "https://feeds.reuters.com/reuters/worldNews",
+        ]:
+            try:
+                _feed = _feedparser.parse(_feed_url)
+                for _entry in _feed.entries[:4]:
+                    _title = (_entry.get("title") or "").strip()
+                    if _title:
+                        result["headlines"].append(_title)
+            except Exception:
+                pass
+        result["headlines"] = result["headlines"][:10]
+
+    result["fetched_at"] = datetime.utcnow().isoformat()
+    return result if result.get("vix") else None
+
+
+def _call_claude_market_analysis(data: dict) -> dict | None:
+    """שולח 4 שכבות נתונים ל-Claude API ומקבל ניתוח מאקרו-גיאופוליטי בעברית."""
+    if not _ANTHROPIC_OK:
+        return None
+    try:
+        _key = ""
+        try:
+            _key = st.secrets.get("ANTHROPIC_API_KEY", "")
+        except Exception:
+            pass
+        _key = _key or os.environ.get("ANTHROPIC_API_KEY", "")
+        if not _key:
+            return None
+
+        _quant = (
+            f"VIX: {data.get('vix', 'N/A')} | "
+            f"SPY 10d: {data.get('spy_trend', 'N/A')}% | "
+            f"QQQ 10d: {data.get('qqq_trend', 'N/A')}% | "
+            f"10Y Yield: {data.get('yield_10y', 'N/A')}% | "
+            f"Gold 5d: {data.get('gold_trend', 'N/A')}%"
+        )
+        _fg = data.get("fear_greed")
+        _fg_str = f"{_fg} ({data.get('fear_greed_label', '')})" if _fg else "לא זמין"
+        _events_str = "\n".join(data.get("macro_events") or []) or "אין אירועים קרובים"
+        _headlines_str = (
+            "\n".join(f"- {h}" for h in data.get("headlines") or [])
+            or "אין כותרות"
+        )
+
+        _prompt = f"""אתה אנליסט מאקרו-גיאופוליטי בכיר עם ניסיון של 20 שנה בשווקים הגלובליים.
+עליך לנתח את מצב השוק הנוכחי לפי 4 ממדים:
+
+📊 נתוני שוק real-time:
+{_quant}
+Fear & Greed Index: {_fg_str}
+
+📅 אירועי מאקרו קרובים (7 ימים):
+{_events_str}
+
+📰 כותרות חדשות עיקריות (גיאופוליטיות וכלכליות):
+{_headlines_str}
+
+הנחיות לניתוח:
+1. זהה את גורמי הסיכון הדומיננטיים (כלכלי / ביטחוני / פוליטי)
+2. הפעל ניתוח ניגודיות: Fear & Greed נמוך = הזדמנות קנייה פוטנציאלית
+3. זהה "שתיקה" משמעותית — מה שאינו מוזכר בכותרות אך חשוב
+4. הצלב: האם הסיכון הגיאופוליטי מוגזם (Priced-in) או מוערך בחסר?
+5. תן המלצה מעשית למשקיע פרטי ישראלי עם טווח של 6-12 חודשים
+
+החזר JSON בלבד (ללא טקסט נוסף):
+{{"verdict": "BULLISH או CAUTIOUS או AVOID", "pulse_score": 0-100, "analysis": "2-3 משפטים בעברית", "geo_risk": "סיכון גיאופוליטי עיקרי אחד", "opportunity": "הזדמנות אחת שהשוק עשוי להתעלם ממנה", "macro_watch": "אירוע מאקרו הכי קריטי לצפות"}}"""
+
+        _client = _anthropic.Anthropic(api_key=_key)
+        _resp = _client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=500,
+            timeout=15,
+            messages=[{"role": "user", "content": _prompt}],
+        )
+        _text = _resp.content[0].text.strip()
+        if "```" in _text:
+            _text = _text.split("```")[1].lstrip("json").strip()
+        return json.loads(_text)
+    except Exception:
+        return None
+
+
+def render_market_pulse_banner() -> None:
+    """מציג דופק השוק — בנר ניתוח מאקרו-גיאופוליטי עם AI מעל הטאבים."""
+    _CACHE = "_mkt_pulse"
+    _now = _time.time()
+    _data = st.session_state.get(_CACHE)
+    _ai   = st.session_state.get(f"{_CACHE}_ai")
+    _ts   = st.session_state.get(f"{_CACHE}_ts", 0)
+    _stale = (_now - _ts) > 3600
+
+    with st.expander("🌍 דופק השוק — האם זה זמן חכם להשקיע?", expanded=True):
+        _, _btn_col = st.columns([8, 1])
+        _do_refresh = _btn_col.button("🔄", key="mkt_pulse_refresh", help="רענן נתונים")
+
+        if _do_refresh or _stale or not _data:
+            with st.spinner("טוען נתוני שוק וחדשות..."):
+                fetch_market_pulse_data.clear()
+                _data = fetch_market_pulse_data()
+            if not _data:
+                st.warning("לא ניתן לטעון נתוני שוק כרגע. נסה שוב מאוחר יותר.")
+                return
+            with st.spinner("מנתח עם AI..."):
+                _ai = _call_claude_market_analysis(_data)
+            st.session_state[_CACHE] = _data
+            st.session_state[f"{_CACHE}_ai"] = _ai
+            st.session_state[f"{_CACHE}_ts"] = _now
+
+        # ── שורת מדדים ─────────────────────────────────────────────────
+        _c1, _c2, _c3, _c4, _c5 = st.columns(5)
+        _vix = _data.get("vix")
+        _spy = _data.get("spy_trend")
+        _yld = _data.get("yield_10y")
+        _gld = _data.get("gold_trend")
+        _fg  = _data.get("fear_greed")
+
+        _c1.metric("VIX",
+                   f"{_vix:.1f}" if _vix else "N/A",
+                   "נמוך ✅" if _vix and _vix < 20 else ("מוגבר ⚠️" if _vix and _vix < 30 else "פחד 🔴"))
+        _c2.metric("S&P 10d",
+                   f"{_spy:+.1f}%" if _spy is not None else "N/A",
+                   "עולה" if _spy and _spy > 0 else "יורד")
+        _c3.metric("10Y Yield",
+                   f"{_yld:.2f}%" if _yld else "N/A",
+                   "גבוה" if _yld and _yld > 4.5 else "מתון")
+        _c4.metric("זהב 5d",
+                   f"{_gld:+.1f}%" if _gld is not None else "N/A",
+                   "מקלט בטוח 🛡" if _gld and _gld > 1 else None)
+        _c5.metric("Fear & Greed",
+                   str(_fg) if _fg else "N/A",
+                   _data.get("fear_greed_label", "") if _fg else None)
+
+        # ── Verdict + AI Narrative ──────────────────────────────────────
+        if _ai:
+            _v      = _ai.get("verdict", "CAUTIOUS")
+            _emoji  = {"BULLISH": "🟢", "CAUTIOUS": "🟡", "AVOID": "🔴"}.get(_v, "🟡")
+            _color  = {"BULLISH": "#26a69a", "CAUTIOUS": "#f59e0b", "AVOID": "#ef5350"}.get(_v, "#f59e0b")
+            _label  = {
+                "BULLISH": "תנאים נוחים להשקעה",
+                "CAUTIOUS": "זהירות — הישאר סלקטיבי",
+                "AVOID": "סביבה מאתגרת — דחה השקעות חדשות",
+            }.get(_v, "")
+            _pulse  = _ai.get("pulse_score", 50)
+
+            st.markdown(
+                f'<div style="margin:10px 0 6px;padding:12px 16px;border-radius:8px;'
+                f'background:#1e293b;border-left:4px solid {_color};">'
+                f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+                f'<span style="font-size:20px">{_emoji}</span>'
+                f'<strong style="font-size:15px;color:{_color}">{_label}</strong>'
+                f'<span style="margin-left:auto;font-size:12px;color:#94a3b8">Pulse Score: {_pulse}/100</span>'
+                f'</div>'
+                f'<p style="color:#cbd5e1;font-size:13px;margin:0 0 10px">{_ai.get("analysis", "")}</p>'
+                f'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;color:#94a3b8">'
+                f'<span>⚠️ <strong style="color:#e2e8f0">סיכון גיאופוליטי:</strong><br>{_ai.get("geo_risk", "")}</span>'
+                f'<span>💡 <strong style="color:#e2e8f0">הזדמנות:</strong><br>{_ai.get("opportunity", "")}</span>'
+                f'<span>📅 <strong style="color:#e2e8f0">לצפות:</strong><br>{_ai.get("macro_watch", "")}</span>'
+                f'</div></div>',
+                unsafe_allow_html=True)
+
+            _headlines = _data.get("headlines", [])
+            if _headlines:
+                with st.expander("📰 כותרות שהשפיעו על הניתוח", expanded=False):
+                    for _h in _headlines:
+                        st.caption(f"• {_h}")
+        else:
+            st.info("💡 הגדר `ANTHROPIC_API_KEY` ב-Streamlit Secrets לניתוח AI מלא.")
+
+        _events = _data.get("macro_events", [])
+        if _events:
+            with st.expander("📅 אירועי מאקרו קרובים (7 ימים)", expanded=False):
+                for _e in _events:
+                    st.caption(f"• {_e}")
+
+        _fetched = _data.get("fetched_at", "")[:16].replace("T", " ")
+        st.caption(f"⏱ עודכן: {_fetched} UTC  ·  ⚠️ לא ייעוץ פיננסי — לצורכי מידע בלבד")
+
+
 # ── Metric Cards ──────────────────────────────────────────────────────────────
 def render_metric_cards(data: dict, tech: dict) -> None:
     price = data["current_price"]; prev = data["prev_close"]
@@ -5387,6 +5658,8 @@ def main() -> None:
     render_metric_cards(data, tech)
     if not is_etf:
         render_analyst_card(data)
+
+    render_market_pulse_banner()
 
     # ── Tabs ────────────────────────────────────────────────────────────────
     _video_enabled = _node_available()
