@@ -3547,71 +3547,203 @@ def fetch_market_pulse_data() -> dict | None:
     return result if result.get("vix") else None
 
 
-def _call_claude_market_analysis(data: dict) -> dict | None:
-    """שולח 4 שכבות נתונים ל-Claude API ומקבל ניתוח מאקרו-גיאופוליטי בעברית."""
-    if not _ANTHROPIC_OK:
-        return None
-    try:
-        _key = ""
+def _rule_based_market_analysis(data: dict) -> dict:
+    """ניתוח שוק rule-based — עובד ללא API Key, מחזיר ניתוח מלא בעברית."""
+    _vix   = data.get("vix")
+    _spy   = data.get("spy_trend")
+    _qqq   = data.get("qqq_trend")
+    _yld   = data.get("yield_10y")
+    _gld   = data.get("gold_trend")
+    _fg    = data.get("fear_greed")
+    _evts  = data.get("macro_events") or []
+    _heads = data.get("headlines") or []
+
+    # ── Pulse Score (base 50) ────────────────────────────────────────────
+    _score = 50
+
+    # VIX component
+    if _vix is not None:
+        if _vix < 15:   _score += 20
+        elif _vix < 20: _score += 10
+        elif _vix < 25: _score += 0
+        elif _vix < 30: _score -= 10
+        else:           _score -= 22
+
+    # SPY trend component
+    if _spy is not None:
+        if _spy > 3:      _score += 20
+        elif _spy > 1:    _score += 10
+        elif _spy > 0:    _score += 5
+        elif _spy > -1:   _score -= 5
+        elif _spy > -3:   _score -= 15
+        else:             _score -= 25
+
+    # 10Y Yield component
+    if _yld is not None:
+        if _yld < 3.5:   _score += 10
+        elif _yld < 4.0: _score += 5
+        elif _yld < 4.5: _score += 0
+        elif _yld < 5.0: _score -= 8
+        else:            _score -= 15
+
+    # Gold (risk-off signal)
+    if _gld is not None:
+        if _gld > 2:     _score -= 10
+        elif _gld > 1:   _score -= 5
+        elif _gld < -1:  _score += 5
+
+    # Fear & Greed (contrarian)
+    if _fg is not None:
+        if _fg < 25:     _score += 15
+        elif _fg < 40:   _score += 8
+        elif _fg < 60:   _score += 0
+        elif _fg < 75:   _score -= 5
+        else:            _score -= 15
+
+    _score = max(0, min(100, _score))
+
+    # ── Verdict ─────────────────────────────────────────────────────────
+    if _score >= 62:   _verdict = "BULLISH"
+    elif _score <= 38: _verdict = "AVOID"
+    else:              _verdict = "CAUTIOUS"
+
+    # ── בניית ניתוח עברי ─────────────────────────────────────────────────
+    _parts = []
+
+    # VIX
+    if _vix is not None:
+        if _vix < 20:
+            _parts.append(f"מדד הפחד (VIX) עומד על {_vix:.1f} — רמה נמוכה המעידה על שוק רגוע יחסית.")
+        elif _vix < 30:
+            _parts.append(f"מדד הפחד (VIX) עומד על {_vix:.1f} — תנודתיות מוגברת, כדאי להיות זהיר.")
+        else:
+            _parts.append(f"מדד הפחד (VIX) גבוה ({_vix:.1f}) — השוק בפאניקה, סביבת סיכון גבוהה.")
+
+    # SPY + QQQ
+    if _spy is not None:
+        _spy_txt = f"ה-S&P 500 עלה {_spy:.1f}%" if _spy >= 0 else f"ה-S&P 500 ירד {abs(_spy):.1f}%"
+        _qqq_txt = ""
+        if _qqq is not None:
+            _qqq_txt = f" והנאסד\"ק {'+' if _qqq >= 0 else ''}{_qqq:.1f}%"
+        _parts.append(f"{_spy_txt}{_qqq_txt} ב-10 הימים האחרונים.")
+
+    # Yield
+    if _yld is not None:
+        if _yld > 4.5:
+            _parts.append(f"תשואת האג\"ח ל-10 שנים גבוהה ({_yld:.2f}%) — לחץ על מניות צמיחה.")
+        elif _yld < 3.5:
+            _parts.append(f"תשואת האג\"ח נמוכה ({_yld:.2f}%) — סביבה תומכת למניות.")
+
+    # Gold
+    if _gld is not None and abs(_gld) > 1:
+        if _gld > 1:
+            _parts.append(f"הזהב עלה {_gld:.1f}% — סימן ל-Risk-Off ומקלט בטוח בביקוש.")
+        else:
+            _parts.append(f"הזהב ירד {abs(_gld):.1f}% — ירידה בביקוש למקלטים בטוחים, סימן חיובי.")
+
+    # Fear & Greed (contrarian insight)
+    if _fg is not None:
+        if _fg < 30:
+            _parts.append(f"Fear & Greed עומד על {_fg} (פחד קיצוני) — היסטורית, זמן כזה מאופיין בהזדמנויות קנייה.")
+        elif _fg > 70:
+            _parts.append(f"Fear & Greed עומד על {_fg} (חמדנות גבוהה) — שוק מחומם, כדאי להיזהר מכניסה בפסגה.")
+
+    _analysis = " ".join(_parts[:3]) if _parts else "הנתונים אינם מספיקים לניתוח מלא."
+
+    # ── Geo Risk מהכותרות ───────────────────────────────────────────────
+    _geo_keywords = {
+        "war": "עימות מזוין", "conflict": "עימות מזוין", "sanctions": "סנקציות כלכליות",
+        "tariff": "מלחמת סחר ומכסים", "iran": "מתיחות עם איראן", "china": "מתיחות סין-ארה\"ב",
+        "russia": "משבר אוקראינה-רוסיה", "inflation": "לחץ אינפלציוני", "recession": "חשש ממיתון",
+        "fed": "אי-ודאות בריבית הפד", "rate": "שינויים בריבית", "oil": "תנודות במחירי הנפט",
+        "bank": "לחץ במגזר הבנקאות", "debt": "משבר חוב ממשלתי",
+    }
+    _geo_risk = "אי-ודאות גיאופוליטית כללית"
+    _all_heads_lower = " ".join(_heads).lower()
+    for _kw, _label in _geo_keywords.items():
+        if _kw in _all_heads_lower:
+            _geo_risk = _label
+            break
+
+    # ── Opportunity ──────────────────────────────────────────────────────
+    if _verdict == "BULLISH":
+        _opp = "מניות צמיחה ואיכות בתיקון מציעות נקודת כניסה אטרקטיבית"
+    elif _fg is not None and _fg < 35:
+        _opp = "פחד קיצוני יוצר הזדמנות DCA — כניסה הדרגתית נחשבת חכמה"
+    elif _yld is not None and _yld > 4.5:
+        _opp = "אג\"ח ממשלתי מציע תשואה אטרקטיבית — גיוון הגיוני"
+    else:
+        _opp = "מניות דיבידנד וסקטור הגנתי כחלופה יציבה"
+
+    # ── Macro Watch ──────────────────────────────────────────────────────
+    _macro_watch = "בדוק פרסומי CPI ו-FOMC הקרובים"
+    if _evts:
+        _macro_watch = _evts[0].split(" — ")[-1] if " — " in _evts[0] else _evts[0]
+
+    return {
+        "verdict": _verdict,
+        "pulse_score": _score,
+        "analysis": _analysis,
+        "geo_risk": _geo_risk,
+        "opportunity": _opp,
+        "macro_watch": _macro_watch,
+        "_source": "rule-based",
+    }
+
+
+def _call_claude_market_analysis(data: dict) -> dict:
+    """ניתוח שוק: rule-based תמיד, עם שדרוג Claude API אם ANTHROPIC_API_KEY מוגדר."""
+    # נסה Claude API (שדרוג אופציונלי)
+    if _ANTHROPIC_OK:
         try:
-            _key = st.secrets.get("ANTHROPIC_API_KEY", "")
+            _key = ""
+            try:
+                _key = st.secrets.get("ANTHROPIC_API_KEY", "")
+            except Exception:
+                pass
+            _key = _key or os.environ.get("ANTHROPIC_API_KEY", "")
+            if _key:
+                _quant = (
+                    f"VIX: {data.get('vix', 'N/A')} | "
+                    f"SPY 10d: {data.get('spy_trend', 'N/A')}% | "
+                    f"QQQ 10d: {data.get('qqq_trend', 'N/A')}% | "
+                    f"10Y Yield: {data.get('yield_10y', 'N/A')}% | "
+                    f"Gold 5d: {data.get('gold_trend', 'N/A')}%"
+                )
+                _fg = data.get("fear_greed")
+                _fg_str = f"{_fg} ({data.get('fear_greed_label', '')})" if _fg else "לא זמין"
+                _events_str = "\n".join(data.get("macro_events") or []) or "אין אירועים קרובים"
+                _headlines_str = (
+                    "\n".join(f"- {h}" for h in data.get("headlines") or []) or "אין כותרות"
+                )
+                _prompt = (
+                    "אתה אנליסט מאקרו-גיאופוליטי בכיר. נתח את מצב השוק לפי הנתונים:\n\n"
+                    f"📊 שוק: {_quant}\nFear & Greed: {_fg_str}\n\n"
+                    f"📅 מאקרו קרוב:\n{_events_str}\n\n"
+                    f"📰 כותרות:\n{_headlines_str}\n\n"
+                    "החזר JSON בלבד:\n"
+                    '{"verdict":"BULLISH/CAUTIOUS/AVOID","pulse_score":0-100,'
+                    '"analysis":"2-3 משפטים בעברית","geo_risk":"סיכון עיקרי",'
+                    '"opportunity":"הזדמנות אחת","macro_watch":"אירוע לצפות"}'
+                )
+                _client = _anthropic.Anthropic(api_key=_key)
+                _resp = _client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=500,
+                    timeout=15,
+                    messages=[{"role": "user", "content": _prompt}],
+                )
+                _text = _resp.content[0].text.strip()
+                if "```" in _text:
+                    _text = _text.split("```")[1].lstrip("json").strip()
+                _result = json.loads(_text)
+                _result["_source"] = "claude-ai"
+                return _result
         except Exception:
             pass
-        _key = _key or os.environ.get("ANTHROPIC_API_KEY", "")
-        if not _key:
-            return None
 
-        _quant = (
-            f"VIX: {data.get('vix', 'N/A')} | "
-            f"SPY 10d: {data.get('spy_trend', 'N/A')}% | "
-            f"QQQ 10d: {data.get('qqq_trend', 'N/A')}% | "
-            f"10Y Yield: {data.get('yield_10y', 'N/A')}% | "
-            f"Gold 5d: {data.get('gold_trend', 'N/A')}%"
-        )
-        _fg = data.get("fear_greed")
-        _fg_str = f"{_fg} ({data.get('fear_greed_label', '')})" if _fg else "לא זמין"
-        _events_str = "\n".join(data.get("macro_events") or []) or "אין אירועים קרובים"
-        _headlines_str = (
-            "\n".join(f"- {h}" for h in data.get("headlines") or [])
-            or "אין כותרות"
-        )
-
-        _prompt = f"""אתה אנליסט מאקרו-גיאופוליטי בכיר עם ניסיון של 20 שנה בשווקים הגלובליים.
-עליך לנתח את מצב השוק הנוכחי לפי 4 ממדים:
-
-📊 נתוני שוק real-time:
-{_quant}
-Fear & Greed Index: {_fg_str}
-
-📅 אירועי מאקרו קרובים (7 ימים):
-{_events_str}
-
-📰 כותרות חדשות עיקריות (גיאופוליטיות וכלכליות):
-{_headlines_str}
-
-הנחיות לניתוח:
-1. זהה את גורמי הסיכון הדומיננטיים (כלכלי / ביטחוני / פוליטי)
-2. הפעל ניתוח ניגודיות: Fear & Greed נמוך = הזדמנות קנייה פוטנציאלית
-3. זהה "שתיקה" משמעותית — מה שאינו מוזכר בכותרות אך חשוב
-4. הצלב: האם הסיכון הגיאופוליטי מוגזם (Priced-in) או מוערך בחסר?
-5. תן המלצה מעשית למשקיע פרטי ישראלי עם טווח של 6-12 חודשים
-
-החזר JSON בלבד (ללא טקסט נוסף):
-{{"verdict": "BULLISH או CAUTIOUS או AVOID", "pulse_score": 0-100, "analysis": "2-3 משפטים בעברית", "geo_risk": "סיכון גיאופוליטי עיקרי אחד", "opportunity": "הזדמנות אחת שהשוק עשוי להתעלם ממנה", "macro_watch": "אירוע מאקרו הכי קריטי לצפות"}}"""
-
-        _client = _anthropic.Anthropic(api_key=_key)
-        _resp = _client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=500,
-            timeout=15,
-            messages=[{"role": "user", "content": _prompt}],
-        )
-        _text = _resp.content[0].text.strip()
-        if "```" in _text:
-            _text = _text.split("```")[1].lstrip("json").strip()
-        return json.loads(_text)
-    except Exception:
-        return None
+    # Fallback: rule-based (עובד תמיד, ללא API Key)
+    return _rule_based_market_analysis(data)
 
 
 def render_market_pulse_banner() -> None:
@@ -3675,6 +3807,13 @@ def render_market_pulse_banner() -> None:
                 "AVOID": "סביבה מאתגרת — דחה השקעות חדשות",
             }.get(_v, "")
             _pulse  = _ai.get("pulse_score", 50)
+            _src_badge = (
+                '<span style="font-size:10px;background:#6366f1;color:#fff;'
+                'padding:2px 6px;border-radius:4px;margin-right:4px">🤖 AI</span>'
+                if _ai.get("_source") == "claude-ai"
+                else '<span style="font-size:10px;background:#475569;color:#cbd5e1;'
+                'padding:2px 6px;border-radius:4px;margin-right:4px">📊 Rule-Based</span>'
+            )
 
             st.markdown(
                 f'<div style="margin:10px 0 6px;padding:12px 16px;border-radius:8px;'
@@ -3682,8 +3821,10 @@ def render_market_pulse_banner() -> None:
                 f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
                 f'<span style="font-size:20px">{_emoji}</span>'
                 f'<strong style="font-size:15px;color:{_color}">{_label}</strong>'
-                f'<span style="margin-left:auto;font-size:12px;color:#94a3b8">Pulse Score: {_pulse}/100</span>'
-                f'</div>'
+                f'<span style="margin-left:auto;display:flex;align-items:center;gap:6px">'
+                f'{_src_badge}'
+                f'<span style="font-size:12px;color:#94a3b8">Pulse Score: {_pulse}/100</span>'
+                f'</span></div>'
                 f'<p style="color:#cbd5e1;font-size:13px;margin:0 0 10px">{_ai.get("analysis", "")}</p>'
                 f'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;color:#94a3b8">'
                 f'<span>⚠️ <strong style="color:#e2e8f0">סיכון גיאופוליטי:</strong><br>{_ai.get("geo_risk", "")}</span>'
@@ -3697,8 +3838,6 @@ def render_market_pulse_banner() -> None:
                 with st.expander("📰 כותרות שהשפיעו על הניתוח", expanded=False):
                     for _h in _headlines:
                         st.caption(f"• {_h}")
-        else:
-            st.info("💡 הגדר `ANTHROPIC_API_KEY` ב-Streamlit Secrets לניתוח AI מלא.")
 
         _events = _data.get("macro_events", [])
         if _events:
