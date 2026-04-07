@@ -1879,6 +1879,21 @@ def _load_alerts_db() -> dict:
     for k, v in _defaults.items():
         data.setdefault(k, v)
 
+    # שחזור: אם _tg_db ריק מאלרטים — נסה לשחזר מגיבוי משני (_ualerts_{norm})
+    if not data.get("alerts") and not data.get("score_alerts"):
+        for _rnorm in list(data.get("registrations", {}).keys()):
+            try:
+                _bk = _supabase_load_user_alerts(_rnorm)
+                if _bk and isinstance(_bk, dict):
+                    _pa = _bk.get("price_alerts") or []
+                    _sa = _bk.get("score_alerts") or []
+                    if _pa:
+                        data["alerts"].extend(_pa)
+                    if _sa:
+                        data["score_alerts"].extend(_sa)
+            except Exception:
+                pass
+
     # שמור בcache של session state לשימוש בקריאות הבאות באותו render
     if not _in_bg:
         try:
@@ -2010,9 +2025,10 @@ def _is_phone_registered(phone: str) -> bool:
 
 def _add_tg_alert(phone: str, ticker: str, condition: str, target_price: float) -> bool:
     try:
+        norm = _normalize_phone(phone)
         db = _load_alerts_db()
         db["alerts"].append({
-            "phone": _normalize_phone(phone),
+            "phone": norm,
             "ticker": ticker.upper(),
             "condition": condition,
             "target_price": float(target_price),
@@ -2021,6 +2037,11 @@ def _add_tg_alert(phone: str, ticker: str, condition: str, target_price: float) 
             "last_checked": None,
         })
         _save_alerts_db(db)
+        _supabase_save_user_alerts(
+            norm,
+            [a for a in db["alerts"] if a.get("phone") == norm],
+            [a for a in db.get("score_alerts", []) if a.get("phone") == norm],
+        )
         return True
     except Exception:
         return False
@@ -2038,6 +2059,11 @@ def _delete_tg_alert(phone: str, idx: int) -> None:
     if 0 <= idx < len(user_idxs):
         db["alerts"].pop(user_idxs[idx])
         _save_alerts_db(db)
+        _supabase_save_user_alerts(
+            norm,
+            [a for a in db["alerts"] if a.get("phone") == norm],
+            [a for a in db.get("score_alerts", []) if a.get("phone") == norm],
+        )
 
 
 def _add_score_alert(phone: str, min_score: int) -> bool:
@@ -2055,6 +2081,11 @@ def _add_score_alert(phone: str, min_score: int) -> bool:
             "last_notified_at": None,
         })
         _save_alerts_db(db)
+        _supabase_save_user_alerts(
+            norm,
+            [a for a in db.get("alerts", []) if a.get("phone") == norm],
+            [a for a in db.get("score_alerts", []) if a.get("phone") == norm],
+        )
         return True
     except Exception:
         return False
@@ -2072,6 +2103,11 @@ def _delete_score_alert(phone: str, idx: int) -> None:
     if 0 <= idx < len(user_idxs):
         db["score_alerts"].pop(user_idxs[idx])
         _save_alerts_db(db)
+        _supabase_save_user_alerts(
+            norm,
+            [a for a in db.get("alerts", []) if a.get("phone") == norm],
+            [a for a in db.get("score_alerts", []) if a.get("phone") == norm],
+        )
 
 
 def _check_and_fire_score_alerts(scores: list, horizon: str = "1Y Strategic") -> int:
@@ -2295,6 +2331,64 @@ def _supabase_load_portfolio(phone: str) -> list | None:
             data = r.json()[0]["portfolio"]
             if isinstance(data, list):
                 return data
+    except Exception:
+        pass
+    return None
+
+
+def _supabase_save_user_alerts(norm: str, price_alerts: list, score_alerts: list) -> bool:
+    """שומר התראות משתמש כגיבוי ב-ticker_cache (מפתח ייעודי לכל משתמש, כמו user_portfolios)."""
+    try:
+        url, key = _sb_creds()
+        if not url or not key:
+            return False
+        _ticker_key = f"_ualerts_{norm}"
+        _payload = {
+            "ticker": _ticker_key,
+            "data": {"price_alerts": price_alerts, "score_alerts": score_alerts},
+            "cached_at": datetime.utcnow().isoformat(),
+        }
+        r = _req.post(
+            f"{url}/rest/v1/ticker_cache?on_conflict=ticker",
+            json=_payload,
+            headers={"apikey": key, "Authorization": f"Bearer {key}",
+                     "Prefer": "resolution=merge-duplicates,return=minimal"},
+            timeout=4,
+        )
+        if not r.ok:
+            _req.delete(
+                f"{url}/rest/v1/ticker_cache",
+                params={"ticker": f"eq.{_ticker_key}"},
+                headers={"apikey": key, "Authorization": f"Bearer {key}"},
+                timeout=4,
+            )
+            r = _req.post(
+                f"{url}/rest/v1/ticker_cache",
+                json=_payload,
+                headers={"apikey": key, "Authorization": f"Bearer {key}",
+                         "Prefer": "return=minimal"},
+                timeout=4,
+            )
+        return r.ok
+    except Exception:
+        return False
+
+
+def _supabase_load_user_alerts(norm: str) -> dict | None:
+    """טוען התראות משתמש מגיבוי ב-ticker_cache."""
+    try:
+        url, key = _sb_creds()
+        if not url or not key:
+            return None
+        r = _req.get(
+            f"{url}/rest/v1/ticker_cache",
+            params={"ticker": f"eq._ualerts_{norm}", "select": "data",
+                    "order": "cached_at.desc", "limit": "1"},
+            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            timeout=4,
+        )
+        if r.status_code == 200 and r.json():
+            return r.json()[0]["data"]
     except Exception:
         pass
     return None
