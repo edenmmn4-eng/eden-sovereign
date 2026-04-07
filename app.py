@@ -5213,7 +5213,7 @@ def main() -> None:
                 _ac1, _ac2 = st.columns(2)
                 with _ac1:
                     _alert_ticker = st.text_input(
-                        "טיקר", placeholder="NVDA",
+                        "טיקר", placeholder="הזן טיקר",
                         key="alert_ticker_input",
                         label_visibility="visible",
                     ).strip().upper()
