@@ -2867,16 +2867,18 @@ def build_chart(
     if ma1 > 0:
         s1 = compute_ma_series(df, ma1)
         if not s1.empty:
+            _ma1_price = f"  ${s1.iloc[-1]:.2f}" if not s1.empty else ""
             fig.add_trace(go.Scattergl(
                 x=df.index, y=s1.values, mode="lines",
-                name=f"MA {ma1}", line=dict(color="#f59e0b", width=1.5)), row=1, col=1)
+                name=f"MA {ma1}{_ma1_price}", line=dict(color="#f59e0b", width=1.5)), row=1, col=1)
 
     if ma2 > 0 and ma2 != ma1:
         s2 = compute_ma_series(df, ma2)
         if not s2.empty:
+            _ma2_price = f"  ${s2.iloc[-1]:.2f}" if not s2.empty else ""
             fig.add_trace(go.Scattergl(
                 x=df.index, y=s2.values, mode="lines",
-                name=f"MA {ma2}", line=dict(color="#ef5350", width=1.5)), row=1, col=1)
+                name=f"MA {ma2}{_ma2_price}", line=dict(color="#ef5350", width=1.5)), row=1, col=1)
 
     if "Bollinger Bands" in overlay_inds and not tech["bb_upper"].empty:
         fig.add_trace(go.Scattergl(
