@@ -1983,6 +1983,13 @@ def _poll_telegram_registrations() -> int:
                         "display_phone": m.group(1).strip(),
                     }
                 new += 1
+                # ודא שגיבוי _ualerts_{norm} קיים — מאפשר fallback ב-_is_phone_registered
+                try:
+                    _pal = [a for a in db.get("alerts", []) if a.get("phone") == norm]
+                    _sal = [a for a in db.get("score_alerts", []) if a.get("phone") == norm]
+                    _supabase_save_user_alerts(norm, _pal, _sal)
+                except Exception:
+                    pass
         db["_last_poll"] = datetime.now().isoformat(timespec="seconds")
         if new > 0:
             _save_alerts_db(db)  # שמור הכל כולל Supabase — נוסף רישום חדש
@@ -2020,7 +2027,12 @@ def _send_telegram_msg(phone: str, text: str) -> bool:
 
 
 def _is_phone_registered(phone: str) -> bool:
-    return _normalize_phone(phone) in _load_alerts_db().get("registrations", {})
+    norm = _normalize_phone(phone)
+    if norm in _load_alerts_db().get("registrations", {}):
+        return True
+    # פאלבק: אם _tg_db נכשל (timeout/container restart) — בדוק גיבוי קל (_ualerts_{norm})
+    _bk = _supabase_load_user_alerts(norm)
+    return _bk is not None
 
 
 def _add_tg_alert(phone: str, ticker: str, condition: str, target_price: float) -> bool:
