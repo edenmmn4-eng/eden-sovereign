@@ -2867,7 +2867,11 @@ def build_chart(
     if ma1 > 0:
         s1 = compute_ma_series(df, ma1)
         if not s1.empty:
-            _ma1_price = f"  ${s1.iloc[-1]:.2f}" if not s1.empty else ""
+            # השתמש בערך מה-tech (מחושב על היסטוריה מלאה) אם זמין, אחרת מהסדרה
+            _ma1_val = tech.get(f"ma{ma1}")
+            if _ma1_val is None or (isinstance(_ma1_val, float) and _isnan(_ma1_val)):
+                _ma1_val = s1.iloc[-1]
+            _ma1_price = f"  ${float(_ma1_val):.2f}"
             fig.add_trace(go.Scattergl(
                 x=df.index, y=s1.values, mode="lines",
                 name=f"MA {ma1}{_ma1_price}", line=dict(color="#f59e0b", width=1.5)), row=1, col=1)
@@ -2875,7 +2879,10 @@ def build_chart(
     if ma2 > 0 and ma2 != ma1:
         s2 = compute_ma_series(df, ma2)
         if not s2.empty:
-            _ma2_price = f"  ${s2.iloc[-1]:.2f}" if not s2.empty else ""
+            _ma2_val = tech.get(f"ma{ma2}")
+            if _ma2_val is None or (isinstance(_ma2_val, float) and _isnan(_ma2_val)):
+                _ma2_val = s2.iloc[-1]
+            _ma2_price = f"  ${float(_ma2_val):.2f}"
             fig.add_trace(go.Scattergl(
                 x=df.index, y=s2.values, mode="lines",
                 name=f"MA {ma2}{_ma2_price}", line=dict(color="#ef5350", width=1.5)), row=1, col=1)
