@@ -661,6 +661,128 @@ def inject_css() -> None:
     .verdict-buy        { border-left: 4px solid #84cc16; }
     .verdict-hold       { border-left: 4px solid #f59e0b; }
     .verdict-sell       { border-left: 4px solid #ef4444; }
+
+    /* ══════════════════════════════════════════════════════════════
+       Market Pulse Terminal — Glassmorphism Dark Theme
+    ══════════════════════════════════════════════════════════════ */
+    .mkt-pulse-wrap{
+      direction:rtl;text-align:right;
+      background:rgba(15,23,42,.82);
+      backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+      border-radius:20px;border:1px solid rgba(99,102,241,.22);
+      padding:24px 28px 20px;margin:4px 0 6px;
+      box-shadow:0 8px 40px rgba(0,0,0,.25);transition:border-color .35s,box-shadow .35s
+    }
+    .mkt-pulse-bullish{
+      border-color:rgba(34,197,94,.55)!important;
+      box-shadow:0 0 28px rgba(34,197,94,.10),0 8px 40px rgba(0,0,0,.25)!important
+    }
+    .mkt-pulse-cautious{
+      border-color:rgba(245,158,11,.55)!important;
+      box-shadow:0 0 28px rgba(245,158,11,.10),0 8px 40px rgba(0,0,0,.25)!important
+    }
+    .mkt-pulse-avoid{
+      border-color:rgba(239,68,68,.55)!important;
+      box-shadow:0 0 28px rgba(239,68,68,.10),0 8px 40px rgba(0,0,0,.25)!important
+    }
+
+    .mkt-pulse-header{
+      display:flex;align-items:center;justify-content:space-between;
+      margin-bottom:20px;flex-wrap:wrap;gap:10px
+    }
+    .mkt-pulse-verdict-pill{
+      display:inline-flex;align-items:center;gap:7px;
+      padding:6px 16px;border-radius:50px;
+      font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;
+      letter-spacing:.6px
+    }
+    .mkt-pulse-score-box{text-align:left;direction:ltr}
+    .mkt-pulse-score-lbl{font-size:9px;font-weight:700;color:#475569;letter-spacing:1.4px;text-transform:uppercase;margin-bottom:3px}
+    .mkt-pulse-score-val{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700}
+    .mkt-pulse-score-max{font-size:11px;color:#475569}
+
+    .mkt-pulse-metrics{
+      display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px
+    }
+    .mkt-pulse-metric{
+      background:rgba(30,41,59,.65);
+      border:1px solid rgba(99,102,241,.1);border-radius:13px;
+      padding:13px 10px 11px;text-align:center
+    }
+    .mkt-pulse-metric-label{
+      font-size:9px;font-weight:700;color:#475569;
+      letter-spacing:1.3px;text-transform:uppercase;margin-bottom:7px
+    }
+    .mkt-pulse-metric-value{
+      font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;
+      color:#e2e8f0;line-height:1.1
+    }
+    .mkt-pulse-metric-sub{font-size:10px;font-weight:600;margin-top:5px}
+    .mpt-green{color:#22c55e}.mpt-yellow{color:#f59e0b}
+    .mpt-red{color:#ef4444}.mpt-gray{color:#475569}
+
+    .mkt-pulse-divider{
+      height:1px;background:rgba(99,102,241,.1);margin:4px 0 16px
+    }
+    .mkt-pulse-analysis{
+      color:#94a3b8;font-size:13px;line-height:1.8;margin-bottom:16px;
+      padding:14px 16px;background:rgba(15,23,42,.4);border-radius:10px;
+      border-right:3px solid rgba(99,102,241,.35)
+    }
+
+    .mkt-pulse-exec-grid{
+      display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px
+    }
+    .mkt-pulse-exec-card{
+      background:rgba(15,23,42,.55);
+      border:1px solid rgba(99,102,241,.1);border-radius:13px;
+      padding:14px 14px 12px;position:relative;overflow:hidden
+    }
+    .mkt-pulse-exec-card::before{
+      content:'';position:absolute;top:0;right:0;left:0;height:2px;border-radius:13px 13px 0 0
+    }
+    .mkt-pulse-exec-geo::before{background:linear-gradient(90deg,#ef4444,#f97316)}
+    .mkt-pulse-exec-opp::before{background:linear-gradient(90deg,#22c55e,#10b981)}
+    .mkt-pulse-exec-watch::before{background:linear-gradient(90deg,#6366f1,#8b5cf6)}
+    .mkt-pulse-exec-icon{font-size:15px;margin-bottom:7px;display:block}
+    .mkt-pulse-exec-label{
+      font-size:9px;font-weight:700;color:#475569;
+      letter-spacing:1.2px;text-transform:uppercase;margin-bottom:7px
+    }
+    .mkt-pulse-exec-text{font-size:12px;color:#cbd5e1;line-height:1.65}
+
+    .mkt-pulse-src-badge{
+      display:inline-flex;align-items:center;gap:4px;
+      padding:3px 10px;border-radius:20px;font-size:9px;
+      font-weight:700;letter-spacing:.8px;text-transform:uppercase
+    }
+    .mkt-pulse-src-groq{
+      background:rgba(16,185,129,.12);color:#10b981;
+      border:1px solid rgba(16,185,129,.28)
+    }
+    .mkt-pulse-src-claude{
+      background:rgba(99,102,241,.12);color:#818cf8;
+      border:1px solid rgba(99,102,241,.28)
+    }
+    .mkt-pulse-src-algo{
+      background:rgba(71,85,105,.25);color:#64748b;
+      border:1px solid rgba(99,102,241,.12)
+    }
+
+    .mkt-pulse-footer{
+      display:flex;justify-content:space-between;align-items:center;
+      font-size:10px;color:#334155;font-family:'JetBrains Mono',monospace;
+      margin-top:6px;flex-direction:row-reverse
+    }
+
+    @media(max-width:768px){
+      .mkt-pulse-metrics{grid-template-columns:repeat(3,1fr)}
+      .mkt-pulse-exec-grid{grid-template-columns:1fr}
+      .mkt-pulse-wrap{padding:16px 14px 14px}
+    }
+    @media(max-width:480px){
+      .mkt-pulse-metrics{grid-template-columns:repeat(2,1fr)}
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -3705,18 +3827,29 @@ def _call_claude_market_analysis(data: dict) -> dict:
         _fg = d.get("fear_greed")
         _fg_str = f"{_fg} ({d.get('fear_greed_label', '')})" if _fg else "לא זמין"
         _events_str = "\n".join(d.get("macro_events") or []) or "אין אירועים קרובים"
+        _headlines_list = d.get("headlines") or []
         _headlines_str = (
-            "\n".join(f"- {h}" for h in d.get("headlines") or []) or "אין כותרות"
+            "\n".join(f"- {h}" for h in _headlines_list) or "אין כותרות זמינות"
         )
         return (
-            "אתה אנליסט מאקרו-גיאופוליטי בכיר. נתח את מצב השוק לפי הנתונים:\n\n"
-            f"📊 שוק: {_quant}\nFear & Greed: {_fg_str}\n\n"
-            f"📅 מאקרו קרוב:\n{_events_str}\n\n"
-            f"📰 כותרות:\n{_headlines_str}\n\n"
-            "החזר JSON בלבד (ללא טקסט נוסף):\n"
+            "אתה אנליסט מאקרו-גיאופוליטי בכיר ברמת Goldman Sachs עם 20 שנות ניסיון. "
+            "עליך לספק ניתוח שוק מוסדי מבוסס על ארבעה ממדים:\n\n"
+            f"📊 נתוני שוק real-time:\n{_quant}\n"
+            f"מדד פחד/חמדנות (Fear & Greed): {_fg_str}\n\n"
+            f"📅 אירועי מאקרו קרובים (7 ימים):\n{_events_str}\n\n"
+            f"📰 כותרות אקטואליות (גיאופוליטיות וכלכליות):\n{_headlines_str}\n\n"
+            "כללי ניתוח מוסדי — חובה לעמוד בכולם:\n"
+            "1. ציטוט ישיר: הזכר ספציפית לפחות שתי כותרות מהרשימה לעיל (לא בכלליות — ציין את שמות המדינות/אירועים)\n"
+            "2. הצלבה: האם עליית הזהב/VIX מאששת את הסיכון שבכותרות, או שמדובר ב-Noise ושוק הנדל\"ן?\n"
+            "3. Priced-in test: האם הסיכון כבר מגולם במחירים (=Priced-in) או מוערך בחסר (=Underpriced risk)?\n"
+            "4. המלצה מעשית: למשקיע פרטי ישראלי עם אופק 6-12 חודשים — מה הפעולה הנכונה?\n"
+            "5. אם אין כותרות: נתח אך ורק על בסיס VIX, תשואות ו-Fear & Greed\n\n"
+            "החזר JSON בלבד — ללא markdown, ללא טקסט נוסף, ללא הסברים לפני/אחרי:\n"
             '{"verdict":"BULLISH","pulse_score":70,'
-            '"analysis":"2-3 משפטים בעברית","geo_risk":"סיכון עיקרי",'
-            '"opportunity":"הזדמנות אחת","macro_watch":"אירוע לצפות"}'
+            '"analysis":"2-3 משפטים — ציטוט ספציפי של כותרות + קישור לנתוני שוק",'
+            '"geo_risk":"סיכון גיאופוליטי ספציפי שמוזכר בכותרות (שם מדינה/אירוע)",'
+            '"opportunity":"הזדמנות ספציפית שהשוק מתעלם ממנה כרגע",'
+            '"macro_watch":"האירוע המאקרו הקריטי ביותר לצפות בשבוע הקרוב"}'
         )
 
     def _parse_json_response(text: str) -> dict:
@@ -3782,7 +3915,7 @@ def _call_claude_market_analysis(data: dict) -> dict:
 
 
 def render_market_pulse_banner() -> None:
-    """מציג דופק השוק — בנר ניתוח מאקרו-גיאופוליטי עם AI מעל הטאבים."""
+    """מציג דופק השוק — טרמינל מאקרו-גיאופוליטי בעיצוב Glassmorphism."""
     _CACHE = "_mkt_pulse"
     _now = _time.time()
     _data = st.session_state.get(_CACHE)
@@ -3790,8 +3923,15 @@ def render_market_pulse_banner() -> None:
     _ts   = st.session_state.get(f"{_CACHE}_ts", 0)
     _stale = (_now - _ts) > 3600
 
-    with st.expander("🌍 דופק השוק — האם זה זמן חכם להשקיע?", expanded=True):
-        _, _btn_col = st.columns([8, 1])
+    with st.expander("🌍 דופק השוק — ניתוח מאקרו-גיאופוליטי", expanded=True):
+        _hdr_col, _btn_col = st.columns([10, 1])
+        with _hdr_col:
+            st.markdown(
+                '<p style="margin:0;font-size:10px;color:#64748b;letter-spacing:1.8px;'
+                'text-transform:uppercase;font-weight:700;font-family:\'JetBrains Mono\',monospace">'
+                'SOVEREIGN MARKET INTELLIGENCE · עדכון שעתי אוטומטי</p>',
+                unsafe_allow_html=True,
+            )
         _do_refresh = _btn_col.button("🔄", key="mkt_pulse_refresh", help="רענן נתונים")
 
         if _do_refresh or _stale or not _data:
@@ -3801,96 +3941,154 @@ def render_market_pulse_banner() -> None:
             if not _data:
                 st.warning("לא ניתן לטעון נתוני שוק כרגע. נסה שוב מאוחר יותר.")
                 return
-            with st.spinner("מנתח עם AI..."):
+            with st.spinner("מנתח עם בינה מלאכותית..."):
                 _ai = _call_claude_market_analysis(_data)
             st.session_state[_CACHE] = _data
             st.session_state[f"{_CACHE}_ai"] = _ai
             st.session_state[f"{_CACHE}_ts"] = _now
 
-        # ── שורת מדדים ─────────────────────────────────────────────────
-        _c1, _c2, _c3, _c4, _c5 = st.columns(5)
+        if not _data:
+            st.info("לחץ 🔄 לטעינת נתוני שוק.")
+            return
+
+        # ── Verdict / Score / Source ────────────────────────────────────
+        _v = (_ai or {}).get("verdict", "CAUTIOUS")
+        _pulse = (_ai or {}).get("pulse_score", 50)
+        _src = (_ai or {}).get("_source", "rule-based")
+
+        _vcolor  = {"BULLISH": "#22c55e", "CAUTIOUS": "#f59e0b", "AVOID": "#ef4444"}.get(_v, "#f59e0b")
+        _vclass  = {"BULLISH": "mkt-pulse-bullish", "CAUTIOUS": "mkt-pulse-cautious", "AVOID": "mkt-pulse-avoid"}.get(_v, "mkt-pulse-cautious")
+        _vbg     = {"BULLISH": "rgba(34,197,94,.15)", "CAUTIOUS": "rgba(245,158,11,.15)", "AVOID": "rgba(239,68,68,.15)"}.get(_v, "rgba(245,158,11,.15)")
+        _vlabel  = {"BULLISH": "▲ תנאים נוחים להשקעה", "CAUTIOUS": "◆ זהירות — הישאר סלקטיבי", "AVOID": "▼ סביבה מאתגרת — דחה השקעות חדשות"}.get(_v, "◆ זהירות")
+
+        if _src == "groq-ai":
+            _src_cls, _src_lbl = "mkt-pulse-src-groq", "⚡ GROQ AI"
+        elif _src == "claude-ai":
+            _src_cls, _src_lbl = "mkt-pulse-src-claude", "🤖 ניתוח בינה מלאכותית"
+        else:
+            _src_cls, _src_lbl = "mkt-pulse-src-algo", "📊 ניתוח אלגוריתמי"
+
+        # ── Metrics ─────────────────────────────────────────────────────
         _vix = _data.get("vix")
         _spy = _data.get("spy_trend")
         _yld = _data.get("yield_10y")
         _gld = _data.get("gold_trend")
         _fg  = _data.get("fear_greed")
+        _fg_label_en = _data.get("fear_greed_label", "")
 
-        _c1.metric("VIX",
-                   f"{_vix:.1f}" if _vix else "N/A",
-                   "נמוך ✅" if _vix and _vix < 20 else ("מוגבר ⚠️" if _vix and _vix < 30 else "פחד 🔴"))
-        _c2.metric("S&P 10d",
-                   f"{_spy:+.1f}%" if _spy is not None else "N/A",
-                   "עולה" if _spy and _spy > 0 else "יורד")
-        _c3.metric("10Y Yield",
-                   f"{_yld:.2f}%" if _yld else "N/A",
-                   "גבוה" if _yld and _yld > 4.5 else "מתון")
-        _c4.metric("זהב 5d",
-                   f"{_gld:+.1f}%" if _gld is not None else "N/A",
-                   "מקלט בטוח 🛡" if _gld and _gld > 1 else None)
-        _c5.metric("Fear & Greed",
-                   str(_fg) if _fg else "N/A",
-                   _data.get("fear_greed_label", "") if _fg else None)
+        _fg_he = {
+            "Extreme Fear": "פחד קיצוני", "Fear": "פחד",
+            "Neutral": "ניטרלי", "Greed": "חמדנות", "Extreme Greed": "חמדנות קיצונית",
+        }.get(_fg_label_en, _fg_label_en)
 
-        # ── Verdict + AI Narrative ──────────────────────────────────────
+        _vix_cls = "mpt-green" if _vix and _vix < 20 else ("mpt-yellow" if _vix and _vix < 30 else "mpt-red")
+        _vix_sub = "נמוך ✓" if _vix and _vix < 20 else ("מוגבר" if _vix and _vix < 30 else "פחד ✗")
+        _spy_cls = "mpt-green" if _spy and _spy > 0 else ("mpt-red" if _spy and _spy < 0 else "mpt-gray")
+        _spy_sub = ("עולה ↑" if _spy and _spy > 0 else ("יורד ↓" if _spy and _spy < 0 else "יציב")) if _spy is not None else "—"
+        _spy_sub_cls = _spy_cls
+        _yld_cls = "mpt-red" if _yld and _yld > 4.5 else ("mpt-yellow" if _yld and _yld > 4.0 else "mpt-green")
+        _yld_sub = "גבוה — לחץ" if _yld and _yld > 4.5 else ("מוגבר" if _yld and _yld > 4.0 else "מתון ✓")
+        _gld_cls = "mpt-yellow" if _gld and _gld > 1 else ("mpt-green" if _gld and _gld < -1 else "mpt-gray")
+        _gld_sub = "מקלט בטוח 🛡" if _gld and _gld > 1 else ("ירידה" if _gld and _gld < -1 else "יציב")
+        _fg_cls  = "mpt-green" if _fg and _fg < 30 else ("mpt-red" if _fg and _fg > 70 else "mpt-yellow")
+
+        _metrics_html = f"""
+        <div class="mkt-pulse-metrics">
+          <div class="mkt-pulse-metric">
+            <div class="mkt-pulse-metric-label">VIX — פחד שוק</div>
+            <div class="mkt-pulse-metric-value {_vix_cls}">{f"{_vix:.1f}" if _vix else "—"}</div>
+            <div class="mkt-pulse-metric-sub {_vix_cls}">{_vix_sub if _vix else "—"}</div>
+          </div>
+          <div class="mkt-pulse-metric">
+            <div class="mkt-pulse-metric-label">S&amp;P 500 — 10 ימים</div>
+            <div class="mkt-pulse-metric-value {_spy_cls}">{f"{_spy:+.2f}%" if _spy is not None else "—"}</div>
+            <div class="mkt-pulse-metric-sub {_spy_sub_cls}">{_spy_sub}</div>
+          </div>
+          <div class="mkt-pulse-metric">
+            <div class="mkt-pulse-metric-label">תשואה — 10 שנים</div>
+            <div class="mkt-pulse-metric-value {_yld_cls}">{f"{_yld:.2f}%" if _yld else "—"}</div>
+            <div class="mkt-pulse-metric-sub {_yld_cls}">{_yld_sub if _yld else "—"}</div>
+          </div>
+          <div class="mkt-pulse-metric">
+            <div class="mkt-pulse-metric-label">זהב — 5 ימים</div>
+            <div class="mkt-pulse-metric-value {_gld_cls}">{f"{_gld:+.2f}%" if _gld is not None else "—"}</div>
+            <div class="mkt-pulse-metric-sub {_gld_cls}">{_gld_sub if _gld is not None else "—"}</div>
+          </div>
+          <div class="mkt-pulse-metric">
+            <div class="mkt-pulse-metric-label">פחד וחמדנות</div>
+            <div class="mkt-pulse-metric-value {_fg_cls}">{str(_fg) if _fg else "—"}</div>
+            <div class="mkt-pulse-metric-sub {_fg_cls}">{_fg_he if _fg else "—"}</div>
+          </div>
+        </div>"""
+
+        # ── Executive Grid ───────────────────────────────────────────────
+        _exec_html = ""
         if _ai:
-            _v      = _ai.get("verdict", "CAUTIOUS")
-            _emoji  = {"BULLISH": "🟢", "CAUTIOUS": "🟡", "AVOID": "🔴"}.get(_v, "🟡")
-            _color  = {"BULLISH": "#26a69a", "CAUTIOUS": "#f59e0b", "AVOID": "#ef5350"}.get(_v, "#f59e0b")
-            _label  = {
-                "BULLISH": "תנאים נוחים להשקעה",
-                "CAUTIOUS": "זהירות — הישאר סלקטיבי",
-                "AVOID": "סביבה מאתגרת — דחה השקעות חדשות",
-            }.get(_v, "")
-            _pulse  = _ai.get("pulse_score", 50)
-            _src = _ai.get("_source", "rule-based")
-            if _src == "groq-ai":
-                _src_badge = (
-                    '<span style="font-size:10px;background:#10b981;color:#fff;'
-                    'padding:2px 6px;border-radius:4px;margin-right:4px">🤖 Groq AI</span>'
-                )
-            elif _src == "claude-ai":
-                _src_badge = (
-                    '<span style="font-size:10px;background:#6366f1;color:#fff;'
-                    'padding:2px 6px;border-radius:4px;margin-right:4px">🤖 Claude AI</span>'
-                )
-            else:
-                _src_badge = (
-                    '<span style="font-size:10px;background:#475569;color:#cbd5e1;'
-                    'padding:2px 6px;border-radius:4px;margin-right:4px">📊 Rule-Based</span>'
-                )
-
-            st.markdown(
-                f'<div style="margin:10px 0 6px;padding:12px 16px;border-radius:8px;'
-                f'background:#1e293b;border-left:4px solid {_color};">'
-                f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
-                f'<span style="font-size:20px">{_emoji}</span>'
-                f'<strong style="font-size:15px;color:{_color}">{_label}</strong>'
-                f'<span style="margin-left:auto;display:flex;align-items:center;gap:6px">'
-                f'{_src_badge}'
-                f'<span style="font-size:12px;color:#94a3b8">Pulse Score: {_pulse}/100</span>'
-                f'</span></div>'
-                f'<p style="color:#cbd5e1;font-size:13px;margin:0 0 10px">{_ai.get("analysis", "")}</p>'
-                f'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;color:#94a3b8">'
-                f'<span>⚠️ <strong style="color:#e2e8f0">סיכון גיאופוליטי:</strong><br>{_ai.get("geo_risk", "")}</span>'
-                f'<span>💡 <strong style="color:#e2e8f0">הזדמנות:</strong><br>{_ai.get("opportunity", "")}</span>'
-                f'<span>📅 <strong style="color:#e2e8f0">לצפות:</strong><br>{_ai.get("macro_watch", "")}</span>'
-                f'</div></div>',
-                unsafe_allow_html=True)
-
-            _headlines = _data.get("headlines", [])
-            if _headlines:
-                with st.expander("📰 כותרות שהשפיעו על הניתוח", expanded=False):
-                    for _h in _headlines:
-                        st.caption(f"• {_h}")
-
-        _events = _data.get("macro_events", [])
-        if _events:
-            with st.expander("📅 אירועי מאקרו קרובים (7 ימים)", expanded=False):
-                for _e in _events:
-                    st.caption(f"• {_e}")
+            _analysis = _ai.get("analysis", "")
+            _geo      = _ai.get("geo_risk", "—")
+            _opp      = _ai.get("opportunity", "—")
+            _watch    = _ai.get("macro_watch", "—")
+            _exec_html = f"""
+          <div class="mkt-pulse-analysis">{_analysis}</div>
+          <div class="mkt-pulse-exec-grid">
+            <div class="mkt-pulse-exec-card mkt-pulse-exec-geo">
+              <span class="mkt-pulse-exec-icon">⚠️</span>
+              <div class="mkt-pulse-exec-label">סיכון גיאופוליטי</div>
+              <div class="mkt-pulse-exec-text">{_geo}</div>
+            </div>
+            <div class="mkt-pulse-exec-card mkt-pulse-exec-opp">
+              <span class="mkt-pulse-exec-icon">💡</span>
+              <div class="mkt-pulse-exec-label">הזדמנות שוק</div>
+              <div class="mkt-pulse-exec-text">{_opp}</div>
+            </div>
+            <div class="mkt-pulse-exec-card mkt-pulse-exec-watch">
+              <span class="mkt-pulse-exec-icon">📅</span>
+              <div class="mkt-pulse-exec-label">אירוע למעקב</div>
+              <div class="mkt-pulse-exec-text">{_watch}</div>
+            </div>
+          </div>"""
 
         _fetched = _data.get("fetched_at", "")[:16].replace("T", " ")
-        st.caption(f"⏱ עודכן: {_fetched} UTC  ·  ⚠️ לא ייעוץ פיננסי — לצורכי מידע בלבד")
+
+        st.markdown(f"""
+        <div class="mkt-pulse-wrap {_vclass}">
+          <div class="mkt-pulse-header">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span class="mkt-pulse-verdict-pill"
+                    style="background:{_vbg};color:{_vcolor}">{_vlabel}</span>
+              <span class="mkt-pulse-src-badge {_src_cls}">{_src_lbl}</span>
+            </div>
+            <div class="mkt-pulse-score-box">
+              <div class="mkt-pulse-score-lbl">מדד עוצמת שוק</div>
+              <div>
+                <span class="mkt-pulse-score-val" style="color:{_vcolor}">{_pulse}</span>
+                <span class="mkt-pulse-score-max">/100</span>
+              </div>
+            </div>
+          </div>
+          {_metrics_html}
+          <div class="mkt-pulse-divider"></div>
+          {_exec_html}
+          <div class="mkt-pulse-footer">
+            <span>⚠️ לא ייעוץ פיננסי — לצורכי מידע בלבד</span>
+            <span>⏱ עודכן: {_fetched} UTC</span>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── Collapsible: כותרות ──────────────────────────────────────────
+        _headlines = _data.get("headlines", [])
+        if _headlines:
+            with st.expander("📰 כותרות שהשפיעו על הניתוח", expanded=False):
+                for _h in _headlines:
+                    st.caption(f"• {_h}")
+
+        # ── Collapsible: אירועי מאקרו ───────────────────────────────────
+        _events = _data.get("macro_events", [])
+        if _events:
+            with st.expander("📅 אירועי מאקרו קרובים — 7 ימים", expanded=False):
+                for _e in _events:
+                    st.caption(f"• {_e}")
 
 
 # ── Metric Cards ──────────────────────────────────────────────────────────────
