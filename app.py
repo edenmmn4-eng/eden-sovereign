@@ -3806,6 +3806,11 @@ def _rule_based_market_analysis(data: dict) -> dict:
             if len(_found_risks) >= 3:
                 break
     _geo_risk = " | ".join(_found_risks[:2])
+    _geo_risk_detail = (
+        f"הסיכון הגיאופוליטי המרכזי הנוכחי: {_geo_risk}. "
+        "קונפליקטים פעילים נוטים להעלות את מחירי האנרגיה והזהב ולגרום לתנודתיות מוגברת בשווקים. "
+        "מומלץ לפזר חשיפה גיאוגרפית ולשקול הגדלת רכיב הגנתי בתיק."
+    )
 
     # ── Opportunity ──────────────────────────────────────────────────────
     if _verdict == "BULLISH":
@@ -3838,6 +3843,7 @@ def _rule_based_market_analysis(data: dict) -> dict:
         "analysis": _analysis,
         "geo_risk": _geo_risk,
         "opportunity": _opp,
+        "geo_risk_detail": _geo_risk_detail,
         "macro_watch": _macro_watch,
         "macro_watch_detail": _macro_watch_detail,
         "_source": "rule-based",
@@ -3878,7 +3884,9 @@ def _call_claude_market_analysis(data: dict) -> dict:
             "החזר JSON בלבד — ללא markdown, ללא טקסט נוסף, ללא הסברים לפני/אחרי:\n"
             '{"verdict":"BULLISH","pulse_score":70,'
             '"analysis":"2-3 משפטים — ציטוט ספציפי של כותרות + קישור לנתוני שוק",'
-            '"geo_risk":"סיכון גיאופוליטי ספציפי שמוזכר בכותרות (שם מדינה/אירוע)",'
+            '"geo_risk":"שם הסיכון הגיאופוליטי — קצר (עד 8 מילים)",'
+            '"geo_risk_detail":"3-4 משפטים: מה הסיכון, למה הוא חשוב עכשיו, '
+            'כיצד הוא משפיע על השווקים, ומה המשקיע צריך לעשות",'
             '"opportunity":"הזדמנות ספציפית שהשוק מתעלם ממנה כרגע",'
             '"macro_watch":"שם האירוע הקריטי ביותר — קצר (עד 10 מילים)",'
             '"macro_watch_detail":"3-4 משפטים: למה האירוע חשוב, מה להצפות, '
@@ -4109,6 +4117,20 @@ def render_market_pulse_banner() -> None:
           </div>
         </div>
         """, unsafe_allow_html=True)
+
+        # ── פירוט סיכון גיאופוליטי ──────────────────────────────────────
+        if _ai:
+            _geo_detail = _ai.get("geo_risk_detail", "")
+            _geo_name   = _ai.get("geo_risk", "")
+            if _geo_detail and _geo_name:
+                with st.expander(f"⚠️ פירוט — {_geo_name}", expanded=False):
+                    st.markdown(
+                        f'<div style="direction:rtl;text-align:right;'
+                        f'font-size:13px;line-height:1.85;color:#374151;padding:4px 2px">'
+                        f'{_geo_detail}'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
 
         # ── פירוט אירוע למעקב ───────────────────────────────────────────
         if _ai:
