@@ -3648,22 +3648,24 @@ def fetch_market_pulse_data() -> dict | None:
     if "macro_events" not in result:
         result["macro_events"] = []
 
-    # ── שכבה 4: כותרות גיאופוליטיות (Reuters + AP RSS) ─────────────
+    # ── שכבה 4: כותרות גיאופוליטיות (BBC + Al Jazeera + CNBC RSS) ──────
     result["headlines"] = []
     if _FEEDPARSER_OK:
         for _feed_url in [
-            "https://feeds.reuters.com/reuters/businessNews",
-            "https://feeds.reuters.com/reuters/worldNews",
+            "http://feeds.bbci.co.uk/news/world/rss.xml",
+            "http://feeds.bbci.co.uk/news/business/rss.xml",
+            "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+            "https://www.cnbc.com/id/10001147/device/rss/rss.html",
         ]:
             try:
                 _feed = _feedparser.parse(_feed_url)
-                for _entry in _feed.entries[:4]:
+                for _entry in _feed.entries[:3]:
                     _title = (_entry.get("title") or "").strip()
-                    if _title:
+                    if _title and _title not in result["headlines"]:
                         result["headlines"].append(_title)
             except Exception:
                 pass
-        result["headlines"] = result["headlines"][:10]
+        result["headlines"] = result["headlines"][:12]
 
     result["fetched_at"] = datetime.utcnow().isoformat()
     return result if result.get("vix") else None
