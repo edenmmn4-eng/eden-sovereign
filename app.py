@@ -3798,9 +3798,19 @@ def _rule_based_market_analysis(data: dict) -> dict:
         _opp = "מניות דיבידנד וסקטור הגנתי כחלופה יציבה"
 
     # ── Macro Watch ──────────────────────────────────────────────────────
-    _macro_watch = "בדוק פרסומי CPI ו-FOMC הקרובים"
+    _macro_watch = "פרסומי CPI ו-FOMC הקרובים"
+    _macro_watch_detail = (
+        "פרסומי מדד המחירים לצרכן (CPI) ו-FOMC הם הגורמים המשפיעים ביותר על הציפיות לריבית. "
+        "CPI גבוה מהצפי עלול לדחות הורדות ריבית ולגרום לתנודתיות בשוק האג\"ח והמניות. "
+        "יש לעקוב אחר הנתונים ביחס לתחזיות הקונצנזוס ולהגיב בהתאם."
+    )
     if _evts:
         _macro_watch = _evts[0].split(" — ")[-1] if " — " in _evts[0] else _evts[0]
+        _macro_watch_detail = (
+            f"האירוע '{_macro_watch}' צפוי להשפיע על ציפיות הריבית ועל תנועות ההון. "
+            "אירועים בעלי השפעה גבוהה (High Impact) נוטים לגרום לתנודתיות מוגברת סביב מועד פרסומם. "
+            "מומלץ להפחית חשיפה לפוזיציות מנוף בסמוך למועד, ולעקוב אחר תגובת שוק האג\"ח כמדד מוביל."
+        )
 
     return {
         "verdict": _verdict,
@@ -3809,6 +3819,7 @@ def _rule_based_market_analysis(data: dict) -> dict:
         "geo_risk": _geo_risk,
         "opportunity": _opp,
         "macro_watch": _macro_watch,
+        "macro_watch_detail": _macro_watch_detail,
         "_source": "rule-based",
     }
 
@@ -3849,7 +3860,9 @@ def _call_claude_market_analysis(data: dict) -> dict:
             '"analysis":"2-3 משפטים — ציטוט ספציפי של כותרות + קישור לנתוני שוק",'
             '"geo_risk":"סיכון גיאופוליטי ספציפי שמוזכר בכותרות (שם מדינה/אירוע)",'
             '"opportunity":"הזדמנות ספציפית שהשוק מתעלם ממנה כרגע",'
-            '"macro_watch":"האירוע המאקרו הקריטי ביותר לצפות בשבוע הקרוב"}'
+            '"macro_watch":"שם האירוע הקריטי ביותר — קצר (עד 10 מילים)",'
+            '"macro_watch_detail":"3-4 משפטים: למה האירוע חשוב, מה להצפות, '
+            'איך להגיב — עם ייחוס לנתוני השוק הנוכחיים (VIX/תשואות)"}'
         )
 
     def _parse_json_response(text: str) -> dict:
@@ -4027,7 +4040,8 @@ def render_market_pulse_banner() -> None:
             _analysis = _ai.get("analysis", "")
             _geo      = _ai.get("geo_risk", "—")
             _opp      = _ai.get("opportunity", "—")
-            _watch    = _ai.get("macro_watch", "—")
+            _watch        = _ai.get("macro_watch", "—")
+            _watch_detail = _ai.get("macro_watch_detail", "")
             _exec_html = f"""
           <div class="mkt-pulse-analysis">{_analysis}</div>
           <div class="mkt-pulse-exec-grid">
@@ -4075,6 +4089,20 @@ def render_market_pulse_banner() -> None:
           </div>
         </div>
         """, unsafe_allow_html=True)
+
+        # ── פירוט אירוע למעקב ───────────────────────────────────────────
+        if _ai:
+            _watch_detail = _ai.get("macro_watch_detail", "")
+            _watch_name   = _ai.get("macro_watch", "")
+            if _watch_detail and _watch_name:
+                with st.expander(f"🔍 פירוט — {_watch_name}", expanded=False):
+                    st.markdown(
+                        f'<div style="direction:rtl;text-align:right;'
+                        f'font-size:13px;line-height:1.85;color:#374151;padding:4px 2px">'
+                        f'{_watch_detail}'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
 
         # ── Collapsible: כותרות ──────────────────────────────────────────
         _headlines = _data.get("headlines", [])
