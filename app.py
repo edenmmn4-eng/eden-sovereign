@@ -3692,57 +3692,92 @@ def _rule_based_market_analysis(data: dict) -> dict:
 
 
 def _call_claude_market_analysis(data: dict) -> dict:
-    """ניתוח שוק: rule-based תמיד, עם שדרוג Claude API אם ANTHROPIC_API_KEY מוגדר."""
-    # נסה Claude API (שדרוג אופציונלי)
+    """ניתוח שוק: Groq (חינמי) → Claude (אופציונלי) → rule-based (תמיד)."""
+
+    def _build_prompt(d: dict) -> str:
+        _quant = (
+            f"VIX: {d.get('vix', 'N/A')} | "
+            f"SPY 10d: {d.get('spy_trend', 'N/A')}% | "
+            f"QQQ 10d: {d.get('qqq_trend', 'N/A')}% | "
+            f"10Y Yield: {d.get('yield_10y', 'N/A')}% | "
+            f"Gold 5d: {d.get('gold_trend', 'N/A')}%"
+        )
+        _fg = d.get("fear_greed")
+        _fg_str = f"{_fg} ({d.get('fear_greed_label', '')})" if _fg else "לא זמין"
+        _events_str = "\n".join(d.get("macro_events") or []) or "אין אירועים קרובים"
+        _headlines_str = (
+            "\n".join(f"- {h}" for h in d.get("headlines") or []) or "אין כותרות"
+        )
+        return (
+            "אתה אנליסט מאקרו-גיאופוליטי בכיר. נתח את מצב השוק לפי הנתונים:\n\n"
+            f"📊 שוק: {_quant}\nFear & Greed: {_fg_str}\n\n"
+            f"📅 מאקרו קרוב:\n{_events_str}\n\n"
+            f"📰 כותרות:\n{_headlines_str}\n\n"
+            "החזר JSON בלבד (ללא טקסט נוסף):\n"
+            '{"verdict":"BULLISH","pulse_score":70,'
+            '"analysis":"2-3 משפטים בעברית","geo_risk":"סיכון עיקרי",'
+            '"opportunity":"הזדמנות אחת","macro_watch":"אירוע לצפות"}'
+        )
+
+    def _parse_json_response(text: str) -> dict:
+        text = text.strip()
+        if "```" in text:
+            text = text.split("```")[1].lstrip("json").strip()
+        return json.loads(text)
+
+    # ── שכבה 1: Groq API (חינמי — llama-3.3-70b) ──────────────────────
+    try:
+        _groq_key = ""
+        try:
+            _groq_key = st.secrets.get("GROQ_API_KEY", "")
+        except Exception:
+            pass
+        _groq_key = _groq_key or os.environ.get("GROQ_API_KEY", "")
+        if _groq_key:
+            _gresp = _req.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {_groq_key}", "Content-Type": "application/json"},
+                json={
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [{"role": "user", "content": _build_prompt(data)}],
+                    "max_tokens": 500,
+                    "temperature": 0.3,
+                },
+                timeout=15,
+            )
+            if _gresp.ok:
+                _text = _gresp.json()["choices"][0]["message"]["content"]
+                _result = _parse_json_response(_text)
+                _result["_source"] = "groq-ai"
+                return _result
+    except Exception:
+        pass
+
+    # ── שכבה 2: Anthropic Claude API (אופציונלי — בתשלום) ─────────────
     if _ANTHROPIC_OK:
         try:
-            _key = ""
+            _ant_key = ""
             try:
-                _key = st.secrets.get("ANTHROPIC_API_KEY", "")
+                _ant_key = st.secrets.get("ANTHROPIC_API_KEY", "")
             except Exception:
                 pass
-            _key = _key or os.environ.get("ANTHROPIC_API_KEY", "")
-            if _key:
-                _quant = (
-                    f"VIX: {data.get('vix', 'N/A')} | "
-                    f"SPY 10d: {data.get('spy_trend', 'N/A')}% | "
-                    f"QQQ 10d: {data.get('qqq_trend', 'N/A')}% | "
-                    f"10Y Yield: {data.get('yield_10y', 'N/A')}% | "
-                    f"Gold 5d: {data.get('gold_trend', 'N/A')}%"
-                )
-                _fg = data.get("fear_greed")
-                _fg_str = f"{_fg} ({data.get('fear_greed_label', '')})" if _fg else "לא זמין"
-                _events_str = "\n".join(data.get("macro_events") or []) or "אין אירועים קרובים"
-                _headlines_str = (
-                    "\n".join(f"- {h}" for h in data.get("headlines") or []) or "אין כותרות"
-                )
-                _prompt = (
-                    "אתה אנליסט מאקרו-גיאופוליטי בכיר. נתח את מצב השוק לפי הנתונים:\n\n"
-                    f"📊 שוק: {_quant}\nFear & Greed: {_fg_str}\n\n"
-                    f"📅 מאקרו קרוב:\n{_events_str}\n\n"
-                    f"📰 כותרות:\n{_headlines_str}\n\n"
-                    "החזר JSON בלבד:\n"
-                    '{"verdict":"BULLISH/CAUTIOUS/AVOID","pulse_score":0-100,'
-                    '"analysis":"2-3 משפטים בעברית","geo_risk":"סיכון עיקרי",'
-                    '"opportunity":"הזדמנות אחת","macro_watch":"אירוע לצפות"}'
-                )
-                _client = _anthropic.Anthropic(api_key=_key)
+            _ant_key = _ant_key or os.environ.get("ANTHROPIC_API_KEY", "")
+            if _ant_key:
+                _client = _anthropic.Anthropic(api_key=_ant_key)
                 _resp = _client.messages.create(
                     model="claude-haiku-4-5-20251001",
                     max_tokens=500,
                     timeout=15,
-                    messages=[{"role": "user", "content": _prompt}],
+                    messages=[{"role": "user", "content": _build_prompt(data)}],
                 )
                 _text = _resp.content[0].text.strip()
-                if "```" in _text:
-                    _text = _text.split("```")[1].lstrip("json").strip()
-                _result = json.loads(_text)
+                _result = _parse_json_response(_text)
                 _result["_source"] = "claude-ai"
                 return _result
         except Exception:
             pass
 
-    # Fallback: rule-based (עובד תמיד, ללא API Key)
+    # ── שכבה 3: Rule-based (עובד תמיד, ללא API Key) ────────────────────
     return _rule_based_market_analysis(data)
 
 
@@ -3807,13 +3842,22 @@ def render_market_pulse_banner() -> None:
                 "AVOID": "סביבה מאתגרת — דחה השקעות חדשות",
             }.get(_v, "")
             _pulse  = _ai.get("pulse_score", 50)
-            _src_badge = (
-                '<span style="font-size:10px;background:#6366f1;color:#fff;'
-                'padding:2px 6px;border-radius:4px;margin-right:4px">🤖 AI</span>'
-                if _ai.get("_source") == "claude-ai"
-                else '<span style="font-size:10px;background:#475569;color:#cbd5e1;'
-                'padding:2px 6px;border-radius:4px;margin-right:4px">📊 Rule-Based</span>'
-            )
+            _src = _ai.get("_source", "rule-based")
+            if _src == "groq-ai":
+                _src_badge = (
+                    '<span style="font-size:10px;background:#10b981;color:#fff;'
+                    'padding:2px 6px;border-radius:4px;margin-right:4px">🤖 Groq AI</span>'
+                )
+            elif _src == "claude-ai":
+                _src_badge = (
+                    '<span style="font-size:10px;background:#6366f1;color:#fff;'
+                    'padding:2px 6px;border-radius:4px;margin-right:4px">🤖 Claude AI</span>'
+                )
+            else:
+                _src_badge = (
+                    '<span style="font-size:10px;background:#475569;color:#cbd5e1;'
+                    'padding:2px 6px;border-radius:4px;margin-right:4px">📊 Rule-Based</span>'
+                )
 
             st.markdown(
                 f'<div style="margin:10px 0 6px;padding:12px 16px;border-radius:8px;'
