@@ -2028,6 +2028,25 @@ def _load_alerts_db() -> dict:
             except Exception:
                 pass
 
+    # 5. Migration חד-פעמי: צור _ualerts_{norm} לכל משתמש קיים שחסר לו ה-row
+    #    מבטיח שה-fallback ב-_is_phone_registered יעבוד גם למשתמשים ישנים
+    if not _in_bg and sb and not st.session_state.get("_ualerts_migration_done"):
+        try:
+            import threading as _thr2
+            def _run_migration():
+                for _mnorm, _mreg in list(data.get("registrations", {}).items()):
+                    try:
+                        if _supabase_load_user_alerts(_mnorm) is None:
+                            _mpal = [a for a in data.get("alerts", []) if a.get("phone") == _mnorm]
+                            _msal = [a for a in data.get("score_alerts", []) if a.get("phone") == _mnorm]
+                            _supabase_save_user_alerts(_mnorm, _mpal, _msal)
+                    except Exception:
+                        pass
+            _thr2.Thread(target=_run_migration, daemon=True, name="ualerts-migration").start()
+            st.session_state["_ualerts_migration_done"] = True
+        except Exception:
+            pass
+
     # שמור בcache של session state לשימוש בקריאות הבאות באותו render
     if not _in_bg:
         try:
