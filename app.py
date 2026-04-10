@@ -6146,6 +6146,31 @@ def main() -> None:
                                 _delete_score_alert(_tg_phone, _si)
                                 st.rerun()
 
+                # ── כפתור סריקת שוק ידנית ────────────────────────────────
+                if _active_score:
+                    _scan_running = _bp_scan_state.get("running", False)
+                    _scan_prog    = _bp_scan_state.get("progress", 0)
+                    _scan_total   = _bp_scan_state.get("total", 1)
+                    _last_results = _bp_scan_state.get("results", {})
+                    if _scan_running:
+                        st.progress(
+                            _scan_prog / max(_scan_total, 1),
+                            text=f"🔍 סריקה פעילה... {_scan_prog}/{_scan_total} מניות"
+                        )
+                    else:
+                        _btn_label = "🔍 סרוק שוק עכשיו"
+                        if _last_results:
+                            _btn_label = "🔍 סרוק שוק מחדש"
+                        if st.button(_btn_label, use_container_width=True, key="manual_bp_scan_btn"):
+                            threading.Thread(
+                                target=_run_bp_scan,
+                                args=("1Y Strategic",),
+                                daemon=True,
+                                name="bp-manual-scan",
+                            ).start()
+                            st.toast("🔍 סריקה החלה — תקבל הודעת טלגרם אם נמצאו מניות מתאימות")
+                            st.rerun()
+
             else:
                 # ── Auto-connect: בדוק פעם אחת בsession (מכסה משתמש רשום שSupabase היה איטי) ──
                 _ap_key = f"_ap_{_norm}"
