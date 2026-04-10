@@ -2013,10 +2013,13 @@ def _load_alerts_db() -> dict:
     for k, v in _defaults.items():
         data.setdefault(k, v)
 
-    # שחזור: אם _tg_db ריק מאלרטים — נסה לשחזר מגיבוי משני (_ualerts_{norm})
-    if not data.get("alerts") and not data.get("score_alerts"):
-        for _rnorm in list(data.get("registrations", {}).keys()):
-            try:
+    # שחזור per-user: אם למשתמש ספציפי אין התראות — שחזר מגיבוי (_ualerts_{norm})
+    # (לא בודקים האם ה-DB כולו ריק — כי משתמש אחד עלול לאבד נתונים בזמן שאחר עדיין קיים)
+    for _rnorm in list(data.get("registrations", {}).keys()):
+        try:
+            _has_price = any(a.get("phone") == _rnorm for a in data.get("alerts", []))
+            _has_score = any(a.get("phone") == _rnorm for a in data.get("score_alerts", []))
+            if not _has_price and not _has_score:
                 _bk = _supabase_load_user_alerts(_rnorm)
                 if _bk and isinstance(_bk, dict):
                     _pa = _bk.get("price_alerts") or []
@@ -2025,8 +2028,8 @@ def _load_alerts_db() -> dict:
                         data["alerts"].extend(_pa)
                     if _sa:
                         data["score_alerts"].extend(_sa)
-            except Exception:
-                pass
+        except Exception:
+            pass
 
     # 5. Migration חד-פעמי: צור _ualerts_{norm} לכל משתמש קיים שחסר לו ה-row
     #    מבטיח שה-fallback ב-_is_phone_registered יעבוד גם למשתמשים ישנים
