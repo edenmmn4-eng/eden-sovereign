@@ -2559,6 +2559,49 @@ def _supabase_load_user_alerts(norm: str) -> dict | None:
     return None
 
 
+def _supabase_save_portfolio_cache(norm: str, portfolio: list) -> bool:
+    """גיבוי שלישי לפורטפוליו ב-ticker_cache תחת מפתח _portfolio_{norm}."""
+    if not portfolio:
+        return False  # לא שומר פורטפוליו ריק כגיבוי
+    try:
+        url, key = _sb_creds()
+        if not url or not key:
+            return False
+        _req.post(
+            f"{url}/rest/v1/ticker_cache",
+            json={"ticker": f"_portfolio_{norm}", "data": {"portfolio": portfolio}},
+            headers={"apikey": key, "Authorization": f"Bearer {key}",
+                     "Prefer": "resolution=merge-duplicates",
+                     "Content-Type": "application/json"},
+            timeout=5,
+        )
+        return True
+    except Exception:
+        return False
+
+
+def _supabase_load_portfolio_cache(norm: str) -> list | None:
+    """טוען גיבוי שלישי לפורטפוליו מ-ticker_cache."""
+    try:
+        url, key = _sb_creds()
+        if not url or not key:
+            return None
+        r = _req.get(
+            f"{url}/rest/v1/ticker_cache",
+            params={"ticker": f"eq._portfolio_{norm}", "select": "data",
+                    "order": "cached_at.desc", "limit": "1"},
+            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            timeout=4,
+        )
+        if r.status_code == 200 and r.json():
+            p = r.json()[0]["data"].get("portfolio")
+            if isinstance(p, list):
+                return p
+    except Exception:
+        pass
+    return None
+
+
 def _supabase_save_portfolio(phone: str, portfolio: list) -> bool:
     """שומר portfolio ב-Supabase לפי מספר טלפון. מחזיר True אם הצליח."""
     try:
@@ -2582,20 +2625,30 @@ def _supabase_save_portfolio(phone: str, portfolio: list) -> bool:
 
 
 def _load_user_portfolio(phone: str) -> list:
-    """טוען את ה-Portfolio — ראשית מ-_tg_db (אמין), אחר כך user_portfolios."""
+    """טוען את ה-Portfolio — _tg_db → user_portfolios → ticker_cache (_portfolio_)."""
     norm = _normalize_phone(phone)
-    # 1. PRIMARY: _tg_db — אותה טבלה כמו ההרשמות, תמיד עובדת
+    # 1. PRIMARY: _tg_db — אותה טבלה כמו ההרשמות
     try:
         db = _load_alerts_db()
         reg = db.get("registrations", {}).get(norm, {})
-        if "portfolio" in reg and isinstance(reg["portfolio"], list):
-            return reg["portfolio"]
+        p = reg.get("portfolio")
+        if isinstance(p, list) and p:  # החזר רק אם לא ריק
+            return p
     except Exception:
         pass
-    # 2. SECONDARY: user_portfolios — אם הטבלה קיימת ב-Supabase
+    # 2. SECONDARY: user_portfolios
     sb = _supabase_load_portfolio(norm)
-    if sb is not None:
+    if sb:  # לא ריק
         return sb
+    # 3. TERTIARY: ticker_cache — גיבוי שלישי (לא תלוי בשתי הטבלאות הקודמות)
+    tc = _supabase_load_portfolio_cache(norm)
+    if tc:
+        return tc
+    # 4. אם הכל נכשל — החזר ריק (אולי פורטפוליו ריק לגיטימי)
+    if sb is not None:  # user_portfolios ענה אבל ריק — זה לגיטימי
+        return sb
+    if isinstance(reg.get("portfolio"), list):  # _tg_db ענה אבל ריק
+        return reg["portfolio"]
     return []
 
 
@@ -2615,6 +2668,8 @@ def _save_user_portfolio(phone: str, portfolio: list) -> bool:
         pass
     # 2. SECONDARY: שמור גם ב-user_portfolios (אם הטבלה קיימת)
     _supabase_save_portfolio(norm, portfolio)
+    # 3. TERTIARY: גיבוי שלישי ב-ticker_cache
+    _supabase_save_portfolio_cache(norm, portfolio)
     return sb_ok
 
 
