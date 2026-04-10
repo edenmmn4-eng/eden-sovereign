@@ -2303,14 +2303,25 @@ def _check_and_fire_score_alerts(scores: list, horizon: str = "1Y Strategic",
                 if not notify_tickers:
                     continue
                 header = f"🏆 *Eden Sovereign — התראת ציון*\nמניות חדשות שהגיעו לציון ≥{min_s} ({horizon}):\n"
-            lines = [header]
-            for t in notify_tickers[:10]:
-                s = next((sc for tk, sc in qualifying if tk == t), 0)
-                label = "STRONG BUY" if s >= 80 else "BUY" if s >= 65 else "HOLD"
-                lines.append(f"• *{t}* — ציון {s} ({label})")
-            body = "\n".join(lines)
-            ok = _send_telegram_msg(alert["phone"], body)
-            if ok:
+            # שלח בחבילות של עד 20 מניות (מגבלת Telegram ~4096 תווים)
+            _chunk_size = 20
+            _sent_ok = False
+            for _chunk_start in range(0, len(notify_tickers), _chunk_size):
+                _chunk = notify_tickers[_chunk_start:_chunk_start + _chunk_size]
+                _total_chunks = (len(notify_tickers) + _chunk_size - 1) // _chunk_size
+                _chunk_num = _chunk_start // _chunk_size + 1
+                _hdr = header if _total_chunks == 1 else header.rstrip("\n") + f" ({_chunk_num}/{_total_chunks})\n"
+                lines = [_hdr]
+                for t in _chunk:
+                    s = next((sc for tk, sc in qualifying if tk == t), 0)
+                    label = "STRONG BUY" if s >= 80 else "BUY" if s >= 65 else "HOLD"
+                    lines.append(f"• *{t}* — ציון {s} ({label})")
+                body = "\n".join(lines)
+                ok = _send_telegram_msg(alert["phone"], body)
+                if ok:
+                    _sent_ok = True
+                import time as _tsl; _tsl.sleep(0.5)  # מניעת flood-limit של Telegram
+            if _sent_ok:
                 alert["last_notified_tickers"] = qualifying_tickers
                 alert["last_notified_at"] = datetime.now().isoformat(timespec="seconds")
                 changed = True
