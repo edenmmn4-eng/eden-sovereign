@@ -2278,25 +2278,33 @@ def _delete_score_alert(phone: str, idx: int) -> None:
         )
 
 
-def _check_and_fire_score_alerts(scores: list, horizon: str = "1Y Strategic") -> int:
-    """scores = list of (ticker, score) tuples — כל תוצאות הסורק"""
+def _check_and_fire_score_alerts(scores: list, horizon: str = "1Y Strategic",
+                                  notify_all: bool = False) -> int:
+    """scores = list of (ticker, score) tuples — כל תוצאות הסורק.
+    notify_all=True → שלח על כל המניות הכשירות (סריקה ידנית), ללא סינון "חדשות בלבד"."""
     try:
         db = _load_alerts_db()
         fired = 0
         changed = False
         for alert in db.get("score_alerts", []):
             min_s = int(alert.get("min_score", 80))
-            # מצא מניות שעברו את הסף
-            qualifying = [(t, s) for t, s in scores if s >= min_s]
+            qualifying = [(t, s) for t, s in scores if s >= min_s and s > 0]
             qualifying_tickers = [t for t, _ in qualifying]
-            prev_tickers = set(alert.get("last_notified_tickers", []))
-            new_tickers = [t for t in qualifying_tickers if t not in prev_tickers]
-            if not new_tickers:
+            if not qualifying_tickers:
                 continue
-            # בנה הודעה רק על המניות החדשות שחצו את הסף
-            lines = [f"🏆 *Eden Sovereign — התראת ציון*\n"]
-            lines.append(f"מניות חדשות שהגיעו לציון ≥{min_s} ({horizon}):\n")
-            for t in new_tickers[:10]:
+            if notify_all:
+                # סריקה ידנית — התרע על כל המניות מעל הסף
+                notify_tickers = qualifying_tickers
+                header = f"🏆 *Eden Sovereign — סריקת שוק*\nמניות עם ציון ≥{min_s} ({horizon}):\n"
+            else:
+                # אוטומטי — רק מניות חדשות שלא נשלחו קודם
+                prev_tickers = set(alert.get("last_notified_tickers", []))
+                notify_tickers = [t for t in qualifying_tickers if t not in prev_tickers]
+                if not notify_tickers:
+                    continue
+                header = f"🏆 *Eden Sovereign — התראת ציון*\nמניות חדשות שהגיעו לציון ≥{min_s} ({horizon}):\n"
+            lines = [header]
+            for t in notify_tickers[:10]:
                 s = next((sc for tk, sc in qualifying if tk == t), 0)
                 label = "STRONG BUY" if s >= 80 else "BUY" if s >= 65 else "HOLD"
                 lines.append(f"• *{t}* — ציון {s} ({label})")
@@ -2417,8 +2425,9 @@ _bp_scan_state: dict = {
 }
 
 
-def _run_bp_scan(horizon: str) -> None:
-    """סורק את כל TICKER_LIST ברקע — אינו חוסם את ממשק המשתמש."""
+def _run_bp_scan(horizon: str, notify_all: bool = False) -> None:
+    """סורק את כל TICKER_LIST ברקע — אינו חוסם את ממשק המשתמש.
+    notify_all=True → סריקה ידנית, שולח על כל המניות הכשירות (לא רק חדשות)."""
     try:
         tickers = [t for t in TICKER_LIST if t not in _CRYPTO_MINING_EXCLUDE]
         with _bp_scan_lock:
@@ -2481,7 +2490,7 @@ def _run_bp_scan(horizon: str) -> None:
 
         # ── הפעל התראות ציון עם תוצאות הסריקה ──────────────────────────
         try:
-            _check_and_fire_score_alerts(results, horizon)
+            _check_and_fire_score_alerts(results, horizon, notify_all=notify_all)
         except Exception:
             pass
     except Exception:
@@ -6164,7 +6173,7 @@ def main() -> None:
                         if st.button(_btn_label, use_container_width=True, key="manual_bp_scan_btn"):
                             threading.Thread(
                                 target=_run_bp_scan,
-                                args=("1Y Strategic",),
+                                args=("1Y Strategic", True),  # notify_all=True — סריקה ידנית
                                 daemon=True,
                                 name="bp-manual-scan",
                             ).start()
