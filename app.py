@@ -2436,9 +2436,14 @@ _bp_scan_state: dict = {
 }
 
 
-def _run_bp_scan(horizon: str, notify_all: bool = False) -> None:
+def _run_bp_scan(horizons=None, notify_all: bool = False) -> None:
     """סורק את כל TICKER_LIST ברקע — אינו חוסם את ממשק המשתמש.
+    horizons — רשימת טווחים לחישוב (ברירת מחדל: שני הטווחים).
     notify_all=True → סריקה ידנית, שולח על כל המניות הכשירות (לא רק חדשות)."""
+    if horizons is None:
+        horizons = ["1Y Strategic", "30D Tactical"]
+    elif isinstance(horizons, str):
+        horizons = [horizons]
     try:
         tickers = [t for t in TICKER_LIST if t not in _CRYPTO_MINING_EXCLUDE]
         with _bp_scan_lock:
@@ -2461,49 +2466,58 @@ def _run_bp_scan(horizon: str, notify_all: bool = False) -> None:
                 try:
                     d = fetch_data(t)
                 except Exception:
-                    return t, 0
+                    return t, {}
                 if d["hist"].empty or d.get("is_etf"):
-                    return t, 0
+                    return t, {}
                 if d["mkt_cap"] < 1_000_000_000:
-                    return t, 0
+                    return t, {}
                 _cp = d.get("current_price", 0) or 0
                 if _isnan(float(_cp)) or float(_cp) < 1.0:
-                    return t, 0
+                    return t, {}
                 if len(d["hist"]) < 60:
-                    return t, 0
+                    return t, {}
                 _avg_vol = d["hist"]["Volume"].tail(30).mean() if "Volume" in d["hist"].columns else 0
                 if _avg_vol < 100_000:
-                    return t, 0
+                    return t, {}
                 if d.get("quote_type") not in ("EQUITY", None, ""):
-                    return t, 0
+                    return t, {}
                 has_pe     = not _isnan(d["pe_ratio"]) and d["pe_ratio"] > 0
                 has_cagr   = d["revenue_cagr"] > 0.01
                 has_margin = not _isnan(d["gross_margins"]) and d["gross_margins"] > 0
                 if not (has_pe or has_cagr or has_margin):
-                    return t, 0
+                    return t, {}
                 tech = compute_technicals(d["hist"])
-                s = compute_score(d, tech, horizon, use_news=True)
-                return t, s
+                # חשב ציון לכל הטווחים בפעם אחת — מונע שליפת נתונים כפולה
+                scores_by_h = {}
+                for h in horizons:
+                    try:
+                        scores_by_h[h] = compute_score(d, tech, h, use_news=True)
+                    except Exception:
+                        scores_by_h[h] = 0
+                return t, scores_by_h
             except Exception:
-                return t, 0
+                return t, {}
             finally:
                 _done[0] += 1
                 with _bp_scan_lock:
                     _bp_scan_state["progress"] = _done[0]
 
         with ThreadPoolExecutor(max_workers=8, thread_name_prefix="bp-scanner") as ex:
-            results = list(ex.map(_score_one_bg, tickers))
+            raw = list(ex.map(_score_one_bg, tickers))  # [(ticker, {horizon: score})]
 
-        results.sort(key=lambda x: x[1], reverse=True)
+        # בנה רשימת תוצאות לכל טווח ושמור ב-state + שגר התראות
         with _bp_scan_lock:
-            _bp_scan_state["results"][horizon] = results
             _bp_scan_state["running"] = False
 
-        # ── הפעל התראות ציון עם תוצאות הסריקה ──────────────────────────
-        try:
-            _check_and_fire_score_alerts(results, horizon, notify_all=notify_all)
-        except Exception:
-            pass
+        for h in horizons:
+            h_results = [(t, scores.get(h, 0)) for t, scores in raw if isinstance(scores, dict)]
+            h_results.sort(key=lambda x: x[1], reverse=True)
+            with _bp_scan_lock:
+                _bp_scan_state["results"][h] = h_results
+            try:
+                _check_and_fire_score_alerts(h_results, h, notify_all=notify_all)
+            except Exception:
+                pass
     except Exception:
         with _bp_scan_lock:
             _bp_scan_state["running"] = False
