@@ -2478,6 +2478,12 @@ def _run_bp_scan(horizon: str) -> None:
         with _bp_scan_lock:
             _bp_scan_state["results"][horizon] = results
             _bp_scan_state["running"] = False
+
+        # ── הפעל התראות ציון עם תוצאות הסריקה ──────────────────────────
+        try:
+            _check_and_fire_score_alerts(results, horizon)
+        except Exception:
+            pass
     except Exception:
         with _bp_scan_lock:
             _bp_scan_state["running"] = False
