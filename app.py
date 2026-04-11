@@ -4148,38 +4148,18 @@ def render_market_pulse_banner() -> None:
         _do_refresh = _btn_col.button("🔄", key="mkt_pulse_refresh", help="רענן נתונים")
 
         if _do_refresh or _stale or not _data:
-            with st.spinner("טוען נתוני שוק וחדשות..."):
+            with st.spinner("טוען נתוני שוק..."):
                 fetch_market_pulse_data.clear()
                 _data = fetch_market_pulse_data()
             if not _data:
                 st.warning("לא ניתן לטעון נתוני שוק כרגע. נסה שוב מאוחר יותר.")
                 return
-            with st.spinner("מנתח עם בינה מלאכותית..."):
-                _ai = _call_claude_market_analysis(_data)
             st.session_state[_CACHE] = _data
-            st.session_state[f"{_CACHE}_ai"] = _ai
             st.session_state[f"{_CACHE}_ts"] = _now
 
         if not _data:
             st.info("לחץ 🔄 לטעינת נתוני שוק.")
             return
-
-        # ── Verdict / Score / Source ────────────────────────────────────
-        _v = (_ai or {}).get("verdict", "CAUTIOUS")
-        _pulse = (_ai or {}).get("pulse_score", 50)
-        _src = (_ai or {}).get("_source", "rule-based")
-
-        _vcolor  = {"BULLISH": "#22c55e", "CAUTIOUS": "#f59e0b", "AVOID": "#ef4444"}.get(_v, "#f59e0b")
-        _vclass  = {"BULLISH": "mkt-pulse-bullish", "CAUTIOUS": "mkt-pulse-cautious", "AVOID": "mkt-pulse-avoid"}.get(_v, "mkt-pulse-cautious")
-        _vbg     = {"BULLISH": "rgba(34,197,94,.15)", "CAUTIOUS": "rgba(245,158,11,.15)", "AVOID": "rgba(239,68,68,.15)"}.get(_v, "rgba(245,158,11,.15)")
-        _vlabel  = {"BULLISH": "▲ תנאים נוחים להשקעה", "CAUTIOUS": "◆ זהירות — הישאר סלקטיבי", "AVOID": "▼ סביבה מאתגרת — דחה השקעות חדשות"}.get(_v, "◆ זהירות")
-
-        if _src == "groq-ai":
-            _src_cls, _src_lbl = "mkt-pulse-src-groq", "⚡ GROQ AI"
-        elif _src == "claude-ai":
-            _src_cls, _src_lbl = "mkt-pulse-src-claude", "🤖 ניתוח בינה מלאכותית"
-        else:
-            _src_cls, _src_lbl = "mkt-pulse-src-algo", "📊 ניתוח אלגוריתמי"
 
         # ── Metrics ─────────────────────────────────────────────────────
         _vix = _data.get("vix")
@@ -4234,103 +4214,17 @@ def render_market_pulse_banner() -> None:
           </div>
         </div>"""
 
-        # ── Executive Grid ───────────────────────────────────────────────
-        _exec_html = ""
-        if _ai:
-            _analysis = _ai.get("analysis", "")
-            _geo      = _ai.get("geo_risk", "—")
-            _opp      = _ai.get("opportunity", "—")
-            _watch        = _ai.get("macro_watch", "—")
-            _watch_detail = _ai.get("macro_watch_detail", "")
-            _exec_html = f"""
-          <div class="mkt-pulse-analysis">{_analysis}</div>
-          <div class="mkt-pulse-exec-grid">
-            <div class="mkt-pulse-exec-card mkt-pulse-exec-geo">
-              <span class="mkt-pulse-exec-icon">⚠️</span>
-              <div class="mkt-pulse-exec-label">סיכון גיאופוליטי</div>
-              <div class="mkt-pulse-exec-text">{_geo}</div>
-            </div>
-            <div class="mkt-pulse-exec-card mkt-pulse-exec-opp">
-              <span class="mkt-pulse-exec-icon">💡</span>
-              <div class="mkt-pulse-exec-label">הזדמנות שוק</div>
-              <div class="mkt-pulse-exec-text">{_opp}</div>
-            </div>
-            <div class="mkt-pulse-exec-card mkt-pulse-exec-watch">
-              <span class="mkt-pulse-exec-icon">📅</span>
-              <div class="mkt-pulse-exec-label">אירוע למעקב</div>
-              <div class="mkt-pulse-exec-text">{_watch}</div>
-            </div>
-          </div>"""
-
         _fetched = _data.get("fetched_at", "")[:16].replace("T", " ")
 
         st.markdown(f"""
-        <div class="mkt-pulse-wrap {_vclass}">
-          <div class="mkt-pulse-header">
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-              <span class="mkt-pulse-verdict-pill"
-                    style="background:{_vbg};color:{_vcolor}">{_vlabel}</span>
-              <span class="mkt-pulse-src-badge {_src_cls}">{_src_lbl}</span>
-            </div>
-            <div class="mkt-pulse-score-box">
-              <div class="mkt-pulse-score-lbl">מדד עוצמת שוק</div>
-              <div>
-                <span class="mkt-pulse-score-val" style="color:{_vcolor}">{_pulse}</span>
-                <span class="mkt-pulse-score-max">/100</span>
-              </div>
-            </div>
-          </div>
+        <div class="mkt-pulse-wrap mkt-pulse-cautious">
           {_metrics_html}
-          <div class="mkt-pulse-divider"></div>
-          {_exec_html}
           <div class="mkt-pulse-footer">
             <span>⚠️ לא ייעוץ פיננסי — לצורכי מידע בלבד</span>
             <span>⏱ עודכן: {_fetched} UTC</span>
           </div>
         </div>
         """, unsafe_allow_html=True)
-
-        # ── פירוט סיכון גיאופוליטי ──────────────────────────────────────
-        if _ai:
-            _geo_detail = _ai.get("geo_risk_detail", "")
-            _geo_name   = _ai.get("geo_risk", "")
-            if _geo_detail and _geo_name:
-                with st.expander(f"⚠️ פירוט — {_geo_name}", expanded=False):
-                    st.markdown(
-                        f'<div style="direction:rtl;text-align:right;'
-                        f'font-size:13px;line-height:1.85;color:#374151;padding:4px 2px">'
-                        f'{_geo_detail}'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-
-        # ── פירוט אירוע למעקב ───────────────────────────────────────────
-        if _ai:
-            _watch_detail = _ai.get("macro_watch_detail", "")
-            _watch_name   = _ai.get("macro_watch", "")
-            if _watch_detail and _watch_name:
-                with st.expander(f"🔍 פירוט — {_watch_name}", expanded=False):
-                    st.markdown(
-                        f'<div style="direction:rtl;text-align:right;'
-                        f'font-size:13px;line-height:1.85;color:#374151;padding:4px 2px">'
-                        f'{_watch_detail}'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-
-        # ── Collapsible: כותרות ──────────────────────────────────────────
-        _headlines = _data.get("headlines", [])
-        if _headlines:
-            with st.expander("📰 כותרות שהשפיעו על הניתוח", expanded=False):
-                for _h in _headlines:
-                    st.caption(f"• {_h}")
-
-        # ── Collapsible: אירועי מאקרו ───────────────────────────────────
-        _events = _data.get("macro_events", [])
-        if _events:
-            with st.expander("📅 אירועי מאקרו קרובים — 7 ימים", expanded=False):
-                for _e in _events:
-                    st.caption(f"• {_e}")
 
 
 # ── Metric Cards ──────────────────────────────────────────────────────────────
