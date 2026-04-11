@@ -3728,6 +3728,29 @@ def fetch_market_pulse_data() -> dict | None:
             result["gold_trend"] = round(
                 (_gld_h["Close"].iloc[-1] - _gld_h["Close"].iloc[-5])
                 / _gld_h["Close"].iloc[-5] * 100, 2)
+        _time.sleep(0.3)
+
+        _dxy_h = yf.Ticker("^DXY").history(period="10d")
+        if not _dxy_h.empty and len(_dxy_h) >= 5:
+            result["dxy_val"]   = round(float(_dxy_h["Close"].iloc[-1]), 1)
+            result["dxy_trend"] = round(
+                (_dxy_h["Close"].iloc[-1] - _dxy_h["Close"].iloc[-5])
+                / _dxy_h["Close"].iloc[-5] * 100, 2)
+        _time.sleep(0.3)
+
+        _oil_h = yf.Ticker("CL=F").history(period="10d")
+        if not _oil_h.empty and len(_oil_h) >= 5:
+            result["oil_val"]   = round(float(_oil_h["Close"].iloc[-1]), 1)
+            result["oil_trend"] = round(
+                (_oil_h["Close"].iloc[-1] - _oil_h["Close"].iloc[-5])
+                / _oil_h["Close"].iloc[-5] * 100, 2)
+        _time.sleep(0.3)
+
+        _btc_h = yf.Ticker("BTC-USD").history(period="10d")
+        if not _btc_h.empty and len(_btc_h) >= 5:
+            result["btc_trend"] = round(
+                (_btc_h["Close"].iloc[-1] - _btc_h["Close"].iloc[-5])
+                / _btc_h["Close"].iloc[-5] * 100, 2)
     except Exception:
         pass
 
@@ -3788,6 +3811,82 @@ def fetch_market_pulse_data() -> dict | None:
 
     result["fetched_at"] = datetime.utcnow().isoformat()
     return result if result.get("vix") else None
+
+
+def _compute_pulse_score(data: dict) -> int:
+    """מחשב ציון שוק 0–100 לפי נתונים טכניים בלבד — ללא AI."""
+    _s = 0
+
+    # VIX — מקסימום 20 נקודות
+    _vix = data.get("vix")
+    if _vix:
+        if _vix < 15:   _s += 20
+        elif _vix < 20: _s += 15
+        elif _vix < 25: _s += 8
+        elif _vix < 30: _s += 3
+
+    # S&P 500 10d — מקסימום 16 נקודות
+    _spy = data.get("spy_trend")
+    if _spy is not None:
+        if _spy > 3:    _s += 16
+        elif _spy > 1:  _s += 12
+        elif _spy > -1: _s += 7
+        elif _spy > -3: _s += 3
+
+    # QQQ 10d — מקסימום 10 נקודות
+    _qqq = data.get("qqq_trend")
+    if _qqq is not None:
+        if _qqq > 3:    _s += 10
+        elif _qqq > 1:  _s += 7
+        elif _qqq > -1: _s += 4
+        elif _qqq > -3: _s += 1
+
+    # תשואת אגרת 10 שנים — מקסימום 12 נקודות
+    _yld = data.get("yield_10y")
+    if _yld:
+        if _yld < 3.5:   _s += 12
+        elif _yld < 4.0: _s += 9
+        elif _yld < 4.5: _s += 6
+        elif _yld < 5.0: _s += 3
+
+    # זהב 5d — מקסימום 8 נקודות (ירידת זהב = risk-on = חיובי למניות)
+    _gld = data.get("gold_trend")
+    if _gld is not None:
+        if _gld < -1:  _s += 8   # זהב יורד — risk-on
+        elif _gld < 1: _s += 5   # יציב
+        else:          _s += 2   # זהב עולה — risk-off
+
+    # Fear & Greed — מקסימום 15 נקודות
+    _fg = data.get("fear_greed")
+    if _fg is not None:
+        if _fg < 20:   _s += 15  # פחד קיצוני = הזדמנות קנייה (contrarian)
+        elif _fg < 40: _s += 10
+        elif _fg < 60: _s += 6
+        elif _fg < 80: _s += 3
+        else:          _s += 1   # חמדנות קיצונית = זהירות
+
+    # DXY (דולר) 5d — מקסימום 8 נקודות (דולר חלש = חיובי למניות/זהב)
+    _dxy = data.get("dxy_trend")
+    if _dxy is not None:
+        if _dxy < -1:  _s += 8
+        elif _dxy < 0: _s += 5
+        elif _dxy < 1: _s += 3
+
+    # נפט 5d — מקסימום 6 נקודות (יציב = אידיאלי)
+    _oil = data.get("oil_trend")
+    if _oil is not None:
+        if -3 < _oil < 3:  _s += 6   # יציב
+        elif -6 < _oil < 6: _s += 3  # תנודתי מתון
+        # חריג מעלה או מטה = לחץ אינפלציוני / חשש מיתון
+
+    # Bitcoin 5d — מקסימום 5 נקודות (BTC עולה = risk-on)
+    _btc = data.get("btc_trend")
+    if _btc is not None:
+        if _btc > 5:    _s += 5
+        elif _btc > 0:  _s += 3
+        elif _btc > -5: _s += 1
+
+    return min(100, _s)
 
 
 def _rule_based_market_analysis(data: dict) -> dict:
@@ -4164,28 +4263,73 @@ def render_market_pulse_banner() -> None:
         # ── Metrics ─────────────────────────────────────────────────────
         _vix = _data.get("vix")
         _spy = _data.get("spy_trend")
+        _qqq = _data.get("qqq_trend")
         _yld = _data.get("yield_10y")
         _gld = _data.get("gold_trend")
         _fg  = _data.get("fear_greed")
         _fg_label_en = _data.get("fear_greed_label", "")
+        _dxy_val   = _data.get("dxy_val")
+        _dxy_trend = _data.get("dxy_trend")
+        _oil_val   = _data.get("oil_val")
+        _oil_trend = _data.get("oil_trend")
+        _btc_trend = _data.get("btc_trend")
 
         _fg_he = {
             "Extreme Fear": "פחד קיצוני", "Fear": "פחד",
             "Neutral": "ניטרלי", "Greed": "חמדנות", "Extreme Greed": "חמדנות קיצונית",
         }.get(_fg_label_en, _fg_label_en)
 
+        def _tc(v, up_good=True):
+            """צבע לפי כיוון."""
+            if v is None: return "mpt-gray"
+            if up_good:   return "mpt-green" if v > 0 else ("mpt-red" if v < 0 else "mpt-gray")
+            else:         return "mpt-red" if v > 0 else ("mpt-green" if v < 0 else "mpt-gray")
+
+        def _arrow(v):
+            if v is None or v == 0: return "יציב"
+            return f"{'↑' if v > 0 else '↓'} {abs(v):.1f}%"
+
         _vix_cls = "mpt-green" if _vix and _vix < 20 else ("mpt-yellow" if _vix and _vix < 30 else "mpt-red")
-        _vix_sub = "נמוך ✓" if _vix and _vix < 20 else ("מוגבר" if _vix and _vix < 30 else "פחד ✗")
-        _spy_cls = "mpt-green" if _spy and _spy > 0 else ("mpt-red" if _spy and _spy < 0 else "mpt-gray")
-        _spy_sub = ("עולה ↑" if _spy and _spy > 0 else ("יורד ↓" if _spy and _spy < 0 else "יציב")) if _spy is not None else "—"
-        _spy_sub_cls = _spy_cls
+        _vix_sub = "נמוך ✓" if _vix and _vix < 20 else ("מוגבר" if _vix and _vix < 30 else "גבוה ✗")
         _yld_cls = "mpt-red" if _yld and _yld > 4.5 else ("mpt-yellow" if _yld and _yld > 4.0 else "mpt-green")
         _yld_sub = "גבוה — לחץ" if _yld and _yld > 4.5 else ("מוגבר" if _yld and _yld > 4.0 else "מתון ✓")
-        _gld_cls = "mpt-yellow" if _gld and _gld > 1 else ("mpt-green" if _gld and _gld < -1 else "mpt-gray")
-        _gld_sub = "מקלט בטוח 🛡" if _gld and _gld > 1 else ("ירידה" if _gld and _gld < -1 else "יציב")
+        _gld_cls = "mpt-yellow" if _gld and _gld > 1 else ("mpt-green" if _gld and _gld is not None and _gld < -1 else "mpt-gray")
+        _gld_sub = "מקלט בטוח 🛡" if _gld and _gld > 1 else ("ירידה — risk-on" if _gld is not None and _gld < -1 else "יציב")
         _fg_cls  = "mpt-green" if _fg and _fg < 30 else ("mpt-red" if _fg and _fg > 70 else "mpt-yellow")
+        # DXY — דולר חלש = חיובי למניות
+        _dxy_cls = _tc(_dxy_trend, up_good=False)
+        _dxy_sub = ("חלש — חיובי ✓" if _dxy_trend and _dxy_trend < -0.5
+                    else ("חזק — לחץ" if _dxy_trend and _dxy_trend > 0.5 else "יציב"))
+        # נפט — יציבות = טוב, קיצוניות = לחץ
+        _oil_cls = ("mpt-yellow" if _oil_trend and abs(_oil_trend) > 5
+                    else ("mpt-green" if _oil_trend is not None and abs(_oil_trend) <= 3 else "mpt-gray"))
+        _oil_sub = ("קפיצה — לחץ אינפלציוני" if _oil_trend and _oil_trend > 5
+                    else ("צניחה — חשש מיתון" if _oil_trend and _oil_trend < -5
+                    else ("יציב ✓" if _oil_trend is not None else "—")))
+        # BTC — עולה = risk-on
+        _btc_cls = _tc(_btc_trend, up_good=True)
+        _btc_sub = ("risk-on ↑" if _btc_trend and _btc_trend > 3
+                    else ("risk-off ↓" if _btc_trend and _btc_trend < -3 else "ניטרלי"))
+
+        # ── Pulse Score ──────────────────────────────────────────────────
+        _pulse = _compute_pulse_score(_data)
+        _p_color = "#22c55e" if _pulse >= 65 else ("#f59e0b" if _pulse >= 40 else "#ef4444")
+        _p_label = "סביבת השקעה חיובית" if _pulse >= 65 else ("זהירות — סלקטיבי" if _pulse >= 40 else "סביבה מאתגרת")
 
         _metrics_html = f"""
+        <div style="display:flex;align-items:center;justify-content:space-between;
+                    margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-size:36px;font-weight:800;color:{_p_color};
+                        font-family:'JetBrains Mono',monospace;line-height:1">{_pulse}</div>
+            <div>
+              <div style="font-size:10px;color:#64748b;letter-spacing:1.5px;
+                          text-transform:uppercase;font-weight:700">ציון שוק</div>
+              <div style="font-size:13px;color:{_p_color};font-weight:600">{_p_label}</div>
+            </div>
+          </div>
+          <div style="font-size:10px;color:#475569">📊 ניתוח אלגוריתמי · 9 מדדים טכניים</div>
+        </div>
         <div class="mkt-pulse-metrics">
           <div class="mkt-pulse-metric">
             <div class="mkt-pulse-metric-label">VIX — פחד שוק</div>
@@ -4194,11 +4338,16 @@ def render_market_pulse_banner() -> None:
           </div>
           <div class="mkt-pulse-metric">
             <div class="mkt-pulse-metric-label">S&amp;P 500 — 10 ימים</div>
-            <div class="mkt-pulse-metric-value {_spy_cls}">{f"{_spy:+.2f}%" if _spy is not None else "—"}</div>
-            <div class="mkt-pulse-metric-sub {_spy_sub_cls}">{_spy_sub}</div>
+            <div class="mkt-pulse-metric-value {_tc(_spy)}">{f"{_spy:+.2f}%" if _spy is not None else "—"}</div>
+            <div class="mkt-pulse-metric-sub {_tc(_spy)}">{_arrow(_spy) if _spy is not None else "—"}</div>
           </div>
           <div class="mkt-pulse-metric">
-            <div class="mkt-pulse-metric-label">תשואה — 10 שנים</div>
+            <div class="mkt-pulse-metric-label">נאסד"ק — 10 ימים</div>
+            <div class="mkt-pulse-metric-value {_tc(_qqq)}">{f"{_qqq:+.2f}%" if _qqq is not None else "—"}</div>
+            <div class="mkt-pulse-metric-sub {_tc(_qqq)}">{_arrow(_qqq) if _qqq is not None else "—"}</div>
+          </div>
+          <div class="mkt-pulse-metric">
+            <div class="mkt-pulse-metric-label">תשואת אג"ח 10Y</div>
             <div class="mkt-pulse-metric-value {_yld_cls}">{f"{_yld:.2f}%" if _yld else "—"}</div>
             <div class="mkt-pulse-metric-sub {_yld_cls}">{_yld_sub if _yld else "—"}</div>
           </div>
@@ -4211,6 +4360,21 @@ def render_market_pulse_banner() -> None:
             <div class="mkt-pulse-metric-label">פחד וחמדנות</div>
             <div class="mkt-pulse-metric-value {_fg_cls}">{str(_fg) if _fg else "—"}</div>
             <div class="mkt-pulse-metric-sub {_fg_cls}">{_fg_he if _fg else "—"}</div>
+          </div>
+          <div class="mkt-pulse-metric">
+            <div class="mkt-pulse-metric-label">דולר (DXY) — 5 ימים</div>
+            <div class="mkt-pulse-metric-value {_dxy_cls}">{f"{_dxy_val:.1f}" if _dxy_val else "—"}</div>
+            <div class="mkt-pulse-metric-sub {_dxy_cls}">{f"{_dxy_trend:+.2f}% " if _dxy_trend is not None else ""}{_dxy_sub if _dxy_val else "—"}</div>
+          </div>
+          <div class="mkt-pulse-metric">
+            <div class="mkt-pulse-metric-label">נפט גולמי — 5 ימים</div>
+            <div class="mkt-pulse-metric-value {_oil_cls}">{f"${_oil_val:.1f}" if _oil_val else "—"}</div>
+            <div class="mkt-pulse-metric-sub {_oil_cls}">{f"{_oil_trend:+.2f}% " if _oil_trend is not None else ""}{_oil_sub if _oil_val else "—"}</div>
+          </div>
+          <div class="mkt-pulse-metric">
+            <div class="mkt-pulse-metric-label">Bitcoin — 5 ימים</div>
+            <div class="mkt-pulse-metric-value {_btc_cls}">{f"{_btc_trend:+.2f}%" if _btc_trend is not None else "—"}</div>
+            <div class="mkt-pulse-metric-sub {_btc_cls}">{_btc_sub if _btc_trend is not None else "—"}</div>
           </div>
         </div>"""
 
