@@ -3730,12 +3730,17 @@ def fetch_market_pulse_data() -> dict | None:
                 / _gld_h["Close"].iloc[-5] * 100, 2)
         _time.sleep(0.3)
 
-        _dxy_h = yf.Ticker("^DXY").history(period="10d")
-        if not _dxy_h.empty and len(_dxy_h) >= 5:
-            result["dxy_val"]   = round(float(_dxy_h["Close"].iloc[-1]), 1)
-            result["dxy_trend"] = round(
-                (_dxy_h["Close"].iloc[-1] - _dxy_h["Close"].iloc[-5])
-                / _dxy_h["Close"].iloc[-5] * 100, 2)
+        for _dxy_tk in ("DX-Y.NYB", "^DXY", "UUP"):
+            try:
+                _dxy_h = yf.Ticker(_dxy_tk).history(period="1mo")
+                if not _dxy_h.empty and len(_dxy_h) >= 5:
+                    result["dxy_val"]   = round(float(_dxy_h["Close"].iloc[-1]), 1)
+                    result["dxy_trend"] = round(
+                        (_dxy_h["Close"].iloc[-1] - _dxy_h["Close"].iloc[-5])
+                        / _dxy_h["Close"].iloc[-5] * 100, 2)
+                    break
+            except Exception:
+                pass
         _time.sleep(0.3)
 
         _oil_h = yf.Ticker("CL=F").history(period="10d")
