@@ -665,124 +665,142 @@ def inject_css() -> None:
     /* ══════════════════════════════════════════════════════════════
        Market Pulse Terminal — Glassmorphism Dark Theme
     ══════════════════════════════════════════════════════════════ */
-    /* ── Market Pulse — Deep Midnight Blue Glassmorphism ── */
+    /* ── Market Pulse — Softer Institutional Theme ─────────────────────
+       All rules are scoped to .mkt-pulse-* so they cannot leak into the
+       rest of the app.
+    ───────────────────────────────────────────────────────────────────── */
+
+    /* Container */
     .mkt-pulse-wrap{
       direction:rtl;text-align:right;
-      background:linear-gradient(135deg,rgba(16,16,35,0.95),rgba(11,11,26,0.98));
-      backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-      border-radius:20px;
-      border:1px solid rgba(255,255,255,0.08);
-      padding:24px 28px 20px;margin:4px 0 6px;
-      box-shadow:0 8px 48px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,0.04);
-      transition:border-color .35s,box-shadow .35s
-    }
-    .mkt-pulse-bullish{
-      border-color:rgba(34,197,94,.35)!important;
-      box-shadow:0 0 32px rgba(34,197,94,.08),0 8px 48px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,0.04)!important
-    }
-    .mkt-pulse-cautious{
-      border-color:rgba(255,255,255,0.08)!important;
-      box-shadow:0 8px 48px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,0.04)!important
-    }
-    .mkt-pulse-avoid{
-      border-color:rgba(239,68,68,.35)!important;
-      box-shadow:0 0 32px rgba(239,68,68,.08),0 8px 48px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,0.04)!important
+      background:linear-gradient(180deg,rgba(30,41,59,0.85) 0%,rgba(22,30,46,0.85) 100%);
+      backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,0.10);
+      padding:22px 26px 18px;margin:4px 0 6px;
+      box-shadow:0 10px 25px -5px rgba(0,0,0,0.30);
+      position:relative;overflow:hidden;
+      transition:border-top-color .3s
     }
 
-    .mkt-pulse-header{
-      display:flex;align-items:center;justify-content:space-between;
-      margin-bottom:20px;flex-wrap:wrap;gap:10px
+    /* Verdict accent — 3 px top stripe only, no neon frame */
+    .mkt-pulse-wrap::before{
+      content:'';position:absolute;top:0;left:0;right:0;height:3px;
+      border-radius:16px 16px 0 0;
+      background:rgba(100,116,139,0.5);        /* neutral default */
+      transition:background .3s
     }
-    .mkt-pulse-verdict-pill{
-      display:inline-flex;align-items:center;gap:7px;
-      padding:6px 16px;border-radius:50px;
-      font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;
-      letter-spacing:.6px
+    .mkt-pulse-bullish::before{background:#22c55e}
+    .mkt-pulse-cautious::before{background:#f59e0b}
+    .mkt-pulse-avoid::before{background:#ef4444}
+
+    /* No per-verdict border or glow changes — keep container identical */
+    .mkt-pulse-bullish,.mkt-pulse-cautious,.mkt-pulse-avoid{
+      border-color:rgba(255,255,255,0.10)!important;
+      box-shadow:0 10px 25px -5px rgba(0,0,0,0.30)!important
     }
-    .mkt-pulse-score-box{text-align:left;direction:ltr}
-    .mkt-pulse-score-lbl{font-size:9px;font-weight:700;color:#e0e0e0;letter-spacing:1.4px;text-transform:uppercase;margin-bottom:3px}
+
+    /* Score / label row (inline HTML — these classes are helpers) */
+    .mkt-pulse-score-lbl{
+      font-size:9px;font-weight:700;color:#94a3b8;
+      letter-spacing:1.4px;text-transform:uppercase;margin-bottom:3px
+    }
     .mkt-pulse-score-val{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700}
-    .mkt-pulse-score-max{font-size:11px;color:#94a3b8}
+    .mkt-pulse-score-max{font-size:11px;color:#64748b}
 
+    /* Metric grid */
     .mkt-pulse-metrics{
-      display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px
+      display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px
     }
+
+    /* Individual card — slightly lighter than the container for hierarchy */
     .mkt-pulse-metric{
-      background:rgba(16,16,35,0.7);
-      border:1px solid rgba(255,255,255,0.06);
-      border-radius:13px;padding:13px 10px 11px;text-align:center;
-      transition:border-color .2s,background .2s
+      background:rgba(255,255,255,0.03);
+      border:1px solid rgba(255,255,255,0.07);
+      border-radius:10px;padding:12px 8px 10px;text-align:center;
+      transition:background .2s,border-color .2s
     }
     .mkt-pulse-metric:hover{
-      background:rgba(22,22,48,0.85);
-      border-color:rgba(255,255,255,0.12)
+      background:rgba(255,255,255,0.06);
+      border-color:rgba(255,255,255,0.13)
     }
     .mkt-pulse-metric-label{
-      font-size:9px;font-weight:700;color:#e0e0e0;
-      letter-spacing:1.3px;text-transform:uppercase;margin-bottom:7px
+      font-size:9px;font-weight:600;color:#94a3b8;
+      letter-spacing:1.1px;text-transform:uppercase;margin-bottom:6px
     }
     .mkt-pulse-metric-value{
-      font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;
-      color:#f0f4f8;line-height:1.1
+      font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;
+      color:#e2e8f0;line-height:1.15
     }
-    .mkt-pulse-metric-sub{font-size:10px;font-weight:600;margin-top:5px;color:#e0e0e0}
-    .mpt-green{color:#22c55e!important}.mpt-yellow{color:#f59e0b!important}
-    .mpt-red{color:#ef4444!important}.mpt-gray{color:#94a3b8!important}
+    .mkt-pulse-metric-sub{font-size:10px;font-weight:500;margin-top:4px;color:#94a3b8}
 
+    /* Data-point accent colours — scoped inside banner */
+    .mkt-pulse-wrap .mpt-green{color:#4ade80!important}
+    .mkt-pulse-wrap .mpt-yellow{color:#fbbf24!important}
+    .mkt-pulse-wrap .mpt-red{color:#f87171!important}
+    .mkt-pulse-wrap .mpt-gray{color:#64748b!important}
+
+    /* Global fallback (outside wrap) — keep existing behaviour */
+    .mpt-green{color:#22c55e}.mpt-yellow{color:#f59e0b}
+    .mpt-red{color:#ef4444}.mpt-gray{color:#475569}
+
+    /* Divider */
     .mkt-pulse-divider{
-      height:1px;background:rgba(255,255,255,0.06);margin:4px 0 16px
-    }
-    .mkt-pulse-analysis{
-      color:#e0e0e0;font-size:13px;line-height:1.8;margin-bottom:16px;
-      padding:14px 16px;background:rgba(11,11,26,0.6);border-radius:10px;
-      border-right:3px solid rgba(99,102,241,.5)
+      height:1px;background:rgba(255,255,255,0.06);margin:2px 0 14px
     }
 
+    /* Analysis block (kept for possible future re-enable) */
+    .mkt-pulse-analysis{
+      color:#cbd5e1;font-size:13px;line-height:1.8;margin-bottom:16px;
+      padding:12px 14px;
+      background:rgba(255,255,255,0.03);
+      border-radius:8px;border-right:3px solid rgba(99,102,241,.4)
+    }
+
+    /* Executive cards (kept for possible future re-enable) */
     .mkt-pulse-exec-grid{
       display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px
     }
     .mkt-pulse-exec-card{
-      background:rgba(11,11,26,0.7);
-      border:1px solid rgba(255,255,255,0.06);border-radius:13px;
-      padding:14px 14px 12px;position:relative;overflow:hidden
+      background:rgba(255,255,255,0.03);
+      border:1px solid rgba(255,255,255,0.07);border-radius:10px;
+      padding:12px 12px 10px;position:relative;overflow:hidden
     }
     .mkt-pulse-exec-card::before{
-      content:'';position:absolute;top:0;right:0;left:0;height:2px;border-radius:13px 13px 0 0
+      content:'';position:absolute;top:0;right:0;left:0;height:2px
     }
-    .mkt-pulse-exec-geo::before{background:linear-gradient(90deg,#ef4444,#f97316)}
-    .mkt-pulse-exec-opp::before{background:linear-gradient(90deg,#22c55e,#10b981)}
-    .mkt-pulse-exec-watch::before{background:linear-gradient(90deg,#6366f1,#8b5cf6)}
-    .mkt-pulse-exec-icon{font-size:15px;margin-bottom:7px;display:block}
+    .mkt-pulse-exec-geo::before{background:linear-gradient(90deg,#f87171,#fb923c)}
+    .mkt-pulse-exec-opp::before{background:linear-gradient(90deg,#4ade80,#34d399)}
+    .mkt-pulse-exec-watch::before{background:linear-gradient(90deg,#818cf8,#a78bfa)}
+    .mkt-pulse-exec-icon{font-size:14px;margin-bottom:6px;display:block}
     .mkt-pulse-exec-label{
-      font-size:9px;font-weight:700;color:#e0e0e0;
-      letter-spacing:1.2px;text-transform:uppercase;margin-bottom:7px
+      font-size:9px;font-weight:600;color:#94a3b8;
+      letter-spacing:1.1px;text-transform:uppercase;margin-bottom:6px
     }
-    .mkt-pulse-exec-text{font-size:12px;color:#e0e0e0;line-height:1.65}
+    .mkt-pulse-exec-text{font-size:12px;color:#cbd5e1;line-height:1.6}
 
+    /* Source badge */
     .mkt-pulse-src-badge{
       display:inline-flex;align-items:center;gap:4px;
       padding:3px 10px;border-radius:20px;font-size:9px;
       font-weight:700;letter-spacing:.8px;text-transform:uppercase
     }
-    .mkt-pulse-src-groq{
-      background:rgba(16,185,129,.15);color:#34d399;
-      border:1px solid rgba(16,185,129,.3)
-    }
-    .mkt-pulse-src-claude{
-      background:rgba(99,102,241,.15);color:#a5b4fc;
-      border:1px solid rgba(99,102,241,.3)
-    }
     .mkt-pulse-src-algo{
-      background:rgba(255,255,255,.06);color:#e0e0e0;
-      border:1px solid rgba(255,255,255,.1)
+      background:rgba(255,255,255,0.05);color:#94a3b8;
+      border:1px solid rgba(255,255,255,0.10)
     }
 
+    /* Footer */
     .mkt-pulse-footer{
       display:flex;justify-content:space-between;align-items:center;
-      font-size:10px;color:#94a3b8;font-family:'JetBrains Mono',monospace;
-      margin-top:6px;flex-direction:row-reverse
+      font-size:10px;color:#475569;font-family:'JetBrains Mono',monospace;
+      margin-top:4px;flex-direction:row-reverse
     }
 
+    /* Responsive */
+    @media(max-width:900px){
+      .mkt-pulse-metrics{grid-template-columns:repeat(3,1fr)}
+    }
     @media(max-width:768px){
       .mkt-pulse-metrics{grid-template-columns:repeat(3,1fr)}
       .mkt-pulse-exec-grid{grid-template-columns:1fr}
@@ -4252,8 +4270,8 @@ def render_market_pulse_banner() -> None:
         _hdr_col, _btn_col = st.columns([10, 1])
         with _hdr_col:
             st.markdown(
-                '<p style="margin:0;font-size:10px;color:#e0e0e0;letter-spacing:1.8px;'
-                'text-transform:uppercase;font-weight:700;font-family:\'JetBrains Mono\',monospace">'
+                '<p style="margin:0;font-size:10px;color:#64748b;letter-spacing:1.8px;'
+                'text-transform:uppercase;font-weight:600;font-family:\'JetBrains Mono\',monospace">'
                 'SOVEREIGN MARKET INTELLIGENCE · עדכון שעתי אוטומטי</p>',
                 unsafe_allow_html=True,
             )
@@ -4326,8 +4344,9 @@ def render_market_pulse_banner() -> None:
 
         # ── Pulse Score ──────────────────────────────────────────────────
         _pulse = _compute_pulse_score(_data)
-        _p_color = "#22c55e" if _pulse >= 65 else ("#f59e0b" if _pulse >= 40 else "#ef4444")
-        _p_label = "סביבת השקעה חיובית" if _pulse >= 65 else ("זהירות — סלקטיבי" if _pulse >= 40 else "סביבה מאתגרת")
+        _p_color  = "#4ade80" if _pulse >= 65 else ("#fbbf24" if _pulse >= 40 else "#f87171")
+        _p_label  = "סביבת השקעה חיובית" if _pulse >= 65 else ("זהירות — הישאר סלקטיבי" if _pulse >= 40 else "סביבה מאתגרת")
+        _p_vclass = "mkt-pulse-bullish" if _pulse >= 65 else ("mkt-pulse-cautious" if _pulse >= 40 else "mkt-pulse-avoid")
 
         _metrics_html = f"""
         <div style="display:flex;align-items:center;justify-content:space-between;
@@ -4336,12 +4355,12 @@ def render_market_pulse_banner() -> None:
             <div style="font-size:36px;font-weight:800;color:{_p_color};
                         font-family:'JetBrains Mono',monospace;line-height:1">{_pulse}</div>
             <div>
-              <div style="font-size:10px;color:#e0e0e0;letter-spacing:1.5px;
-                          text-transform:uppercase;font-weight:700">ציון שוק</div>
+              <div style="font-size:10px;color:#94a3b8;letter-spacing:1.5px;
+                          text-transform:uppercase;font-weight:600">ציון שוק</div>
               <div style="font-size:13px;color:{_p_color};font-weight:600">{_p_label}</div>
             </div>
           </div>
-          <div style="font-size:10px;color:#e0e0e0;letter-spacing:.8px">📊 ניתוח אלגוריתמי · 9 מדדים טכניים</div>
+          <div style="font-size:10px;color:#64748b;letter-spacing:.8px;font-family:'JetBrains Mono',monospace">📊 ניתוח אלגוריתמי · 9 מדדים טכניים</div>
         </div>
         <div class="mkt-pulse-metrics">
           <div class="mkt-pulse-metric">
@@ -4394,7 +4413,7 @@ def render_market_pulse_banner() -> None:
         _fetched = _data.get("fetched_at", "")[:16].replace("T", " ")
 
         st.markdown(f"""
-        <div class="mkt-pulse-wrap mkt-pulse-cautious">
+        <div class="mkt-pulse-wrap {_p_vclass}">
           {_metrics_html}
           <div class="mkt-pulse-footer">
             <span>⚠️ לא ייעוץ פיננסי — לצורכי מידע בלבד</span>
