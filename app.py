@@ -3934,29 +3934,38 @@ def _rule_based_market_analysis(data: dict) -> dict:
     _geo_details_pool = []
     _risks_lower = " ".join(_found_risks).lower() + " " + _all_heads_lower
 
-    if any(k in _risks_lower for k in ("ukraine", "russia", "אוקראינה", "רוסיה")):
+    # זיהוי הפסקת אש / הסכם — גובר על תרחישי עימות
+    _has_ceasefire = any(k in _risks_lower for k in ("ceasefire", "peace deal", "truce", "הפסקת אש", "הסכם שלום"))
+    _has_israel_iran = any(k in _risks_lower for k in ("iran", "israel", "hezbollah", "hamas", "איראן", "ישראל"))
+    _has_ukraine = any(k in _risks_lower for k in ("ukraine", "russia", "אוקראינה", "רוסיה"))
+    _has_china = any(k in _risks_lower for k in ("china", "tariff", "taiwan", "סין", "מכסים"))
+
+    if _has_ceasefire and (_has_israel_iran or _has_ukraine):
+        # הפסקת אש מזוהה → מציג הפחתת סיכון, לא הסלמה
         _geo_details_pool.append(
-            "מלחמת רוסיה-אוקראינה לוחצת על מחירי האנרגיה באירופה ועל שרשרת האספקה של חיטה ודשנים — "
-            "מה שמוסיף לאינפלציה הגלובלית. מניות ביטחון (Lockheed, RTX, Rheinmetall) נהנות מגידול בתקציבי הגנה של נאט\"ו. "
-            "הנפט מושפע מהסנקציות על הייצוא הרוסי — עלייה במחירו תלחץ על הצרכן ותאט את הצמיחה."
+            "הפסקת אש / הסכם מזוהה בכותרות — פרמיית הסיכון הגיאופוליטי יורדת. "
+            "תרחיש זה מוביל לירידה במחירי הזהב והנפט ולעלייה בתיאבון הסיכון (Risk-On). "
+            "מניות ביטחון (RTX, LMT) עלולות להיחלש; שווקים מתעוררים, טכנולוגיה ואנרגיה מתחדשת יכולים להרוויח."
         )
-    if any(k in _risks_lower for k in ("iran", "israel", "hezbollah", "hamas", "איראן", "ישראל")):
-        _geo_details_pool.append(
-            "המתיחות בין ישראל/ארה\"ב לאיראן מציבה סיכון למיצר הורמוז — דרכו עובר כ-20% מסחר הנפט הגלובלי. "
-            "סגירה חלקית עלולה לשגר את מחיר הנפט מעל $120 לחבית ולגרום לשוק ל-Risk-Off חריף. "
-            "הזהב והדולר מתחזקים בתרחיש זה; מניות טכנולוגיה וצמיחה הן הפגיעות ביותר."
-        )
-    if any(k in _risks_lower for k in ("china", "tariff", "taiwan", "סין", "מכסים")):
+    else:
+        if _has_ukraine:
+            _geo_details_pool.append(
+                "מלחמת רוסיה-אוקראינה לוחצת על מחירי האנרגיה באירופה ועל שרשרת האספקה של חיטה ודשנים — "
+                "מה שמוסיף לאינפלציה הגלובלית. מניות ביטחון (Lockheed, RTX, Rheinmetall) נהנות מגידול בתקציבי הגנה. "
+                "הנפט מושפע מהסנקציות על הייצוא הרוסי."
+            )
+        if _has_israel_iran:
+            _geo_details_pool.append(
+                "המתיחות בין ישראל/ארה\"ב לאיראן מציבה סיכון למיצר הורמוז — דרכו עובר כ-20% מסחר הנפט הגלובלי. "
+                "סגירה חלקית עלולה לשגר את מחיר הנפט מעל $120 לחבית ולגרום לשוק ל-Risk-Off חריף. "
+                "הזהב והדולר מתחזקים בתרחיש זה; מניות טכנולוגיה וצמיחה הן הפגיעות ביותר."
+            )
+
+    if _has_china:
         _geo_details_pool.append(
             "מלחמת הסחר סין-ארה\"ב פוגעת בשרשרת האספקה של מוליכים למחצה. "
             "חברות כמו Apple, NVIDIA ו-TSMC חשופות לסיכון שיבוש ייצור. "
             "יצרנים אמריקאים עשויים להרוויח מהעברת ייצור חזרה לארה\"ב (Reshoring)."
-        )
-    if any(k in _risks_lower for k in ("ceasefire", "peace", "deal", "הפסקת אש", "הסכם")):
-        _geo_details_pool.append(
-            "הפסקת אש או הסכם עשויים להפחית את פרמיית הסיכון הגיאופוליטי — "
-            "מה שעלול להוביל לירידה במחירי הזהב והנפט ולעלייה בתיאבון הסיכון. "
-            "מניות הביטחון עלולות להיחלש בתרחיש שלום; שווקים מתעוררים יכולים להרוויח."
         )
 
     if _geo_details_pool:
