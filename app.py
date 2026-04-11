@@ -1924,30 +1924,50 @@ def _supabase_save_tg_db(db: dict) -> bool:
             return False
         _to_save = {k: v for k, v in db.items() if not k.startswith("_last_")}
 
-        # הגן על פורטפוליו: אם יש רשומות ללא portfolio — השלם מהגרסה הנוכחית ב-Supabase לפני שנדרוס
-        _regs_missing = [p for p, r in _to_save.get("registrations", {}).items() if r.get("portfolio") is None]
-        if _regs_missing:
-            try:
-                _curr_r = _req.get(
-                    f"{url}/rest/v1/ticker_cache",
-                    params={"ticker": "eq._tg_db", "select": "data",
-                            "order": "cached_at.desc", "limit": "1"},
-                    headers={"apikey": key, "Authorization": f"Bearer {key}"},
-                    timeout=4,
-                )
-                if _curr_r.status_code == 200 and _curr_r.json():
-                    _curr = _curr_r.json()[0]["data"]
-                    if isinstance(_curr, dict):
-                        for _p in _regs_missing:
-                            _saved_portfolio = _curr.get("registrations", {}).get(_p, {}).get("portfolio")
-                            if _saved_portfolio:
-                                _to_save["registrations"][_p]["portfolio"] = _saved_portfolio
+        # ── הגנת registrations: קרא את הגרסה הקיימת ב-Supabase תמיד ─────────
+        # מונע 2 תרחישים הרסניים:
+        # 1. _to_save ריק מרישומים (Supabase timeout בהפעלה) — לא לדרוס registrations קיימות
+        # 2. רישום קיים ללא portfolio (לאחר רישום מחדש) — להשלים portfolio מגיבוי
+        try:
+            _curr_r = _req.get(
+                f"{url}/rest/v1/ticker_cache",
+                params={"ticker": "eq._tg_db", "select": "data",
+                        "order": "cached_at.desc", "limit": "1"},
+                headers={"apikey": key, "Authorization": f"Bearer {key}"},
+                timeout=4,
+            )
+            if _curr_r.status_code == 200 and _curr_r.json():
+                _curr = _curr_r.json()[0]["data"]
+                if isinstance(_curr, dict):
+                    _curr_regs = _curr.get("registrations", {})
+                    _new_regs  = _to_save.setdefault("registrations", {})
+
+                    # א. אם _to_save ריק לחלוטין — השתמש ב-registrations מ-Supabase
+                    if not _new_regs and _curr_regs:
+                        _to_save["registrations"] = _curr_regs
+                        # גם alerts/score_alerts — אל תדרוס נתונים קיימים ריק
+                        if not _to_save.get("alerts") and _curr.get("alerts"):
+                            _to_save["alerts"] = _curr["alerts"]
+                        if not _to_save.get("score_alerts") and _curr.get("score_alerts"):
+                            _to_save["score_alerts"] = _curr["score_alerts"]
+                        print("[INFO] _supabase_save_tg_db: DB ריק — שוחזרו registrations מ-Supabase")
+
+                    # ב. השלמת portfolio חסר לכל רישום קיים
+                    for _p, _p_curr in _curr_regs.items():
+                        if _p in _to_save["registrations"]:
+                            if not _to_save["registrations"][_p].get("portfolio") and _p_curr.get("portfolio"):
+                                _to_save["registrations"][_p]["portfolio"] = _p_curr["portfolio"]
                                 print(f"[INFO] _supabase_save_tg_db: שוחזר פורטפוליו עבור {_p}")
-            except Exception as _pe:
-                print(f"[WARNING] _supabase_save_tg_db: קריאת הגנה נכשלה: {_pe}")
+                        else:
+                            # רישום קיים ב-Supabase אך חסר ב-_to_save — הוסף אותו
+                            _to_save["registrations"][_p] = _p_curr
+                            print(f"[INFO] _supabase_save_tg_db: שוחזר רישום חסר עבור {_p}")
+        except Exception as _pe:
+            print(f"[WARNING] _supabase_save_tg_db: קריאת הגנה נכשלה: {_pe}")
 
         _payload = {"ticker": "_tg_db", "data": _to_save,
                     "cached_at": datetime.utcnow().isoformat()}
+
         # נסה upsert עם on_conflict (דורש UNIQUE constraint על ticker)
         r = _req.post(
             f"{url}/rest/v1/ticker_cache?on_conflict=ticker",
@@ -1957,17 +1977,9 @@ def _supabase_save_tg_db(db: dict) -> bool:
             timeout=4,
         )
         if not r.ok:
-            # fallback: אם אין UNIQUE constraint — DELETE + INSERT
-            print(f"[INFO] _supabase_save_tg_db: on_conflict failed ({r.status_code}), trying DELETE+INSERT")
-            try:
-                _req.delete(
-                    f"{url}/rest/v1/ticker_cache",
-                    params={"ticker": "eq._tg_db"},
-                    headers={"apikey": key, "Authorization": f"Bearer {key}"},
-                    timeout=4,
-                )
-            except Exception:
-                pass
+            # fallback בטוח: INSERT בלבד (ללא DELETE) — הקריאה תמיד שולפת ORDER BY cached_at DESC
+            # כך שהשורה החדשה תנצח, אבל הישנה נשארת כגיבוי במקרה שה-INSERT ייכשל
+            print(f"[INFO] _supabase_save_tg_db: on_conflict failed ({r.status_code}), trying safe INSERT")
             r = _req.post(
                 f"{url}/rest/v1/ticker_cache",
                 json=_payload,
@@ -2039,10 +2051,24 @@ def _load_alerts_db() -> dict:
     for k, v in _defaults.items():
         data.setdefault(k, v)
 
-    # שחזור per-user per-type: בדוק כל סוג התראה בנפרד — מחיר וציון
-    # (תנאי "שניהם חסרים" היה גורם לאי-שחזור אם רק סוג אחד חסר)
-    for _rnorm in list(data.get("registrations", {}).keys()):
+    # שחזור per-user: התראות + פורטפוליו — בדוק כל סוג בנפרד
+    _needs_resave = False
+    for _rnorm, _rreg in list(data.get("registrations", {}).items()):
         try:
+            # א. שחזור פורטפוליו חסר — user_portfolios → _portfolio_{norm}
+            if not _rreg.get("portfolio"):
+                _port_bk = (
+                    _supabase_load_portfolio(_rnorm)
+                    or _supabase_load_portfolio_cache(_rnorm)
+                )
+                if _port_bk:
+                    data["registrations"][_rnorm]["portfolio"] = _port_bk
+                    _needs_resave = True
+                    print(f"[INFO] _load_alerts_db: שוחזר פורטפוליו עבור {_rnorm}")
+        except Exception:
+            pass
+        try:
+            # ב. שחזור התראות חסרות — _ualerts_{norm}
             _has_price = any(a.get("phone") == _rnorm for a in data.get("alerts", []))
             _has_score = any(a.get("phone") == _rnorm for a in data.get("score_alerts", []))
             if not _has_price or not _has_score:
@@ -2056,6 +2082,15 @@ def _load_alerts_db() -> dict:
                         _sa = _bk.get("score_alerts") or []
                         if _sa:
                             data["score_alerts"].extend(_sa)
+        except Exception:
+            pass
+
+    # אם שוחזר פורטפוליו — שמור מיד חזרה ל-_tg_db כדי שהפעם הבאה יהיה שם
+    if _needs_resave and not _in_bg:
+        try:
+            import threading as _thr3
+            _thr3.Thread(target=_save_alerts_db, args=(data,), daemon=True,
+                         name="portfolio-resave").start()
         except Exception:
             pass
 
@@ -2160,18 +2195,45 @@ def _poll_telegram_registrations() -> int:
                     # קיים ב-Supabase — שחזר רישום מלא (עם portfolio), רק רענן chat_id
                     db["registrations"][norm] = {**_sb_existing, "chat_id": chat_id}
                 else:
-                    # רישום חדש באמת
+                    # רישום חדש — בנה בסיס ונסה לשחזר פורטפוליו מכל שכבות הגיבוי
                     db["registrations"][norm] = {
                         "chat_id": chat_id,
                         "registered_at": datetime.now().isoformat(timespec="seconds"),
                         "display_phone": m.group(1).strip(),
                     }
                 new += 1
-                # ודא שגיבוי _ualerts_{norm} קיים — מאפשר fallback ב-_is_phone_registered
+
+                # שחזור פורטפוליו: user_portfolios → _portfolio_{norm}
+                # (פועל גם אחרי רישום מחדש כשה-_tg_db נדרס)
+                if not db["registrations"][norm].get("portfolio"):
+                    try:
+                        _recovered_port = (
+                            _supabase_load_portfolio(norm)
+                            or _supabase_load_portfolio_cache(norm)
+                        )
+                        if _recovered_port:
+                            db["registrations"][norm]["portfolio"] = _recovered_port
+                            print(f"[INFO] _poll_telegram_registrations: שוחזר פורטפוליו עבור {norm}")
+                    except Exception:
+                        pass
+
+                # שחזור התרעות: _ualerts_{norm}
                 try:
-                    _pal = [a for a in db.get("alerts", []) if a.get("phone") == norm]
-                    _sal = [a for a in db.get("score_alerts", []) if a.get("phone") == norm]
-                    _supabase_save_user_alerts(norm, _pal, _sal)
+                    _bk_alerts = _supabase_load_user_alerts(norm)
+                    if _bk_alerts and isinstance(_bk_alerts, dict):
+                        _pal = _bk_alerts.get("price_alerts") or []
+                        _sal = _bk_alerts.get("score_alerts") or []
+                        existing_phones = {a.get("phone") for a in db.get("alerts", [])}
+                        if norm not in existing_phones:
+                            db.setdefault("alerts", []).extend(_pal)
+                        existing_score_phones = {a.get("phone") for a in db.get("score_alerts", [])}
+                        if norm not in existing_score_phones:
+                            db.setdefault("score_alerts", []).extend(_sal)
+                    else:
+                        # אין גיבוי — שמור גיבוי ריק כדי ש-_is_phone_registered יעבוד
+                        _pal = [a for a in db.get("alerts", []) if a.get("phone") == norm]
+                        _sal = [a for a in db.get("score_alerts", []) if a.get("phone") == norm]
+                        _supabase_save_user_alerts(norm, _pal, _sal)
                 except Exception:
                     pass
         db["_last_poll"] = datetime.now().isoformat(timespec="seconds")
