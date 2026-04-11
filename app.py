@@ -1715,6 +1715,86 @@ def fetch_news_score(ticker: str) -> float:
 
 
 # ── Quantum Scoring Engine ────────────────────────────────────────────────────
+# ── Sector-Aware Macro Overlay ────────────────────────────────────────────────
+# כותרות מאוחסנות כאן כדי ש-build_report יוכל לקרוא אחרי compute_score
+_macro_notes: dict[str, str] = {}
+
+# טיקרים ספציפיים שמסווגים ידנית (מחוץ לסקטור שלהם ב-yfinance)
+_AIRLINES_TICKERS = {"DAL","AAL","UAL","LUV","ALK","SKYW","JOBY","HA","SAVE"}
+_ROBOTICS_AI_TICKERS = {"PLTR","AI","BBAI","IONQ","SOUN","RXRX","ISRG","IRBT",
+                         "NVDA","AMD","SMCI","ARM","AIOT","RCAT","OUST","INVZ"}
+
+
+def _get_macro_overlay(ticker: str, sector: str, pulse_data: dict) -> tuple:
+    """
+    Sector-Aware Macro Overlay — מחזיר (bonus_points, note_he).
+    מיישם פרמיות/קנסות לפי מאקרו-סביבה עדכנית + סקטור.
+    """
+    if not pulse_data:
+        return 0.0, ""
+
+    _dxy_t  = pulse_data.get("dxy_trend")    # % 5d, שלילי = דולר נחלש
+    _yld_t  = pulse_data.get("yield_trend")   # % 5d, שלילי = תשואות יורדות
+    _oil_t  = pulse_data.get("oil_trend")     # % 5d, חיובי = נפט עולה
+    _pulse  = _compute_pulse_score(pulse_data)
+
+    bonus = 0.0
+    notes_he = []
+    t = (ticker or "").upper()
+    s = (sector or "").lower()
+
+    # ── Growth / Tech / AI / Robotics ────────────────────────────────────────
+    _is_tech = ("technology" in s or "software" in s or
+                "communication" in s or t in _ROBOTICS_AI_TICKERS)
+    if _is_tech:
+        if (_dxy_t is not None and _dxy_t < -0.3) or (_yld_t is not None and _yld_t < -2):
+            bonus += 5.0
+            reasons = []
+            if _dxy_t is not None and _dxy_t < -0.3:
+                reasons.append(f"דולר נחלש ({_dxy_t:+.1f}%)")
+            if _yld_t is not None and _yld_t < -2:
+                reasons.append(f"תשואות יורדות ({_yld_t:+.1f}%)")
+            notes_he.append(f"ציון טכנולוגיה/AI עלה בשל סביבת מאקרו נוחה — {' ו-'.join(reasons)}")
+
+    # ── Energy / Oil & Gas ───────────────────────────────────────────────────
+    _is_energy = "energy" in s
+    if _is_energy and _oil_t is not None:
+        if _oil_t > 1.5:
+            bonus += 7.0
+            notes_he.append(f"ציון אנרגיה עלה בשל עלייה במחיר הנפט ({_oil_t:+.1f}%)")
+        elif _oil_t < -1.5:
+            bonus -= 5.0
+            notes_he.append(f"ציון אנרגיה ירד בשל ירידה במחיר הנפט ({_oil_t:+.1f}%)")
+
+    # ── Aviation & Transport ─────────────────────────────────────────────────
+    _is_airline = (t in _AIRLINES_TICKERS or
+                   ("industrial" in s and t in _AIRLINES_TICKERS))
+    if _is_airline and _oil_t is not None and _oil_t > 1.5:
+        bonus -= 7.0
+        notes_he.append(f"ציון חברת תעופה ירד בשל עלייה בעלויות הדלק — נפט {_oil_t:+.1f}%")
+
+    # ── Healthcare & Pharma ──────────────────────────────────────────────────
+    _is_health = "health" in s
+    if _is_health and _pulse < 40:
+        bonus += 4.0
+        notes_he.append(f"ציון בריאות/פארמה עלה — בונוס מגן בשוק פחד (Pulse={_pulse})")
+
+    # ── Financials / Banks ───────────────────────────────────────────────────
+    _is_financial = ("financial" in s or "bank" in s)
+    if _is_financial and _yld_t is not None and _yld_t > 2:
+        bonus += 5.0
+        notes_he.append(f"ציון פיננסים עלה — תשואות גבוהות מגדילות מרווח ריבית ({_yld_t:+.1f}%)")
+
+    # ── Consumer Discretionary ───────────────────────────────────────────────
+    _is_consumer_disc = ("consumer cyclical" in s or "consumer discretionary" in s)
+    if _is_consumer_disc and _dxy_t is not None and _dxy_t < -0.3:
+        bonus += 3.0
+        notes_he.append(f"ציון צריכה מחזורית עלה — דולר חלש תומך במכירות גלובליות ({_dxy_t:+.1f}%)")
+
+    note = " | ".join(notes_he) if notes_he else ""
+    return bonus, note
+
+
 def compute_score(data: dict, tech: dict, horizon: str, use_news: bool = True) -> int:
     price   = np.float64(_safe(data["current_price"], 100.0))
     rsi     = np.float64(tech["rsi"])
@@ -1822,6 +1902,22 @@ def compute_score(data: dict, tech: dict, horizon: str, use_news: bool = True) -
             total = float(total) * (1.0 - _news_weight) + _news_raw * 100.0 * _news_weight
         except Exception:
             pass  # If news fetch fails, use base score unchanged
+
+    # ── Sector-Aware Macro Overlay ───────────────────────────────────────────
+    # רץ רק כשיש נתוני Market Pulse זמינים (לא מ-background threads)
+    try:
+        import streamlit as _st2
+        _pulse_data = _st2.session_state.get("_mkt_pulse")
+        if _pulse_data and isinstance(_pulse_data, dict):
+            _m_bonus, _m_note = _get_macro_overlay(
+                data.get("ticker", ""), data.get("sector", ""), _pulse_data)
+            if _m_bonus != 0.0:
+                total = float(total) + _m_bonus
+            _ticker_key = data.get("ticker", "")
+            if _ticker_key:
+                _macro_notes[_ticker_key] = _m_note
+    except Exception:
+        pass  # background thread או st לא זמין — דלג
 
     return int(np.clip(float(total), 1.0, 100.0))
 
@@ -3517,6 +3613,29 @@ def _row(name: str, value: str, blabel: str, bkind: str) -> str:
             f'<span class="rpt-value">{value}</span>'
             f'{_badge(blabel, bkind)}</span></div>')
 
+def _build_macro_overlay_section(ticker: str) -> str:
+    """בונה את סעיף 6 — Macro Overlay בדוח, אם יש הערת מאקרו קיימת."""
+    note = _macro_notes.get(ticker.upper(), "")
+    if not note:
+        return ""
+    items = note.split(" | ")
+    rows = "".join(
+        f'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">'
+        f'<span style="color:#f59e0b;font-size:13px;flex-shrink:0">⚡</span>'
+        f'<span style="font-size:12px;color:#cbd5e1;line-height:1.6">{item}</span>'
+        f'</div>'
+        for item in items if item.strip()
+    )
+    return (
+        f'<div class="report-section">'
+        f'<div class="report-section-title">6 — Macro Overlay'
+        f'<span style="font-size:10px;font-weight:400;color:#9ca3af;margin-right:8px">'
+        f' — השפעת מאקרו-סביבה על הציון</span></div>'
+        f'{rows}'
+        f'</div>'
+    )
+
+
 def build_report(ticker: str, data: dict, tech: dict, score: int, horizon: str) -> str:
     cname   = data["company_name"]
     price   = data["current_price"]
@@ -3690,6 +3809,7 @@ def build_report(ticker: str, data: dict, tech: dict, score: int, horizon: str) 
     <div class="report-section-title">5 — Strategic Risk Assessment</div>
     <ul class="thesis-list">{risks_html}</ul>
   </div>
+  {_build_macro_overlay_section(ticker)}
   <div class="verdict-box">
     <span class="verdict-label" style="color:{vcolor};">{verdict}</span>
     <div class="verdict-meta">Confidence: {confidence}%<br>Sovereign Score: {score} / 100<br>Horizon: {horizon}</div>
@@ -3807,8 +3927,13 @@ def fetch_market_pulse_data() -> dict | None:
                 / _qqq_h["Close"].iloc[-10] * 100, 2)
         _time.sleep(0.3)
 
-        _tnx_p = yf.Ticker("^TNX").fast_info.last_price
-        result["yield_10y"] = round(float(_tnx_p), 2) if _tnx_p else None
+        _tnx_h = yf.Ticker("^TNX").history(period="10d")
+        if not _tnx_h.empty and len(_tnx_h) >= 2:
+            result["yield_10y"] = round(float(_tnx_h["Close"].iloc[-1]), 2)
+            if len(_tnx_h) >= 5:
+                result["yield_trend"] = round(
+                    (_tnx_h["Close"].iloc[-1] - _tnx_h["Close"].iloc[-5])
+                    / max(float(_tnx_h["Close"].iloc[-5]), 0.01) * 100, 2)
         _time.sleep(0.3)
 
         _gld_h = yf.Ticker("GLD").history(period="10d")
