@@ -1725,71 +1725,122 @@ _ROBOTICS_AI_TICKERS = {"PLTR","AI","BBAI","IONQ","SOUN","RXRX","ISRG","IRBT",
                          "NVDA","AMD","SMCI","ARM","AIOT","RCAT","OUST","INVZ"}
 
 
-def _get_macro_overlay(ticker: str, sector: str, pulse_data: dict) -> tuple:
+def _get_macro_overlay(ticker: str, sector: str, pulse_data: dict,
+                       mkt_cap: float = 0.0) -> tuple:
     """
-    Sector-Aware Macro Overlay — מחזיר (bonus_points, note_he).
-    מיישם פרמיות/קנסות לפי מאקרו-סביבה עדכנית + סקטור.
+    Precision Macro Overlay (v2) — מחזיר (bonus_points, note_he).
+
+    כללי סף:
+    • DXY / תשואות: פועלים רק אם שינוי 5d > ±0.5%
+    • נפט: פועל רק אם שינוי 5d > ±2%
+    • VIX < 18  → +3 (Stability Bonus) — לכל הסקטורים
+    • VIX > 30 + מכסה שוק > 50B → +10 (Panic Opportunity)
+    • תקרת מאקרו: ±15 נקודות סה"כ
     """
     if not pulse_data:
         return 0.0, ""
 
-    _dxy_t  = pulse_data.get("dxy_trend")    # % 5d, שלילי = דולר נחלש
-    _yld_t  = pulse_data.get("yield_trend")   # % 5d, שלילי = תשואות יורדות
-    _oil_t  = pulse_data.get("oil_trend")     # % 5d, חיובי = נפט עולה
-    _pulse  = _compute_pulse_score(pulse_data)
+    _DXY_THRESH  = 0.5   # % minimum move to count
+    _YLD_THRESH  = 0.5   # % minimum move to count
+    _OIL_THRESH  = 2.0   # % minimum move to count
+    _50B         = 50_000_000_000
+
+    _dxy_t  = pulse_data.get("dxy_trend")    # % 5d
+    _yld_t  = pulse_data.get("yield_trend")  # % 5d
+    _oil_t  = pulse_data.get("oil_trend")    # % 5d
+    _vix    = pulse_data.get("vix")
 
     bonus = 0.0
     notes_he = []
     t = (ticker or "").upper()
     s = (sector or "").lower()
 
-    # ── Growth / Tech / AI / Robotics ────────────────────────────────────────
-    _is_tech = ("technology" in s or "software" in s or
-                "communication" in s or t in _ROBOTICS_AI_TICKERS)
-    if _is_tech:
-        if (_dxy_t is not None and _dxy_t < -0.3) or (_yld_t is not None and _yld_t < -2):
-            bonus += 5.0
-            reasons = []
-            if _dxy_t is not None and _dxy_t < -0.3:
-                reasons.append(f"דולר נחלש ({_dxy_t:+.1f}%)")
-            if _yld_t is not None and _yld_t < -2:
-                reasons.append(f"תשואות יורדות ({_yld_t:+.1f}%)")
-            notes_he.append(f"ציון טכנולוגיה/AI עלה בשל סביבת מאקרו נוחה — {' ו-'.join(reasons)}")
+    # ── 1. VIX Dual-Mode (universal — applies to all sectors) ────────────────
+    if _vix is not None:
+        if _vix < 18:
+            bonus += 3.0
+            notes_he.append(f"Stability Bonus: VIX נמוך ({_vix:.1f} < 18) — שוק יציב, סיכון נמוך")
+        elif _vix > 30 and float(mkt_cap or 0) > _50B:
+            bonus += 10.0
+            notes_he.append(
+                f"Panic Opportunity: VIX={_vix:.1f} > 30 עם מכסה שוק >{_50B/1e9:.0f}B — "
+                f"בוסט קונטראריאן אסטרטגי בשל פחד קיצוני")
 
-    # ── Energy / Oil & Gas ───────────────────────────────────────────────────
-    _is_energy = "energy" in s
-    if _is_energy and _oil_t is not None:
-        if _oil_t > 1.5:
-            bonus += 7.0
-            notes_he.append(f"ציון אנרגיה עלה בשל עלייה במחיר הנפט ({_oil_t:+.1f}%)")
-        elif _oil_t < -1.5:
-            bonus -= 5.0
-            notes_he.append(f"ציון אנרגיה ירד בשל ירידה במחיר הנפט ({_oil_t:+.1f}%)")
-
-    # ── Aviation & Transport ─────────────────────────────────────────────────
-    _is_airline = (t in _AIRLINES_TICKERS or
-                   ("industrial" in s and t in _AIRLINES_TICKERS))
-    if _is_airline and _oil_t is not None and _oil_t > 1.5:
-        bonus -= 7.0
-        notes_he.append(f"ציון חברת תעופה ירד בשל עלייה בעלויות הדלק — נפט {_oil_t:+.1f}%")
-
-    # ── Healthcare & Pharma ──────────────────────────────────────────────────
-    _is_health = "health" in s
-    if _is_health and _pulse < 40:
-        bonus += 4.0
-        notes_he.append(f"ציון בריאות/פארמה עלה — בונוס מגן בשוק פחד (Pulse={_pulse})")
-
-    # ── Financials / Banks ───────────────────────────────────────────────────
+    # ── 2. Sector rules — כפוף לסף מינימלי ──────────────────────────────────
+    _is_tech     = ("technology" in s or "software" in s or
+                    "communication" in s or t in _ROBOTICS_AI_TICKERS)
+    _is_energy   = "energy" in s
+    _is_airline  = t in _AIRLINES_TICKERS
+    _is_health   = "health" in s
     _is_financial = ("financial" in s or "bank" in s)
-    if _is_financial and _yld_t is not None and _yld_t > 2:
-        bonus += 5.0
-        notes_he.append(f"ציון פיננסים עלה — תשואות גבוהות מגדילות מרווח ריבית ({_yld_t:+.1f}%)")
+    _is_cons_disc = ("consumer cyclical" in s or "consumer discretionary" in s)
 
-    # ── Consumer Discretionary ───────────────────────────────────────────────
-    _is_consumer_disc = ("consumer cyclical" in s or "consumer discretionary" in s)
-    if _is_consumer_disc and _dxy_t is not None and _dxy_t < -0.3:
+    # Tech / AI / Robotics — DXY down>0.5% OR Yields down>0.5% → +5
+    if _is_tech:
+        _tech_reasons = []
+        if _dxy_t is not None and _dxy_t < -_DXY_THRESH:
+            _tech_reasons.append(f"Dollar moved >{_DXY_THRESH}% down ({_dxy_t:+.2f}%)")
+        if _yld_t is not None and _yld_t < -_YLD_THRESH:
+            _tech_reasons.append(f"10Y Yields moved >{_YLD_THRESH}% down ({_yld_t:+.2f}%)")
+        if _tech_reasons:
+            bonus += 5.0
+            notes_he.append(
+                f"Tech/AI +5: סביבת מאקרו נוחה — {' ו-'.join(_tech_reasons)}")
+        elif _dxy_t is not None and _dxy_t > _DXY_THRESH and _yld_t is not None and _yld_t > _YLD_THRESH:
+            bonus -= 5.0
+            notes_he.append(
+                f"Tech/AI −5: דולר חזק >{_DXY_THRESH}% ({_dxy_t:+.2f}%) "
+                f"+ תשואות עולות >{_YLD_THRESH}% ({_yld_t:+.2f}%) — לחץ על מכפילים")
+
+    # Energy — Oil >2% → +7 | Oil <-2% → -7
+    if _is_energy and _oil_t is not None:
+        if _oil_t > _OIL_THRESH:
+            bonus += 7.0
+            notes_he.append(f"Energy +7: Oil moved >{_OIL_THRESH}% up ({_oil_t:+.2f}%) — הכנסות עולות")
+        elif _oil_t < -_OIL_THRESH:
+            bonus -= 7.0
+            notes_he.append(f"Energy −7: Oil moved >{_OIL_THRESH}% down ({_oil_t:+.2f}%) — לחץ על ההכנסות")
+
+    # Airlines — Oil >2% → -7
+    if _is_airline and _oil_t is not None:
+        if _oil_t > _OIL_THRESH:
+            bonus -= 7.0
+            notes_he.append(
+                f"Airlines −7: Oil moved >{_OIL_THRESH}% up ({_oil_t:+.2f}%) — "
+                f"עלויות דלק עולות, לחץ על שולי הרווח")
+        elif _oil_t < -_OIL_THRESH:
+            bonus += 7.0
+            notes_he.append(
+                f"Airlines +7: Oil moved >{_OIL_THRESH}% down ({_oil_t:+.2f}%) — "
+                f"הוזלת עלויות דלק")
+
+    # Healthcare — market fear (VIX>30 already handled above; here: pulse-based)
+    if _is_health and _vix is not None and 20 < _vix <= 30:
+        bonus += 4.0
+        notes_he.append(f"Healthcare +4: בונוס מגן — VIX מוגבר ({_vix:.1f}), ביקוש דפנסיבי")
+
+    # Financials — Yields >0.5% → +5 | Yields <-0.5% → -5
+    if _is_financial and _yld_t is not None:
+        if _yld_t > _YLD_THRESH:
+            bonus += 5.0
+            notes_he.append(
+                f"Financials +5: 10Y Yields moved >{_YLD_THRESH}% up ({_yld_t:+.2f}%) — "
+                f"מרווח ריבית מתרחב")
+        elif _yld_t < -_YLD_THRESH:
+            bonus -= 5.0
+            notes_he.append(
+                f"Financials −5: 10Y Yields moved >{_YLD_THRESH}% down ({_yld_t:+.2f}%) — "
+                f"לחץ על מרווח ריבית")
+
+    # Consumer Discretionary — DXY >0.5% down → +3
+    if _is_cons_disc and _dxy_t is not None and _dxy_t < -_DXY_THRESH:
         bonus += 3.0
-        notes_he.append(f"ציון צריכה מחזורית עלה — דולר חלש תומך במכירות גלובליות ({_dxy_t:+.1f}%)")
+        notes_he.append(
+            f"Consumer Disc +3: Dollar moved >{_DXY_THRESH}% down ({_dxy_t:+.2f}%) — "
+            f"תמיכה במכירות גלובליות")
+
+    # ── 3. Global cap ±15 ────────────────────────────────────────────────────
+    bonus = max(-15.0, min(15.0, bonus))
 
     note = " | ".join(notes_he) if notes_he else ""
     return bonus, note
@@ -1910,7 +1961,8 @@ def compute_score(data: dict, tech: dict, horizon: str, use_news: bool = True) -
         _pulse_data = _st2.session_state.get("_mkt_pulse")
         if _pulse_data and isinstance(_pulse_data, dict):
             _m_bonus, _m_note = _get_macro_overlay(
-                data.get("ticker", ""), data.get("sector", ""), _pulse_data)
+                data.get("ticker", ""), data.get("sector", ""), _pulse_data,
+                mkt_cap=float(data.get("mkt_cap") or 0))
             if _m_bonus != 0.0:
                 total = float(total) + _m_bonus
             _ticker_key = data.get("ticker", "")
@@ -3614,23 +3666,41 @@ def _row(name: str, value: str, blabel: str, bkind: str) -> str:
             f'{_badge(blabel, bkind)}</span></div>')
 
 def _build_macro_overlay_section(ticker: str) -> str:
-    """בונה את סעיף 6 — Macro Overlay בדוח, אם יש הערת מאקרו קיימת."""
+    """בונה את סעיף 6 — Precision Macro Overlay בדוח."""
     note = _macro_notes.get(ticker.upper(), "")
     if not note:
         return ""
-    items = note.split(" | ")
+    items = [i.strip() for i in note.split(" | ") if i.strip()]
+
+    def _row_color(item: str) -> str:
+        if item.startswith("Tech/AI +") or item.startswith("Energy +") \
+                or item.startswith("Airlines +") or item.startswith("Financials +") \
+                or item.startswith("Consumer") or item.startswith("Stability") \
+                or item.startswith("Panic") or item.startswith("Healthcare"):
+            return "#4ade80"   # ירוק — בונוס
+        if "−" in item or "−" in item:
+            return "#f87171"   # אדום — קנס
+        return "#fbbf24"       # צהוב — ניטרלי
+
+    def _icon(item: str) -> str:
+        if "Panic Opportunity" in item:  return "🚨"
+        if "Stability Bonus"   in item:  return "🟢"
+        if "−" in item:                  return "⬇️"
+        return "⚡"
+
     rows = "".join(
-        f'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">'
-        f'<span style="color:#f59e0b;font-size:13px;flex-shrink:0">⚡</span>'
-        f'<span style="font-size:12px;color:#cbd5e1;line-height:1.6">{item}</span>'
+        f'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:7px">'
+        f'<span style="font-size:14px;flex-shrink:0;line-height:1.4">{_icon(item)}</span>'
+        f'<span style="font-size:12px;color:{_row_color(item)};line-height:1.65;'
+        f'font-family:\'JetBrains Mono\',monospace">{item}</span>'
         f'</div>'
-        for item in items if item.strip()
+        for item in items
     )
     return (
         f'<div class="report-section">'
-        f'<div class="report-section-title">6 — Macro Overlay'
-        f'<span style="font-size:10px;font-weight:400;color:#9ca3af;margin-right:8px">'
-        f' — השפעת מאקרו-סביבה על הציון</span></div>'
+        f'<div class="report-section-title">6 — Precision Macro Overlay'
+        f'<span style="font-size:10px;font-weight:400;color:#6b7280;margin-right:8px">'
+        f' · סף DXY/תשואות >0.5% · סף נפט >2% · תקרה ±15 נק\'</span></div>'
         f'{rows}'
         f'</div>'
     )
