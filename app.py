@@ -2336,16 +2336,17 @@ def _tg_token() -> str:
         return ""
 
 
-def _poll_telegram_registrations() -> int:
-    """קורא עדכונים מהבוט ורושם מספרי טלפון שנשלחו דרך /start"""
+def _poll_telegram_registrations(force: bool = False) -> int:
+    """קורא עדכונים מהבוט ורושם מספרי טלפון שנשלחו דרך /start.
+    force=True — מדלג על throttle ה-30 שניות (לשימוש מכפתור ידני)."""
     import requests as _req, re as _re
     try:
         token = _tg_token()
         if not token:
             return 0
         db = _load_alerts_db()
-        # throttle: לא יותר מפעם אחת ב-30 שניות
-        if db["_last_poll"]:
+        # throttle: לא יותר מפעם אחת ב-30 שניות (אלא אם force=True)
+        if not force and db["_last_poll"]:
             elapsed = (datetime.now() - datetime.fromisoformat(db["_last_poll"])).total_seconds()
             if elapsed < 30:
                 return 0
@@ -2423,6 +2424,14 @@ def _poll_telegram_registrations() -> int:
         db["_last_poll"] = datetime.now().isoformat(timespec="seconds")
         if new > 0:
             _save_alerts_db(db)  # שמור הכל כולל Supabase — נוסף רישום חדש
+            # עדכן את ה-cache של session state כך ש-_is_phone_registered יראה מיד את הרישום החדש
+            # (בלי זה, ה-cache של 60 שניות עדיין מחזיר dict ריק ו-auto-connect נכשל)
+            try:
+                import time as _tp
+                st.session_state["_tg_db_ss_cache"] = db
+                st.session_state["_tg_db_ss_ts"] = _tp.time()
+            except Exception:
+                pass
         else:
             # throttle בלבד — אל תדרוס Supabase עם DB שעלול להיות חסר פורטפוליו
             try:
@@ -2458,9 +2467,27 @@ def _send_telegram_msg(phone: str, text: str) -> bool:
 
 def _is_phone_registered(phone: str) -> bool:
     norm = _normalize_phone(phone)
+    # 1. בדיקה ראשונה: דרך _load_alerts_db (כולל cache של 60 שניות, קובץ מקומי, Supabase)
     if norm in _load_alerts_db().get("registrations", {}):
         return True
-    # פאלבק: אם _tg_db נכשל (timeout/container restart) — בדוק גיבוי קל (_ualerts_{norm})
+    # 2. פאלבק ישיר ל-Supabase (מדלג על ה-cache) — חשוב כשה-cache נטען כשהיה ריק
+    #    (למשל: Supabase היה איטי בהפעלה, ה-cache נשמר עם dict ריק)
+    try:
+        _sb = _supabase_load_tg_db()
+        if _sb and isinstance(_sb, dict) and norm in _sb.get("registrations", {}):
+            # עדכן את ה-cache כדי שהפניות הבאות לא יפגעו שוב
+            try:
+                import time as _tp2
+                _c = st.session_state.get("_tg_db_ss_cache") or {}
+                _c.setdefault("registrations", {})[norm] = _sb["registrations"][norm]
+                st.session_state["_tg_db_ss_cache"] = _c
+                st.session_state["_tg_db_ss_ts"] = _tp2.time()
+            except Exception:
+                pass
+            return True
+    except Exception:
+        pass
+    # 3. פאלבק אחרון: קיום row של _ualerts_{norm} מעיד על רישום היסטורי
     _bk = _supabase_load_user_alerts(norm)
     return _bk is not None
 
@@ -6633,7 +6660,7 @@ def main() -> None:
                 st.caption("לחץ → טלגרם נפתח → לחץ START → חזור לכאן")
                 if st.button("✅ בדוק רישום", use_container_width=True, key="check_reg_btn"):
                     with st.spinner("בודק..."):
-                        _poll_telegram_registrations()
+                        _poll_telegram_registrations(force=True)  # force=True — מדלג על throttle
                     if _is_phone_registered(_tg_phone):
                         st.session_state["_tg_verified_phone"] = _tg_phone
                         st.toast("✅ נרשמת בהצלחה!")
