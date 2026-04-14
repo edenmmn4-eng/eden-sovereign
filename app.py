@@ -2310,20 +2310,27 @@ def _load_alerts_db() -> dict:
 
 def _save_alerts_db(db: dict) -> bool:
     """שומר DB ל-Supabase + קובץ מקומי. מחזיר True אם Supabase הצליח."""
+    import threading as _thr_sv
     # חותמת זמן לבחירת המקור העדכני ביותר בטעינה — עותק כדי לא למטייט את ה-dict המקורי
     db = {**db, "saved_at": datetime.utcnow().isoformat()}
-    # שמור ב-Supabase (persistent)
+    # שמור ב-Supabase (persistent) — קריאת הגנה read-before-write כבר ב-_supabase_save_tg_db
     sb_ok = _supabase_save_tg_db(db)
-    # שמור גם לקובץ מקומי (fallback) — תמיד, ללא תלות בהצלחת Supabase
+    # שמור לקובץ מקומי (fallback) — בthread מתזמן: רק אם יש נתונים ממשיים
+    # מגן מפני: Supabase timeout בthread רקע → db ריק → מדרוס קובץ תקין
+    _in_scheduler = _thr_sv.current_thread().name == "eden-alert-scheduler"
+    _has_real_data = bool(db.get("registrations") or db.get("alerts") or db.get("score_alerts"))
+    if not _in_scheduler or _has_real_data:
+        try:
+            json.dump(db, open(_ALERTS_FILE, "w", encoding="utf-8"),
+                      ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+    # עדכן cache של session state עם הנתונים החדשים — לא למחוק!
+    # מחיקת ה-cache גרמה לקריאת Supabase מחדש שעלולה להחזיר ריק/ישן ולדרוס פורטפוליו
     try:
-        json.dump(db, open(_ALERTS_FILE, "w", encoding="utf-8"),
-                  ensure_ascii=False, indent=2)
-    except Exception:
-        pass
-    # בטל cache של session state — הנתונים השתנו
-    try:
-        st.session_state.pop("_tg_db_ss_cache", None)
-        st.session_state.pop("_tg_db_ss_ts", None)
+        import time as _t_sv
+        st.session_state["_tg_db_ss_cache"] = db
+        st.session_state["_tg_db_ss_ts"] = _t_sv.time()
     except Exception:
         pass
     return sb_ok
@@ -2433,12 +2440,13 @@ def _poll_telegram_registrations(force: bool = False) -> int:
             except Exception:
                 pass
         else:
-            # throttle בלבד — אל תדרוס Supabase עם DB שעלול להיות חסר פורטפוליו
-            try:
-                json.dump(db, open(_ALERTS_FILE, "w", encoding="utf-8"),
-                          ensure_ascii=False, indent=2)
-            except Exception:
-                pass
+            # throttle בלבד — אל תדרוס קובץ מקומי תקין בנתונים ריקים (Supabase timeout)
+            if db.get("registrations") or db.get("alerts") or db.get("score_alerts"):
+                try:
+                    json.dump(db, open(_ALERTS_FILE, "w", encoding="utf-8"),
+                              ensure_ascii=False, indent=2)
+                except Exception:
+                    pass
         return new
     except Exception:
         return 0
@@ -2707,11 +2715,13 @@ def _bg_worker() -> None:
             # _last_bg_check מסונן מ-Supabase ממילא, אין שום סיבה לכתוב Supabase עם DB שעלול להיות חסר פורטפוליו
             db2 = _load_alerts_db()
             db2["_last_bg_check"] = datetime.now().isoformat(timespec="seconds")
-            try:
-                json.dump(db2, open(_ALERTS_FILE, "w", encoding="utf-8"),
-                          ensure_ascii=False, indent=2)
-            except Exception:
-                pass
+            # רק אם יש נתונים ממשיים — מגן מפני Supabase timeout שגורם לכתיבת dict ריק
+            if db2.get("registrations") or db2.get("alerts") or db2.get("score_alerts"):
+                try:
+                    json.dump(db2, open(_ALERTS_FILE, "w", encoding="utf-8"),
+                              ensure_ascii=False, indent=2)
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -2865,12 +2875,8 @@ def _supabase_save_user_alerts(norm: str, price_alerts: list, score_alerts: list
             timeout=4,
         )
         if not r.ok:
-            _req.delete(
-                f"{url}/rest/v1/ticker_cache",
-                params={"ticker": f"eq.{_ticker_key}"},
-                headers={"apikey": key, "Authorization": f"Bearer {key}"},
-                timeout=4,
-            )
+            # safe INSERT — אל תמחק! הקריאה תמיד שולפת ORDER BY cached_at DESC LIMIT 1
+            # הrow הישן נשאר כגיבוי אם ה-INSERT הזה ייכשל
             r = _req.post(
                 f"{url}/rest/v1/ticker_cache",
                 json=_payload,
@@ -6382,7 +6388,10 @@ def main() -> None:
             st.session_state["portfolio"] = _load_user_portfolio(_expected_user)
         elif not st.session_state.get("_tg_db_ss_cache"):
             # cache פג תוקף (60 שנ') — טען פורטפוליו עדכני לסנכרון בין מכשירים
-            st.session_state["portfolio"] = _load_user_portfolio(_expected_user)
+            _fresh = _load_user_portfolio(_expected_user)
+            # אל תדרוס פורטפוליו קיים בנתונים ריקים (Supabase איטי → החזיר [])
+            if _fresh or not st.session_state.get("portfolio"):
+                st.session_state["portfolio"] = _fresh
     elif not _tg_ph or _tg_ph != st.session_state.get("current_user_phone"):
         # טלפון נוקה או הוחלף — אפס session
         if st.session_state.get("current_user_phone"):
