@@ -4205,9 +4205,9 @@ def _compute_pulse_score(data: dict) -> int:
             if _spy < -8:       _s += 8   # קריסה — ייתכן המשך ירידה, זהירות
             else:               _s += 13  # תיקון בריא = הזדמנות
         else:                             # _spy > 2
-            if _spy <= 5:       _s += 10  # עלייה מהירה — שוק מתחמם
-            elif _spy <= 8:     _s += 5   # over-extended — סיכון גבוה לתיקון
-            else:               _s += 2   # מסוכן לקנות בנקודה זו
+            if _spy <= 5:       _s += 11  # עלייה מהירה — שוק מתחמם
+            elif _spy <= 8:     _s += 8   # over-extended — זהירות
+            else:               _s += 5   # מסוכן לקנות בנקודה זו
 
     # QQQ 10d — מקסימום 10 נקודות (אותה לוגיקה)
     _qqq = data.get("qqq_trend")
@@ -4217,9 +4217,9 @@ def _compute_pulse_score(data: dict) -> int:
             if _qqq < -8:       _s += 5
             else:               _s += 8
         else:
-            if _qqq <= 5:       _s += 6
-            elif _qqq <= 8:     _s += 3
-            else:               _s += 1
+            if _qqq <= 5:       _s += 7
+            elif _qqq <= 8:     _s += 5
+            else:               _s += 3
 
     # תשואת אגרת 10 שנים — מקסימום 12 נקודות (נמוך = טוב למניות)
     _yld = data.get("yield_10y")
