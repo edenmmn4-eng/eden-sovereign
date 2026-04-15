@@ -4175,34 +4175,50 @@ def fetch_market_pulse_data() -> dict | None:
 
 
 def _compute_pulse_score(data: dict) -> int:
-    """מחשב ציון שוק 0–100 לפי נתונים טכניים בלבד — ללא AI."""
+    """מחשב ציון הזדמנות השקעה 0–100.
+    גבוה = כדאי לקנות | נמוך = הימנע / שקול למכור.
+    לוגיקה contrarian: פחד גבוה (VIX↑, F&G↓, SPY↓) = הזדמנות."""
     _s = 0
 
-    # VIX — מקסימום 20 נקודות
+    # VIX — מקסימום 20 נקודות (לוגיקה contrarian — פאניקה = הזדמנות)
+    # VIX < 12: שאננות מסוכנת (שוק בבועה) → נקודות נמוכות
+    # VIX > 30: פחד קיצוני → הזדמנות קנייה מקסימלית
     _vix = data.get("vix")
     if _vix:
-        if _vix < 15:   _s += 20
-        elif _vix < 20: _s += 15
-        elif _vix < 25: _s += 8
-        elif _vix < 30: _s += 3
+        if _vix > 35:        _s += 20  # פאניקה קיצונית = הזדמנות מקסימלית
+        elif _vix > 28:      _s += 17
+        elif _vix > 22:      _s += 13  # פחד מוגבר = הזדמנות טובה
+        elif _vix > 18:      _s += 9   # פחד קל = ניטרלי
+        elif _vix > 14:      _s += 6   # שאננות — שוק רץ, פחות הזדמנות
+        elif _vix > 12:      _s += 3
+        else:                _s += 1   # שאננות מסוכנת — VIX < 12
 
     # S&P 500 10d — מקסימום 16 נקודות
+    # שטוח/ירידה קלה = אזור צבירה = הזדמנות | עלייה חדה = over-extension = סיכון
     _spy = data.get("spy_trend")
     if _spy is not None:
-        if _spy > 3:    _s += 16
-        elif _spy > 1:  _s += 12
-        elif _spy > -1: _s += 7
-        elif _spy > -3: _s += 3
+        if -3 <= _spy <= 2:     _s += 16  # שטוח / ירידה קלה = אזור צבירה אידיאלי
+        elif _spy < -3:
+            if _spy < -8:       _s += 8   # קריסה — ייתכן המשך ירידה, זהירות
+            else:               _s += 13  # תיקון בריא = הזדמנות
+        else:                             # _spy > 2
+            if _spy <= 5:       _s += 10  # עלייה מהירה — שוק מתחמם
+            elif _spy <= 8:     _s += 5   # over-extended — סיכון גבוה לתיקון
+            else:               _s += 2   # מסוכן לקנות בנקודה זו
 
-    # QQQ 10d — מקסימום 10 נקודות
+    # QQQ 10d — מקסימום 10 נקודות (אותה לוגיקה)
     _qqq = data.get("qqq_trend")
     if _qqq is not None:
-        if _qqq > 3:    _s += 10
-        elif _qqq > 1:  _s += 7
-        elif _qqq > -1: _s += 4
-        elif _qqq > -3: _s += 1
+        if -3 <= _qqq <= 2:     _s += 10
+        elif _qqq < -3:
+            if _qqq < -8:       _s += 5
+            else:               _s += 8
+        else:
+            if _qqq <= 5:       _s += 6
+            elif _qqq <= 8:     _s += 3
+            else:               _s += 1
 
-    # תשואת אגרת 10 שנים — מקסימום 12 נקודות
+    # תשואת אגרת 10 שנים — מקסימום 12 נקודות (נמוך = טוב למניות)
     _yld = data.get("yield_10y")
     if _yld:
         if _yld < 3.5:   _s += 12
@@ -4210,23 +4226,23 @@ def _compute_pulse_score(data: dict) -> int:
         elif _yld < 4.5: _s += 6
         elif _yld < 5.0: _s += 3
 
-    # זהב 5d — מקסימום 8 נקודות (ירידת זהב = risk-on = חיובי למניות)
+    # זהב 5d — מקסימום 8 נקודות (ירידה = risk-on = כסף זורם למניות)
     _gld = data.get("gold_trend")
     if _gld is not None:
-        if _gld < -1:  _s += 8   # זהב יורד — risk-on
+        if _gld < -1:  _s += 8   # זהב יורד = risk-on
         elif _gld < 1: _s += 5   # יציב
-        else:          _s += 2   # זהב עולה — risk-off
+        else:          _s += 2   # זהב עולה = risk-off / פחד
 
-    # Fear & Greed — מקסימום 15 נקודות
+    # Fear & Greed — מקסימום 15 נקודות (contrarian — כבר מיושר עם הלוגיקה)
     _fg = data.get("fear_greed")
     if _fg is not None:
-        if _fg < 20:   _s += 15  # פחד קיצוני = הזדמנות קנייה (contrarian)
+        if _fg < 20:   _s += 15  # פחד קיצוני = קנה
         elif _fg < 40: _s += 10
         elif _fg < 60: _s += 6
-        elif _fg < 80: _s += 3
-        else:          _s += 1   # חמדנות קיצונית = זהירות
+        elif _fg < 80: _s += 2
+        else:          _s += 0   # חמדנות קיצונית = אל תקנה
 
-    # DXY (דולר) 5d — מקסימום 8 נקודות (דולר חלש = חיובי למניות/זהב)
+    # DXY (דולר) 5d — מקסימום 8 נקודות (דולר חלש = חיובי למניות)
     _dxy = data.get("dxy_trend")
     if _dxy is not None:
         if _dxy < -1:  _s += 8
@@ -4236,11 +4252,10 @@ def _compute_pulse_score(data: dict) -> int:
     # נפט 5d — מקסימום 6 נקודות (יציב = אידיאלי)
     _oil = data.get("oil_trend")
     if _oil is not None:
-        if -3 < _oil < 3:  _s += 6   # יציב
-        elif -6 < _oil < 6: _s += 3  # תנודתי מתון
-        # חריג מעלה או מטה = לחץ אינפלציוני / חשש מיתון
+        if -3 < _oil < 3:   _s += 6
+        elif -6 < _oil < 6: _s += 3
 
-    # Bitcoin 5d — מקסימום 5 נקודות (BTC עולה = risk-on)
+    # Bitcoin 5d — מקסימום 5 נקודות (עולה = risk-on)
     _btc = data.get("btc_trend")
     if _btc is not None:
         if _btc > 5:    _s += 5
