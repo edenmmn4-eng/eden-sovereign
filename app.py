@@ -733,6 +733,8 @@ def inject_css() -> None:
       color:#e2e8f0;line-height:1.15
     }
     .mkt-pulse-metric-sub{font-size:10px;font-weight:500;margin-top:4px;color:#94a3b8}
+    .mkt-pulse-metric-exp{font-size:9px;font-style:italic;margin-top:5px;color:#64748b;line-height:1.35;min-height:24px}
+    .mkt-pulse-score-summary{margin:12px 0 14px;padding:10px 14px;background:rgba(255,255,255,0.04);border-radius:8px;border-right:3px solid;font-size:12px;color:#cbd5e1;line-height:1.5;text-align:right}
 
     /* Data-point accent colours — scoped inside banner */
     .mkt-pulse-wrap .mpt-green{color:#4ade80!important}
@@ -4696,6 +4698,81 @@ def render_market_pulse_banner() -> None:
         _p_label  = "סביבת השקעה חיובית" if _pulse >= 65 else ("זהירות — הישאר סלקטיבי" if _pulse >= 40 else "סביבה מאתגרת")
         _p_vclass = "mkt-pulse-bullish" if _pulse >= 65 else ("mkt-pulse-cautious" if _pulse >= 40 else "mkt-pulse-avoid")
 
+        # ── הסברים לכל מדד ──────────────────────────────────────────────
+        _vix_exp = (
+            "שאננות קיצונית — שוק לא מתמחר סיכון, היזהר" if _vix and _vix < 12 else
+            "שאננות — שוק רץ, מעט פחד, הזדמנויות מוגבלות" if _vix and _vix < 16 else
+            "סביבה תקינה — תנודתיות מאוזנת" if _vix and _vix < 20 else
+            "חשש מוגבר — שוק עצבני, תנודות חדות אפשריות" if _vix and _vix < 28 else
+            "פחד — הזדמנות כניסה למשקיע ארוך טווח" if _vix and _vix < 35 else
+            "פאניקה קיצונית — הזדמנות נדירה לקנייה במניות איכות" if _vix else "—"
+        )
+        _spy_exp = (
+            "קריסה — זהירות, ייתכן המשך ירידה" if _spy is not None and _spy < -8 else
+            "תיקון בריא — נקודת כניסה פוטנציאלית טובה" if _spy is not None and _spy < -3 else
+            "אזור צבירה — עדיף להגדיל פוזיציות בהדרגה" if _spy is not None and _spy <= 2 else
+            "עלייה מהירה — שוק מתחמם, כניסה בזהירות" if _spy is not None and _spy <= 5 else
+            "over-extended — סיכון לתיקון טכני קרוב" if _spy is not None and _spy <= 8 else
+            "עלייה חדה מאוד — סיכון גבוה, המתן לתיקון לפני כניסה" if _spy is not None else "—"
+        )
+        _qqq_exp = (
+            "קריסה בנאסדק — זהירות מיוחדת במניות טק" if _qqq is not None and _qqq < -8 else
+            "תיקון בריא — נקודת כניסה למניות צמיחה" if _qqq is not None and _qqq < -3 else
+            "אזור צבירה — עדיף להיכנס לטק בהדרגה" if _qqq is not None and _qqq <= 2 else
+            "נאסדק מתחמם — כניסה בסלקטיביות" if _qqq is not None and _qqq <= 5 else
+            "over-extended — זהירות בקניית מניות טק" if _qqq is not None and _qqq <= 8 else
+            "עלייה חדה מאוד בנאסדק — סיכון לתיקון חד" if _qqq is not None else "—"
+        )
+        _yld_exp = (
+            "תשואה נמוכה — סביבה מצוינת למניות צמיחה" if _yld and _yld < 3.5 else
+            "תשואה מאוזנת — לחץ מתון על הערכות שווי" if _yld and _yld < 4.0 else
+            "תשואה מוגבהת — לחץ על מניות צמיחה עתידניות" if _yld and _yld < 4.5 else
+            "תשואה גבוהה — אג\"ח מתחרה במניות, מכפילים בלחץ" if _yld and _yld < 5.0 else
+            "תשואה גבוהה מאוד — לחץ כבד על שוק המניות" if _yld else "—"
+        )
+        _gld_exp = (
+            "זהב יורד חזק — כסף זורם למניות (risk-on)" if _gld is not None and _gld < -1 else
+            "זהב יציב — שוק מאוזן, אין פאניקה" if _gld is not None and _gld <= 1 else
+            "זהב עולה — משקיעים מחפשים מקלט בטוח, חשש בשוק" if _gld is not None else "—"
+        )
+        _fg_exp = (
+            "פחד קיצוני — היסטורית: זמן מצוין לקנייה (Buffett Rule)" if _fg and _fg < 20 else
+            "פחד — שוק לחוץ, סנטימנט שלילי = הזדמנות" if _fg and _fg < 40 else
+            "ניטרלי — אין קיצוניות בסנטימנט השוק" if _fg and _fg < 60 else
+            "חמדנות — שוק אופטימי מדי, זהירות בכניסות חדשות" if _fg and _fg < 80 else
+            "חמדנות קיצונית — שוק מנופח, סיכון גבוה לתיקון" if _fg else "—"
+        )
+        _dxy_exp = (
+            "דולר חלש מאוד — חיובי מאוד לסחורות ומניות גלובליות" if _dxy_trend and _dxy_trend < -1 else
+            "דולר נחלש — חיובי למניות ולחברות יצואניות" if _dxy_trend and _dxy_trend < -0.5 else
+            "דולר יציב — ניטרלי לשוק המניות" if _dxy_trend is not None and abs(_dxy_trend) <= 0.5 else
+            "דולר מתחזק — לחץ על חברות רב-לאומיות" if _dxy_trend is not None and _dxy_trend <= 1 else
+            "דולר חזק מאוד — לחץ על שווקים מתעוררים ורווחי חברות" if _dxy_trend is not None else "—"
+        )
+        _oil_exp = (
+            "צניחה חדה — חשש ממיתון גלובלי, ירידת ביקוש" if _oil_trend is not None and _oil_trend < -5 else
+            "ירידה — לחץ אינפלציוני מוקל, חיובי לצרכנים" if _oil_trend is not None and _oil_trend < -2 else
+            "יציב — סביבת מאקרו מאוזנת ומאפשרת" if _oil_trend is not None and _oil_trend <= 2 else
+            "עלייה — לחץ אינפלציוני קל, עלות עסקים עולה" if _oil_trend is not None and _oil_trend <= 5 else
+            "קפיצה חדה — לחץ אינפלציוני גבוה, יפגע ברווחיות" if _oil_trend is not None else "—"
+        )
+        _btc_exp = (
+            "ירידה חדה בביטקוין — risk-off, שנאת סיכון גבוהה" if _btc_trend is not None and _btc_trend < -5 else
+            "ירידה — סנטימנט שלילי בנכסי סיכון" if _btc_trend is not None and _btc_trend < -2 else
+            "יציב — סנטימנט ניטרלי בשוק הקריפטו" if _btc_trend is not None and _btc_trend <= 2 else
+            "עלייה — risk-on, תיאבון סיכון חיובי בשווקים" if _btc_trend is not None and _btc_trend <= 8 else
+            "עלייה חדה — risk-on קיצוני, סנטימנט חיובי מאוד" if _btc_trend is not None else "—"
+        )
+
+        # ── סיכום ציון כללי ─────────────────────────────────────────────
+        _score_summary = (
+            f"ציון {_pulse} — שוק בפאניקה: הזדמנות נדירה לרכישת מניות איכות בהנחה גדולה. VIX גבוה = פחד = קנה בהדרגה." if _pulse >= 80 else
+            f"ציון {_pulse} — סביבת השקעה טובה: יחס סיכון/תשואה נוח. מומלץ להגדיל חשיפה למניות צמיחה." if _pulse >= 65 else
+            f"ציון {_pulse} — שוק מאוזן: בחר מניות סלקטיבית עם שולי בטחון. לא הזמן לקנות הכל." if _pulse >= 50 else
+            f"ציון {_pulse} — שוק מתחמם ו-over-extended: הימנע מכניסות חדשות, שמור מזומן להזדמנות הבאה." if _pulse >= 40 else
+            f"ציון {_pulse} — שוק נסחר גבוה מאוד: שקול מימוש רווחים חלקי והמתן לתיקון לפני כניסה."
+        )
+
         _metrics_html = f"""
         <div style="display:flex;align-items:center;justify-content:space-between;
                     margin-bottom:14px;flex-wrap:wrap;gap:8px">
@@ -4715,48 +4792,58 @@ def render_market_pulse_banner() -> None:
             <div class="mkt-pulse-metric-label">VIX — פחד שוק</div>
             <div class="mkt-pulse-metric-value {_vix_cls}">{f"{_vix:.1f}" if _vix else "—"}</div>
             <div class="mkt-pulse-metric-sub {_vix_cls}">{_vix_sub if _vix else "—"}</div>
+            <div class="mkt-pulse-metric-exp">{_vix_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
             <div class="mkt-pulse-metric-label">S&amp;P 500 — 10 ימים</div>
             <div class="mkt-pulse-metric-value {_tc(_spy)}">{f"{_spy:+.2f}%" if _spy is not None else "—"}</div>
             <div class="mkt-pulse-metric-sub {_tc(_spy)}">{_arrow(_spy) if _spy is not None else "—"}</div>
+            <div class="mkt-pulse-metric-exp">{_spy_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
             <div class="mkt-pulse-metric-label">נאסד"ק — 10 ימים</div>
             <div class="mkt-pulse-metric-value {_tc(_qqq)}">{f"{_qqq:+.2f}%" if _qqq is not None else "—"}</div>
             <div class="mkt-pulse-metric-sub {_tc(_qqq)}">{_arrow(_qqq) if _qqq is not None else "—"}</div>
+            <div class="mkt-pulse-metric-exp">{_qqq_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
             <div class="mkt-pulse-metric-label">תשואת אג"ח 10Y</div>
             <div class="mkt-pulse-metric-value {_yld_cls}">{f"{_yld:.2f}%" if _yld else "—"}</div>
             <div class="mkt-pulse-metric-sub {_yld_cls}">{_yld_sub if _yld else "—"}</div>
+            <div class="mkt-pulse-metric-exp">{_yld_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
             <div class="mkt-pulse-metric-label">זהב — 5 ימים</div>
             <div class="mkt-pulse-metric-value {_gld_cls}">{f"{_gld:+.2f}%" if _gld is not None else "—"}</div>
             <div class="mkt-pulse-metric-sub {_gld_cls}">{_gld_sub if _gld is not None else "—"}</div>
+            <div class="mkt-pulse-metric-exp">{_gld_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
             <div class="mkt-pulse-metric-label">פחד וחמדנות</div>
             <div class="mkt-pulse-metric-value {_fg_cls}">{str(_fg) if _fg else "—"}</div>
             <div class="mkt-pulse-metric-sub {_fg_cls}">{_fg_he if _fg else "—"}</div>
+            <div class="mkt-pulse-metric-exp">{_fg_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
             <div class="mkt-pulse-metric-label">דולר (DXY) — 5 ימים</div>
             <div class="mkt-pulse-metric-value {_dxy_cls}">{f"{_dxy_val:.1f}" if _dxy_val else "—"}</div>
             <div class="mkt-pulse-metric-sub {_dxy_cls}">{f"{_dxy_trend:+.2f}% " if _dxy_trend is not None else ""}{_dxy_sub if _dxy_val else "—"}</div>
+            <div class="mkt-pulse-metric-exp">{_dxy_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
             <div class="mkt-pulse-metric-label">נפט גולמי — 5 ימים</div>
             <div class="mkt-pulse-metric-value {_oil_cls}">{f"${_oil_val:.1f}" if _oil_val else "—"}</div>
             <div class="mkt-pulse-metric-sub {_oil_cls}">{f"{_oil_trend:+.2f}% " if _oil_trend is not None else ""}{_oil_sub if _oil_val else "—"}</div>
+            <div class="mkt-pulse-metric-exp">{_oil_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
             <div class="mkt-pulse-metric-label">Bitcoin — 5 ימים</div>
             <div class="mkt-pulse-metric-value {_btc_cls}">{f"{_btc_trend:+.2f}%" if _btc_trend is not None else "—"}</div>
             <div class="mkt-pulse-metric-sub {_btc_cls}">{_btc_sub if _btc_trend is not None else "—"}</div>
+            <div class="mkt-pulse-metric-exp">{_btc_exp}</div>
           </div>
-        </div>"""
+        </div>
+        <div class="mkt-pulse-score-summary" style="border-color:{_p_color}">{_score_summary}</div>"""
 
         _fetched = _data.get("fetched_at", "")[:16].replace("T", " ")
 
