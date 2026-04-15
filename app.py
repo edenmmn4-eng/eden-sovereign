@@ -2090,7 +2090,7 @@ def _supabase_load_tg_db() -> dict | None:
             params={"ticker": "eq._tg_db", "select": "data",
                     "order": "cached_at.desc", "limit": "1"},
             headers={"apikey": key, "Authorization": f"Bearer {key}"},
-            timeout=4,
+            timeout=8,
         )
         if r.status_code == 200 and r.json():
             return r.json()[0]["data"]
@@ -2301,8 +2301,11 @@ def _load_alerts_db() -> dict:
     if not _in_bg:
         try:
             import time as _t2
+            _has_data = bool(data.get("registrations") or data.get("alerts") or data.get("score_alerts"))
             st.session_state["_tg_db_ss_cache"] = data
-            st.session_state["_tg_db_ss_ts"] = _t2.time()
+            # Cold start: Supabase מחזיר ריק תוך 8s → TTL קצר (10s) כדי שהrerun הבא ינסה שוב
+            # נתונים ממשיים: TTL רגיל (60s)
+            st.session_state["_tg_db_ss_ts"] = _t2.time() if _has_data else (_t2.time() - 50)
         except Exception:
             pass
     return data
@@ -6660,10 +6663,11 @@ def main() -> None:
                             st.rerun()
 
             else:
-                # ── Auto-connect: בדוק פעם אחת בsession (מכסה משתמש רשום שSupabase היה איטי) ──
-                _ap_key = f"_ap_{_norm}"
-                if not st.session_state.get(_ap_key):
-                    st.session_state[_ap_key] = True
+                # ── Auto-connect: עד 3 ניסיונות בsession (מכסה cold-start שבו Supabase איטי) ──
+                _ap_key = f"_ap_tries_{_norm}"
+                _ap_tries = st.session_state.get(_ap_key, 0)
+                if _ap_tries < 3:
+                    st.session_state[_ap_key] = _ap_tries + 1
                     with st.spinner("מחפש רישום..."):
                         _poll_telegram_registrations()
                     if _is_phone_registered(_tg_phone):
