@@ -4198,30 +4198,21 @@ def _compute_pulse_score(data: dict) -> int:
         elif _vix > 12:      _s += 3
         else:                _s += 1   # שאננות מסוכנת — VIX < 12
 
-    # S&P 500 10d — מקסימום 16 נקודות
-    # שטוח/ירידה קלה = אזור צבירה = הזדמנות | עלייה חדה = over-extension = סיכון
+    # S&P 500 10d — מקסימום 16 נקודות (עלייה = חיובי)
     _spy = data.get("spy_trend")
     if _spy is not None:
-        if -3 <= _spy <= 2:     _s += 16  # שטוח / ירידה קלה = אזור צבירה אידיאלי
-        elif _spy < -3:
-            if _spy < -8:       _s += 8   # קריסה — ייתכן המשך ירידה, זהירות
-            else:               _s += 13  # תיקון בריא = הזדמנות
-        else:                             # _spy > 2
-            if _spy <= 5:       _s += 11  # עלייה מהירה — שוק מתחמם
-            elif _spy <= 8:     _s += 8   # over-extended — זהירות
-            else:               _s += 5   # מסוכן לקנות בנקודה זו
+        if _spy > 3:    _s += 16
+        elif _spy > 1:  _s += 12
+        elif _spy > -1: _s += 7
+        elif _spy > -3: _s += 3
 
-    # QQQ 10d — מקסימום 10 נקודות (אותה לוגיקה)
+    # QQQ 10d — מקסימום 10 נקודות (עלייה = חיובי)
     _qqq = data.get("qqq_trend")
     if _qqq is not None:
-        if -3 <= _qqq <= 2:     _s += 10
-        elif _qqq < -3:
-            if _qqq < -8:       _s += 5
-            else:               _s += 8
-        else:
-            if _qqq <= 5:       _s += 7
-            elif _qqq <= 8:     _s += 5
-            else:               _s += 3
+        if _qqq > 3:    _s += 10
+        elif _qqq > 1:  _s += 7
+        elif _qqq > -1: _s += 4
+        elif _qqq > -3: _s += 1
 
     # תשואת אגרת 10 שנים — מקסימום 12 נקודות (נמוך = טוב למניות)
     _yld = data.get("yield_10y")
