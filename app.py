@@ -4245,11 +4245,12 @@ def _compute_pulse_score(data: dict) -> int:
         elif _dxy < 0: _s += 5
         elif _dxy < 1: _s += 3
 
-    # נפט 5d — מקסימום 6 נקודות (יציב = אידיאלי)
+    # נפט 5d — מקסימום 6 נקודות (ירידה או יציבות = חיובי, עלייה = לחץ אינפלציוני)
     _oil = data.get("oil_trend")
     if _oil is not None:
-        if -3 < _oil < 3:   _s += 6
-        elif -6 < _oil < 6: _s += 3
+        if _oil <= 3:    _s += 6   # ירידה כלשהי או יציבות = מקסימום
+        elif _oil < 8:   _s += 3   # עלייה מתונה — לחץ אינפלציוני
+        # עלייה חדה >8% → 0 נקודות
 
     # Bitcoin 5d — מקסימום 5 נקודות (עולה = risk-on)
     _btc = data.get("btc_trend")
@@ -4741,10 +4742,10 @@ def render_market_pulse_banner() -> None:
             "דולר חזק מאוד — לחץ על שווקים מתעוררים ורווחי חברות" if _dxy_trend is not None else "—"
         )
         _oil_exp = (
-            "צניחה חדה — חשש ממיתון גלובלי, ירידת ביקוש" if _oil_trend is not None and _oil_trend < -5 else
-            "ירידה — לחץ אינפלציוני מוקל, חיובי לצרכנים" if _oil_trend is not None and _oil_trend < -2 else
-            "יציב — סביבת מאקרו מאוזנת ומאפשרת" if _oil_trend is not None and _oil_trend <= 2 else
-            "עלייה — לחץ אינפלציוני קל, עלות עסקים עולה" if _oil_trend is not None and _oil_trend <= 5 else
+            "צניחה חדה — אינפלציה יורדת, Fed יכול להוריד ריבית — חיובי מאוד לשוק" if _oil_trend is not None and _oil_trend < -5 else
+            "ירידה — לחץ אינפלציוני מוקל, חיובי לצרכנים ולמניות" if _oil_trend is not None and _oil_trend < -2 else
+            "יציב — סביבת מאקרו מאוזנת ומאפשרת" if _oil_trend is not None and _oil_trend <= 3 else
+            "עלייה — לחץ אינפלציוני קל, עלות עסקים עולה" if _oil_trend is not None and _oil_trend <= 8 else
             "קפיצה חדה — לחץ אינפלציוני גבוה, יפגע ברווחיות" if _oil_trend is not None else "—"
         )
         _btc_exp = (
