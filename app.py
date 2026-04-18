@@ -2013,7 +2013,27 @@ def compute_score(data: dict, tech: dict, horizon: str, use_news: bool = True) -
 
 
 # ── Portfolio persistence helpers ─────────────────────────────────────────────
-_PORTFOLIO_FILE = os.path.join(os.path.dirname(__file__), "portfolio_state.json")
+_PORTFOLIO_FILE      = os.path.join(os.path.dirname(__file__), "portfolio_state.json")
+_DEMO_PORTFOLIO_FILE = "/tmp/demo_portfolio_state.json"
+
+
+def _save_demo_portfolio(portfolio: list) -> None:
+    try:
+        with open(_DEMO_PORTFOLIO_FILE, "w", encoding="utf-8") as _f:
+            json.dump(portfolio, _f)
+    except Exception:
+        pass
+
+
+def _load_demo_portfolio() -> list:
+    try:
+        if os.path.exists(_DEMO_PORTFOLIO_FILE):
+            _d = json.load(open(_DEMO_PORTFOLIO_FILE, encoding="utf-8"))
+            if isinstance(_d, list):
+                return _d
+    except Exception:
+        pass
+    return []
 
 
 def _save_portfolio(portfolio: list) -> None:
@@ -6203,7 +6223,9 @@ def _render_portfolio_tab(horizon: str):
                     "quantity": _port_qty,
                     "buy_price": _port_buy,
                 })
-                if not _is_demo:
+                if _is_demo:
+                    _save_demo_portfolio(st.session_state[_port_key])
+                else:
                     _save_portfolio(st.session_state[_port_key])
                 st.rerun()
             else:
@@ -6212,6 +6234,7 @@ def _render_portfolio_tab(horizon: str):
     if st.button("&#9851; Reset Portfolio", use_container_width=False, key=f"port_reset_{_port_key}"):
         if _is_demo:
             st.session_state["demo_portfolio"] = []
+            _save_demo_portfolio([])
         else:
             st.session_state["portfolio"] = []
             _save_portfolio([])
@@ -6282,7 +6305,9 @@ def _render_portfolio_tab(horizon: str):
             st.session_state[_port_key] = [
                 h for h in st.session_state[_port_key] if h["ticker"] not in _to_delete
             ]
-            if not _is_demo:
+            if _is_demo:
+                _save_demo_portfolio(st.session_state[_port_key])
+            else:
                 _save_portfolio(st.session_state[_port_key])
             st.rerun()
 
@@ -6502,7 +6527,7 @@ def main() -> None:
     if "portfolio" not in st.session_state:
         st.session_state["portfolio"] = _load_portfolio()
     if "demo_portfolio" not in st.session_state:
-        st.session_state["demo_portfolio"] = []
+        st.session_state["demo_portfolio"] = _load_demo_portfolio()
 
     # ── בדיקת התראות מחיר Telegram (כל רענון) ────────────────────────────────
     try:
