@@ -6585,6 +6585,10 @@ def main() -> None:
                                       index=3, key="compare_period_sel",
                                       label_visibility="collapsed")
 
+        st.markdown("**Candle Size**")
+        candle_tf = st.radio("Candle Size", ["יומי", "שבועי", "חודשי"],
+                             horizontal=True, key="candle_tf_radio",
+                             label_visibility="collapsed")
 
         # ── 👤 חשבון משתמש + 🔔 התראות מחיר — Telegram ──────────────────────
         st.markdown("---")
@@ -6902,8 +6906,20 @@ def main() -> None:
                     f'<span style="background:{_ret_color}22;padding:2px 8px;border-radius:4px">'
                     f'{_ret_sign}{_ret:.1f}% ({compare_period})</span></div>',
                     unsafe_allow_html=True)
+            # ── Candle timeframe resample ─────────────────────────────────
+            _tf_map = {"שבועי": "W-FRI", "חודשי": "ME"}
+            if candle_tf in _tf_map:
+                _rs = _hist_slice.resample(_tf_map[candle_tf]).agg(
+                    {"Open": "first", "High": "max", "Low": "min",
+                     "Close": "last", "Volume": "sum"}).dropna(subset=["Close"])
+                if len(_rs) >= 2:
+                    _hist_slice = _rs
+                # Bollinger/VWAP computed on daily data — skip when resampled
+                _inds_chart = [i for i in selected_indicators if i not in OVERLAY_INDS]
+            else:
+                _inds_chart = selected_indicators
             _ct = "line" if chart_type == "📈 Line" else "candlestick"
-            fig = build_chart(_hist_slice, tech, int(ma1), int(ma2), selected_indicators, chart_type=_ct)
+            fig = build_chart(_hist_slice, tech, int(ma1), int(ma2), _inds_chart, chart_type=_ct)
             st.plotly_chart(fig, config={"displayModeBar": False, "scrollZoom": False}, use_container_width=True)
 
     with tab_rep:
