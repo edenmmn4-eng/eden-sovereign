@@ -2019,7 +2019,7 @@ _PORTFOLIO_FILE = os.path.join(os.path.dirname(__file__), "portfolio_state.json"
 def _save_portfolio(portfolio: list) -> None:
     # אם משתמש מחובר דרך טלגרם — שמור בחשבון שלו
     try:
-        _cu = st.session_state.get("current_user_phone", "")
+        _cu = st.session_state.get("current_user_phone", "") or st.session_state.get("_tg_verified_phone", "")
         if _cu:
             ok = _save_user_portfolio(_cu, portfolio)
             if not ok:
@@ -2041,7 +2041,7 @@ def _save_portfolio(portfolio: list) -> None:
 def _load_portfolio() -> list:
     # אם משתמש מחובר דרך טלגרם — טען מחשבון שלו
     try:
-        _cu = st.session_state.get("current_user_phone", "")
+        _cu = st.session_state.get("current_user_phone", "") or st.session_state.get("_tg_verified_phone", "")
         if _cu:
             return _load_user_portfolio(_cu)
     except Exception:
@@ -2092,7 +2092,7 @@ def _supabase_load_tg_db() -> dict | None:
             params={"ticker": "eq._tg_db", "select": "data",
                     "order": "cached_at.desc", "limit": "1"},
             headers={"apikey": key, "Authorization": f"Bearer {key}"},
-            timeout=8,
+            timeout=12,
         )
         if r.status_code == 200 and r.json():
             return r.json()[0]["data"]
@@ -6770,6 +6770,9 @@ def main() -> None:
                 )
                 st.caption("לחץ → טלגרם נפתח → לחץ START → חזור לכאן")
                 if st.button("✅ בדוק רישום", use_container_width=True, key="check_reg_btn"):
+                    # אפס cache + counter → הרנדר הבא יוכל לנסות auto-connect שוב
+                    st.session_state["_tg_db_ss_ts"] = 0
+                    st.session_state[f"_ap_tries_{_norm}"] = 0
                     with st.spinner("בודק..."):
                         _poll_telegram_registrations(force=True)  # force=True — מדלג על throttle
                     if _is_phone_registered(_tg_phone):
