@@ -6795,13 +6795,34 @@ def main() -> None:
                 )
                 st.caption("לחץ → טלגרם נפתח → לחץ START → חזור לכאן")
                 if st.button("✅ בדוק רישום", use_container_width=True, key="check_reg_btn"):
-                    # אפס cache + counter → הרנדר הבא יוכל לנסות auto-connect שוב
-                    st.session_state["_tg_db_ss_ts"] = 0
-                    st.session_state[f"_ap_tries_{_norm}"] = 0
-                    with st.spinner("בודק..."):
-                        _poll_telegram_registrations(force=True)  # force=True — מדלג על throttle
-                    if _is_phone_registered(_tg_phone):
+                    # בדיקה ישירה ב-Supabase עם timeout ארוך (מתאים לcold-start של Supabase free tier)
+                    _found = False
+                    with st.spinner("מתחבר ל-Supabase — עשוי לקחת עד 30 שניות..."):
+                        try:
+                            _url2, _key2 = _sb_creds()
+                            if _url2 and _key2:
+                                _r2 = _req.get(
+                                    f"{_url2}/rest/v1/ticker_cache",
+                                    params={"ticker": "eq._tg_db", "select": "data",
+                                            "order": "cached_at.desc", "limit": "1"},
+                                    headers={"apikey": _key2, "Authorization": f"Bearer {_key2}"},
+                                    timeout=25,
+                                )
+                                if _r2.status_code == 200 and _r2.json():
+                                    _db2 = _r2.json()[0]["data"]
+                                    if isinstance(_db2, dict) and _norm in _db2.get("registrations", {}):
+                                        _found = True
+                                        # עדכן session cache
+                                        st.session_state["_tg_db_ss_cache"] = _db2
+                                        import time as _t25; st.session_state["_tg_db_ss_ts"] = _t25.time()
+                        except Exception:
+                            pass
+                        # פאלבק: בדוק via user-alerts row
+                        if not _found:
+                            _found = _supabase_load_user_alerts(_norm) is not None
+                    if _found:
                         st.session_state["_tg_verified_phone"] = _tg_phone
+                        st.session_state[f"_ap_tries_{_norm}"] = 0
                         st.toast("✅ נרשמת בהצלחה!")
                         st.rerun()
                     else:
