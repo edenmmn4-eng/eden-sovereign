@@ -49,42 +49,52 @@ TICKER_LIST = sorted(set([
     'ARM','NXPI','ON','SWKS','QRVO','MPWR','SMCI','ONTO','ACLS','WOLF',
     'AMBA','SLAB','DIOD','POWI','SITM','CRUS','MTSI','LSCC','ALGM',
     'TSM','ASML','UMC','HIMX','AEHR',
+    'ADI','MCHP','ACMR','NVTS','FORM','CEVA',
     # Software / Cloud / SaaS
     'ORCL','CRM','ADBE','NOW','INTU','WDAY','VEEV','TEAM','ZM','OKTA',
     'TWLO','TTD','HUBS','ZS','DDOG','SNOW','MDB','GTLB','ESTC','APPN','PCTY','PAYC','GWRE','JAMF','TENB',
     'QLYS','CHKP','FTNT','PANW','CRWD','S','CYBR','RPM','VRNS',
     'NCNO','DOCU','BOX','DOCN','FSLY','BILL',
     'NET','CFLT','MNDY','WIX','ZI','BRZE','APP','RBRK','RDDT','KVYO',
-    # Big Tech / Hardware
+    'RNG','PD','ASAN','FROG','SPSC','TNET','DOMO','SDGR','PRGS','NTNX',
+    # Big Tech / Hardware / IT Services
     'IBM','CSCO','HPQ','HPE','DELL','WDC','STX','NTAP','JNPR','ZBRA',
     'VRSN','FFIV','CTSH','EPAM','GDDY','AKAM','CDW','NSIT','ACN',
     'LDOS','SAIC','BAH','CACI',
+    'ADP','PAYX',
     # Internet / Consumer Tech
     'NFLX','UBER','LYFT','ABNB','DASH','RBLX','SNAP','PINS','SHOP',
     'MELI','SE','BIDU','JD','PDD','BABA','TCOM','NTES','BILI','IQ',
     'ZTO','EDU','TAL','WB','DOYU','HUYA','VIPS',
     'ETSY','EBAY','CHWY','W','RVLV','REAL','ROKU','SPOT','SIRI',
     'DUOL','CPNG','CART','BMBL','MTCH','GLBE','TOST','RELY',
+    'YELP','ANGI','CVNA','FUBO','HIMS','TDOC','DOCS','GENI','CHGG','COUR',
+    # Ad Tech / Digital Media
+    'PUBM','MGNI','DV','IAS','CRTO',
     # Crypto / Blockchain
     'COIN','MSTR','HOOD','RIOT','MARA','HUT','CLSK','BTBT','CIFR',
-    'BITF','IREN','WULF','HIVE',
-    # AI / Emerging Tech
+    'BITF','IREN','WULF','HIVE','CORZ',
+    # AI / Emerging Tech / Robotics / Autonomous
     'PLTR','SOUN','AI','BBAI','IONQ','QUBT','RGTI','ARQQ','ONDS',
     'KULR','BFLY','RCAT','OUST','INVZ','RXRX','OPEN','AIOT',
+    'SYM','MBLY','LAZR','MVIS','AEVA','XMTR',
     # Fintech
     'SQ','PYPL','SOFI','AFRM','UPST','LC','NU','ALLY','DFS','SYF',
     'CACC','NAVI','GPN','FIS','FISV','WEX','RPAY','FLYW','CURO',
     'RELY','MQ','FICO','WU','GDOT','QNST',
+    'PAYO','DLO','ACIW','EVTC','STNE','TREE','OLO','LMND',
     # Banks / Financials
     'JPM','BAC','GS','MS','WFC','C','USB','TFC','PNC','COF',
     'AXP','V','MA','BLK','SCHW','STT','BK','NTRS','AMP','BEN',
     'TROW','IVZ','RJF','SF','LPLA',
     'MCO','SPGI','MSCI','ICE','CME','NDAQ','CBOE',
     'BX','KKR','APO','ARES','CG','BN','BAM','OWL','HLNE','TPG',
+    'FITB','HBAN','KEY','RF','CFG','ZION','MTB','FHN','WAL',
     # Insurance
     'PGR','ALL','TRV','AIG','HIG','CB','MKL','RNR','RE','WRB',
     'CINF','AFL','MET','PRU','LNC','UNM','GL','FG','RLI',
-    # Healthcare / Pharma
+    'RYAN','ACGL','ORI',
+    # Healthcare / Pharma / Medical Devices
     'UNH','LLY','JNJ','ABBV','MRK','PFE','AMGN','GILD','REGN',
     'ISRG','TMO','DHR','ZTS','SYK','MDT','ABT','ELV','CI','HUM','CVS',
     'MCK','CAH','COR','HSIC',
@@ -95,6 +105,8 @@ TICKER_LIST = sorted(set([
     'IQV','CTLT','PRGO','JAZZ','EXAS','NTRA','GH','ACAD','SAGE',
     'INCY','ALNY','BMRN','SRPT','RARE','FOLD','KYMR',
     'CRSP','NTLA','EDIT','BEAM','HALO','MEDP','ROIVT','RVMD',
+    'BSX','BDX','EW','STE','GEHC','PGNY','NVCR','CLDX','DVAX','AGIO',
+    'OPCH','ACHC','CNC','MOH',
     # Consumer Discretionary
     'WMT','COST','TGT','HD','LOW','MCD','SBUX','NKE','LULU','ULTA',
     'RL','TPR','CPRI','VFC','HBI','PVH','UAA','UA','ONON','SKX','CROX',
@@ -102,7 +114,11 @@ TICKER_LIST = sorted(set([
     'DRI','CAKE','F','GM','STLA','RIVN','NIO','LCID','XPEV','LI','BKNG','EXPE','TRIP','MAR','HLT','H','IHG','CHH',
     'MGM','WYNN','LVS','CZR','PENN','DKNG','BYD','CHDN',
     'CCL','RCL','NCLH',
-    'PTON','DKS','ASO',# Consumer Staples
+    'PTON','DKS','ASO',
+    'TJX','ROSS','DG','DLTR','BURL','ORLY','AZO','AAP',
+    'YETI','FIGS','BOOT','ANF','AEO','FIVE','OLLI','DRVN',
+    'DHI','LEN','PHM','TOL','KBH','NVR','PZZA','BRCC',
+    # Consumer Staples
     'PG','KO','PEP','PM','MO','MDLZ','CL','KHC','GIS','K','CPB',
     'CAG','HRL','SJM','MKC','CHD','CLX','EL','COTY','IPAR',
     'STZ','BUD','TAP','SAM','MNST','KDP','FIZZ','CELH',
@@ -112,12 +128,13 @@ TICKER_LIST = sorted(set([
     'HAL','BKR','NOV','HP','PTEN','RIG','VAL','DO','NE','FTI',
     'PXD','FANG','APA','MRO','HES','CNX','EQT','RRC','AR','SWN',
     'KMI','WMB','OKE','ET','EPD','TRGP','PAA','MPLX','LNG',
+    'CIVI','SM','PR','VTLE','NOG','LBRT',
     # Utilities / Clean Energy
     'NEE','AES','D','DUK','SO','EXC','PCG','ED','FE','AEE','CMS',
     'WEC','XEL','ES','PEG','ETR','EVRG','NI','OGE',
     'FSLR','ENPH','SEDG','NOVA','RUN','SPWR','SHLS','STEM','ARRY','BE',
     'VST','CEG','NRG','CWEN','ORA','FLNC','BWEN',
-    # Industrials / Defense
+    # Industrials / Defense / Aerospace
     'BA','LMT','RTX','GE','HON','CAT','DE','UPS','NSC','GD','NOC',
     'TDG','LHX','KTOS','AXON','CACI','HII','AVAV','JOBY',
     'MMM','EMR','ITW','ROK','PH','AME','DOV','IR','XYL',
@@ -127,24 +144,31 @@ TICKER_LIST = sorted(set([
     'GPC','LKQ','APTV','LEA','BWA','GNTX','TEN','GT',
     'FAST','GWW','MSM','AIT','TTC','AGCO','CNH','LNN',
     'OTIS','CARR','TT','JCI',
+    'UNP','CSX','ODFL','GEV',
+    'BLDR','TREX','GNRC','AEIS','AOS','WMS','BECN','SITE','MLI','ITRI',
+    'IPGP','LITE','COHR','VIAV','GTLS',
+    'HEI','TDY','SPR','HXL','CW','MRCY',
     # Materials
     'LIN','APD','ALB','PPG','SHW','RPM','FMC','ECL','IFF','AVNT',
     'CE','HUN','WLK','LYB','OLN','CC','EMN','PKG','IP','WRK','SEE',
     'NUE','STLD','X','CLF','RS','CMC','MP','ARNC','AA','CENX',
     'FCX','NEM','AEM','GOLD','KGC','AU','GFI','WPM','PAAS','SILV',
     'RIO','BHP','VALE','SCCO','TECK','FM','HBM','SQM','LTHM',
-    # Real Estate
+    # Real Estate / Proptech
     'AMT','PLD','EQIX','CCI','SBAC','DLR','PSA','EXR','CUBE',
     'SPG','O','NNN','ADC','EPRT','KIM','REG','BRX',
     'ARE','BXP','SLG','VNO','HPP','WELL','VTR','OHI','NHI','CTRE','LTC','SBRA',
     'EQR','AVB','UDR','CPT','ESS','IRT',
+    'VICI','INVH','AMH','STAG','REXR','MPW',
+    'CSGP','RDFN','Z',
     # Communication Services
     'T','VZ','TMUS','LUMN','TDS','USM','IDT','OOMA',
     'DIS','CMCSA','WBD','PARA','AMC','NWSA','NWS','FOXA','FOX',
     'NYT','IAC',
-    # Space / Aerospace
+    # Space / Aerospace / eVTOL
     'SPCE','RKLB','ASTS','PL','BWXT',
     'ACHR','JOBY','BLDE','EHANG',
+    'LUNR','RDW',
     # Gaming / Leisure
     'EA','TTWO','RBLX',
     # Meme / Retail Favorites
@@ -156,6 +180,7 @@ TICKER_LIST = sorted(set([
     'SE','GRAB','MELI','NU','ITUB',
     'RIO','BHP','VALE','TECK','SQM',
     'IRE','ING','CS','UBS','DB','HSBC','BCS','LYG','MFG','SMFG',
+    'INFY','WIT','RELX',
     # ETFs (popular)
     'SPY','QQQ','IWM','DIA','VTI','VOO','IVV',
     'XLK','XLF','XLE','XLV','XLI','XLU','XLB','XLRE','XLC','XLY','XLP',
@@ -167,6 +192,9 @@ TICKER_LIST = sorted(set([
     'SKYY','CLOU','PAVE','DRIV','BOTZ','CIBR','HACK',
     'BND','SHY','IEF','TIP','IEMG','ACWI','VT','VXUS',
     'SOXS','UVXY','VXX','VIXY',
+    'VGT','SCHG','IAU','MCHI','INDA','EWJ','EWZ','BITO',
+    'PSQ','SH','SQQQ','SPXS','DBC','QLD','SSO','SPLG',
+    'URNM','LIT','JETS','KBWB','ROBO','COPX',
     # Misc / Other
     'BRK-B','BRK-A','MMM','TRMB','GDDY',
     'BALL','SON','AMCR','BERY','OC','SOLV']))
