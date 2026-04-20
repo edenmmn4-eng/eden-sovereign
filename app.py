@@ -6795,9 +6795,17 @@ def main() -> None:
                 )
                 st.caption("לחץ → טלגרם נפתח → לחץ START → חזור לכאן")
                 if st.button("✅ בדוק רישום", use_container_width=True, key="check_reg_btn"):
-                    # בדיקה ישירה ב-Supabase עם timeout ארוך (מתאים לcold-start של Supabase free tier)
+                    import time as _t_reg
                     _found = False
-                    with st.spinner("מתחבר ל-Supabase — עשוי לקחת עד 30 שניות..."):
+                    _found_db = None  # ה-DB שמצא את הרישום — לעדכון session cache
+                    with st.spinner("מחפש רישום — עשוי לקחת עד 30 שניות..."):
+                        # שלב א: סרוק הודעות טלגרם (/start) — מאפשר רישום ראשוני וחוזר
+                        try:
+                            _poll_telegram_registrations(force=True)
+                        except Exception:
+                            pass
+
+                        # שלב ב: בדיקה ישירה ב-Supabase עם timeout ארוך (cold-start free tier)
                         try:
                             _url2, _key2 = _sb_creds()
                             if _url2 and _key2:
@@ -6812,21 +6820,56 @@ def main() -> None:
                                     _db2 = _r2.json()[0]["data"]
                                     if isinstance(_db2, dict) and _norm in _db2.get("registrations", {}):
                                         _found = True
-                                        # עדכן session cache
-                                        st.session_state["_tg_db_ss_cache"] = _db2
-                                        import time as _t25; st.session_state["_tg_db_ss_ts"] = _t25.time()
+                                        _found_db = _db2
                         except Exception:
                             pass
-                        # פאלבק: בדוק via user-alerts row
+
+                        # שלב ג: פאלבק — קובץ מקומי (עודכן ע"י שלב א אם /start נמצא)
                         if not _found:
-                            _found = _supabase_load_user_alerts(_norm) is not None
+                            try:
+                                if os.path.exists(_ALERTS_FILE):
+                                    _ldb = json.load(open(_ALERTS_FILE, encoding="utf-8"))
+                                    if isinstance(_ldb, dict) and _norm in _ldb.get("registrations", {}):
+                                        _found = True
+                                        _found_db = _ldb
+                            except Exception:
+                                pass
+
+                        # שלב ד: פאלבק אחרון — _ualerts_{norm} row (רישום היסטורי, timeout ארוך)
+                        if not _found:
+                            try:
+                                _url3, _key3 = _sb_creds()
+                                if _url3 and _key3:
+                                    _r3 = _req.get(
+                                        f"{_url3}/rest/v1/ticker_cache",
+                                        params={"ticker": f"eq._ualerts_{_norm}", "select": "data",
+                                                "order": "cached_at.desc", "limit": "1"},
+                                        headers={"apikey": _key3, "Authorization": f"Bearer {_key3}"},
+                                        timeout=15,
+                                    )
+                                    if _r3.status_code == 200 and _r3.json():
+                                        _found = True
+                            except Exception:
+                                pass
+
                     if _found:
+                        # עדכן session cache אם יש DB מלא
+                        if _found_db:
+                            st.session_state["_tg_db_ss_cache"] = _found_db
+                            st.session_state["_tg_db_ss_ts"] = _t_reg.time()
+                        # הגדר חיבור מלא ישירות — לא לסמוך על rerender chain
                         st.session_state["_tg_verified_phone"] = _tg_phone
+                        st.session_state["current_user_phone"] = _tg_phone
                         st.session_state[f"_ap_tries_{_norm}"] = 0
+                        try:
+                            st.query_params["u"] = _tg_phone
+                        except Exception:
+                            pass
+                        st.session_state["portfolio"] = _load_user_portfolio(_tg_phone)
                         st.toast("✅ נרשמת בהצלחה!")
                         st.rerun()
                     else:
-                        st.warning("עדיין לא נמצא. לחץ START בטלגרם ונסה שוב.")
+                        st.warning("עדיין לא נמצא. לחץ 📲 הירשם דרך טלגרם → לחץ START → חזור ולחץ שוב.")
 
         st.markdown("---")
         st.caption("⚠️ For educational purposes only. Not financial advice.")
