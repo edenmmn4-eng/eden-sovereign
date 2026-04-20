@@ -1013,7 +1013,7 @@ def _supabase_get(ticker: str, stale_ok: bool = False) -> dict | None:
             f"{url}/rest/v1/ticker_cache",
             params={"ticker": f"eq.{ticker}", "select": "data,cached_at"},
             headers={"apikey": key, "Authorization": f"Bearer {key}"},
-            timeout=3,
+            timeout=8,
         )
         if r.status_code == 200 and r.json():
             row = r.json()[0]
@@ -1591,6 +1591,29 @@ def fetch_data(ticker: str) -> dict:
                 out["current_price"] = float(hist["Close"].iloc[-1])
             if _isnan(out["prev_close"]) and len(hist) >= 2:
                 out["prev_close"] = float(hist["Close"].iloc[-2])
+            # 52-week range from hist — אמין לחלוטין, לא תלוי ב-API rate limit
+            if _isnan(out["week52_high"]) or _isnan(out["week52_low"]):
+                try:
+                    _tz = hist.index.tz
+                    _cutoff = pd.Timestamp.now(tz=_tz) - pd.Timedelta(days=370)
+                    _1y = hist[hist.index >= _cutoff]
+                    if _1y.empty:
+                        _1y = hist
+                    if _isnan(out["week52_high"]) and "High" in _1y.columns:
+                        out["week52_high"] = float(_1y["High"].max())
+                    if _isnan(out["week52_low"]) and "Low" in _1y.columns:
+                        out["week52_low"] = float(_1y["Low"].min())
+                except Exception:
+                    pass
+            # Market cap fallback: last close × shares outstanding (כשfast_info.market_cap ריק)
+            if out["mkt_cap"] == 0.0:
+                try:
+                    _shr2 = _fi("shares")
+                    _px2  = float(hist["Close"].iloc[-1])
+                    if _shr2 and float(_shr2) > 0 and _px2 > 0:
+                        out["mkt_cap"] = float(_shr2) * _px2
+                except Exception:
+                    pass
         elif not _hist_ok:
             out["error"] = out.get("error") or "Rate limited. Try after a while."
             raise RuntimeError("rate_limited")  # אל תשמור ב-cache — נסה שוב בבקשה הבאה
