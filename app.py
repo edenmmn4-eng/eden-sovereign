@@ -2191,7 +2191,7 @@ def _supabase_save_tg_db(db: dict) -> bool:
                 params={"ticker": "eq._tg_db", "select": "data",
                         "order": "cached_at.desc", "limit": "1"},
                 headers={"apikey": key, "Authorization": f"Bearer {key}"},
-                timeout=4,
+                timeout=12,
             )
             if _curr_r.status_code == 200 and _curr_r.json():
                 _curr = _curr_r.json()[0]["data"]
@@ -2231,7 +2231,7 @@ def _supabase_save_tg_db(db: dict) -> bool:
             json=_payload,
             headers={"apikey": key, "Authorization": f"Bearer {key}",
                      "Prefer": "resolution=merge-duplicates,return=minimal"},
-            timeout=4,
+            timeout=12,
         )
         if not r.ok:
             # fallback בטוח: INSERT בלבד (ללא DELETE) — הקריאה תמיד שולפת ORDER BY cached_at DESC
@@ -2242,7 +2242,7 @@ def _supabase_save_tg_db(db: dict) -> bool:
                 json=_payload,
                 headers={"apikey": key, "Authorization": f"Bearer {key}",
                          "Prefer": "return=minimal"},
-                timeout=4,
+                timeout=12,
             )
             if not r.ok:
                 print(f"[WARNING] _supabase_save_tg_db failed: HTTP {r.status_code} — {r.text[:200]}")
@@ -2391,6 +2391,17 @@ def _save_alerts_db(db: dict) -> bool:
     db = {**db, "saved_at": datetime.utcnow().isoformat()}
     # שמור ב-Supabase (persistent) — קריאת הגנה read-before-write כבר ב-_supabase_save_tg_db
     sb_ok = _supabase_save_tg_db(db)
+    # Retry ב-background thread אם נכשל — Supabase free tier cold-start לוקח 15-30 שניות
+    if not sb_ok:
+        try:
+            import threading as _thr_retry, time as _t_retry
+            def _retry_save(_db=db):
+                _t_retry.sleep(10)
+                _supabase_save_tg_db(_db)
+            _t = _thr_retry.Thread(target=_retry_save, daemon=True, name="eden-sb-retry")
+            _t.start()
+        except Exception:
+            pass
     # שמור לקובץ מקומי (fallback) — בthread מתזמן: רק אם יש נתונים ממשיים
     # מגן מפני: Supabase timeout בthread רקע → db ריק → מדרוס קובץ תקין
     _in_scheduler = _thr_sv.current_thread().name == "eden-alert-scheduler"
@@ -2999,7 +3010,7 @@ def _supabase_save_portfolio_cache(norm: str, portfolio: list) -> bool:
             headers={"apikey": key, "Authorization": f"Bearer {key}",
                      "Prefer": "resolution=merge-duplicates",
                      "Content-Type": "application/json"},
-            timeout=5,
+            timeout=10,
         )
         return True
     except Exception:
@@ -3043,7 +3054,7 @@ def _supabase_save_portfolio(phone: str, portfolio: list) -> bool:
                 "Prefer": "resolution=merge-duplicates",
                 "Content-Type": "application/json",
             },
-            timeout=5,
+            timeout=12,
         )
         return r.status_code in (200, 201, 204)
     except Exception:
@@ -3093,9 +3104,24 @@ def _save_user_portfolio(phone: str, portfolio: list) -> bool:
     except Exception:
         pass
     # 2. SECONDARY: שמור גם ב-user_portfolios (אם הטבלה קיימת)
-    _supabase_save_portfolio(norm, portfolio)
+    _sp_ok = _supabase_save_portfolio(norm, portfolio)
     # 3. TERTIARY: גיבוי שלישי ב-ticker_cache
-    _supabase_save_portfolio_cache(norm, portfolio)
+    _spc_ok = _supabase_save_portfolio_cache(norm, portfolio)
+    # Retry ב-background thread אם SECONDARY/TERTIARY נכשלו
+    if not _sp_ok or not _spc_ok:
+        try:
+            import threading as _thr_sp, time as _t_sp
+            _norm_c, _port_c = norm, list(portfolio)
+            def _retry_portfolio(_n=_norm_c, _p=_port_c, _sp=_sp_ok, _spc=_spc_ok):
+                _t_sp.sleep(10)
+                if not _sp:
+                    _supabase_save_portfolio(_n, _p)
+                if not _spc:
+                    _supabase_save_portfolio_cache(_n, _p)
+            _t2 = _thr_sp.Thread(target=_retry_portfolio, daemon=True, name="eden-sb-port-retry")
+            _t2.start()
+        except Exception:
+            pass
     return sb_ok
 
 
