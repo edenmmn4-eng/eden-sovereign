@@ -1011,19 +1011,20 @@ def _supabase_get(ticker: str, stale_ok: bool = False) -> dict | None:
             return None
         r = _req.get(
             f"{url}/rest/v1/ticker_cache",
-            params={"ticker": f"eq.{ticker}", "select": "data,cached_at"},
+            params={"ticker": f"eq.{ticker}", "select": "data,cached_at",
+                    "order": "cached_at.desc", "limit": "1"},
             headers={"apikey": key, "Authorization": f"Bearer {key}"},
-            timeout=8,
+            timeout=15,
         )
         if r.status_code == 200 and r.json():
             row = r.json()[0]
             from datetime import timezone, timedelta
             cached_at = datetime.fromisoformat(row["cached_at"].replace("Z", "+00:00"))
             age = datetime.now(timezone.utc) - cached_at
-            if age < timedelta(hours=24):
+            if age < timedelta(hours=48):
                 return row["data"]
-            if stale_ok and age < timedelta(hours=720):
-                return row["data"]   # נתונים ישנים — עדיף על כלום (מכסה עד 30 ימים)
+            if stale_ok and age < timedelta(hours=1440):
+                return row["data"]   # נתונים ישנים — עדיף על כלום (מכסה עד 60 ימים)
     except Exception:
         pass
     return None
@@ -1043,16 +1044,33 @@ def _supabase_set(ticker: str, info: dict) -> None:
                 return v.item()
             return v
         safe_info = {k: _safe(v) for k, v in info.items()}
-        _req.post(
-            f"{url}/rest/v1/ticker_cache",
-            json={"ticker": ticker, "data": safe_info},
+        from datetime import timezone as _tz_set
+        _r_set = _req.post(
+            f"{url}/rest/v1/ticker_cache?on_conflict=ticker",
+            json={"ticker": ticker, "data": safe_info,
+                  "cached_at": datetime.now(_tz_set.utc).isoformat()},
             headers={
                 "apikey": key,
                 "Authorization": f"Bearer {key}",
-                "Prefer": "resolution=merge-duplicates",
+                "Prefer": "resolution=merge-duplicates,return=minimal",
+                "Content-Type": "application/json",
             },
-            timeout=3,
+            timeout=10,
         )
+        if not _r_set.ok:
+            # fallback: regular INSERT (older rows stay but newest wins on ORDER BY)
+            _req.post(
+                f"{url}/rest/v1/ticker_cache",
+                json={"ticker": ticker, "data": safe_info,
+                      "cached_at": datetime.now(_tz_set.utc).isoformat()},
+                headers={
+                    "apikey": key,
+                    "Authorization": f"Bearer {key}",
+                    "Prefer": "return=minimal",
+                    "Content-Type": "application/json",
+                },
+                timeout=10,
+            )
     except Exception:
         pass
 
@@ -1162,7 +1180,7 @@ def _supabase_get_all() -> dict:
             f"{url}/rest/v1/ticker_cache",
             params={"select": "ticker,data,cached_at"},
             headers={"apikey": key, "Authorization": f"Bearer {key}"},
-            timeout=5,
+            timeout=12,
         )
         if r.status_code != 200:
             return {}
