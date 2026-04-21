@@ -1289,6 +1289,49 @@ def fetch_data(ticker: str) -> dict:
         out["gross_margins"] = float(_safe(info.get("grossMargins"), float("nan")))
         out["fcf"]           = float(_safe(info.get("freeCashflow"), float("nan")))
 
+        # ── fast_info internal data — chart API, נפרד מ-quoteSummary, לא נחסם ──
+        # fi._data מכיל trailingPE, epsTrailingTwelveMonths, epsForward, forwardPE
+        # גם כשobj.info נחסם, chart API עובד — זו מקור P/E אמין!
+        _fi_data: dict = {}
+        try:
+            _raw = getattr(fi, "_data", None)
+            if isinstance(_raw, dict):
+                _fi_data = _raw
+        except Exception:
+            pass
+
+        if _isnan(out["pe_ratio"]):
+            try:
+                _pe_c = _fi_data.get("trailingPE")
+                if _pe_c is not None and float(_pe_c) > 0:
+                    out["pe_ratio"] = float(_pe_c)
+            except Exception:
+                pass
+        if _isnan(out["pe_ratio"]):
+            try:
+                _eps_c = _fi_data.get("epsTrailingTwelveMonths")
+                _px_c  = out["current_price"]
+                if _eps_c is not None and float(_eps_c) > 0 and not _isnan(_px_c) and _px_c > 0:
+                    out["pe_ratio"] = _px_c / float(_eps_c)
+            except Exception:
+                pass
+
+        if _isnan(out["forward_pe"]):
+            try:
+                _fpe_c = _fi_data.get("forwardPE")
+                if _fpe_c is not None and float(_fpe_c) > 0:
+                    out["forward_pe"] = float(_fpe_c)
+            except Exception:
+                pass
+        if _isnan(out["forward_pe"]):
+            try:
+                _eps_fwd = _fi_data.get("epsForward")
+                _px_c    = out["current_price"]
+                if _eps_fwd is not None and float(_eps_fwd) > 0 and not _isnan(_px_c) and _px_c > 0:
+                    out["forward_pe"] = _px_c / float(_eps_fwd)
+            except Exception:
+                pass
+
         # ── Fetch all financial statements ONCE with retry ─────────────────
         # Prevents duplicate calls and cascading rate-limits
         def _stmt_fetch(primary: str, fallback: str | None = None):
@@ -1308,6 +1351,26 @@ def fetch_data(ticker: str) -> dict:
         if not _info_ok:
             out["rate_limited"] = True
             _ann_income = _q_income = _cf_stmt = None
+            # שמור fast_info data ל-Supabase כ-minimal cache — הבקשה הבאה תמצא נתונים
+            if _fi_data:
+                _min_info = {k: v for k, v in {
+                    "trailingPE":              _fi_data.get("trailingPE"),
+                    "epsTrailingTwelveMonths": _fi_data.get("epsTrailingTwelveMonths"),
+                    "epsForward":              _fi_data.get("epsForward"),
+                    "forwardPE":               _fi_data.get("forwardPE"),
+                    "marketCap":               _fi_data.get("marketCap"),
+                    "currentPrice":            _fi_data.get("regularMarketPrice"),
+                    "previousClose":           _fi_data.get("regularMarketPreviousClose"),
+                    "fiftyTwoWeekHigh":        _fi_data.get("fiftyTwoWeekHigh"),
+                    "fiftyTwoWeekLow":         _fi_data.get("fiftyTwoWeekLow"),
+                    "longName":                _fi_data.get("longName") or _fi_data.get("shortName"),
+                    "sharesOutstanding":       _fi_data.get("sharesOutstanding"),
+                    "quoteType":               _fi_data.get("quoteType") or "EQUITY",
+                    "dividendYield":           _fi_data.get("trailingAnnualDividendYield"),
+                    "_from_fast_info":         True,
+                }.items() if v is not None}
+                if len(_min_info) > 3:
+                    _supabase_set(ticker, _min_info)
         elif _info_from_yahoo:
             # Yahoo עבד — אפשר למשוך גם דוחות כספיים
             out["rate_limited"] = False
@@ -1497,6 +1560,15 @@ def fetch_data(ticker: str) -> dict:
                                 if _prior > 0 and _recent > 0:
                                     out["revenue_cagr"] = float((_recent/_prior - 1.0) * 0.7)
                             break
+            except Exception:
+                pass
+
+        # revenue_cagr מ-FMP info אם income stmts לא זמינים
+        if out["revenue_cagr"] == 0.0:
+            try:
+                _rg = info.get("revenueGrowth")
+                if _rg and not _isnan(float(_rg)) and float(_rg) > 0.01:
+                    out["revenue_cagr"] = float(_rg)
             except Exception:
                 pass
 
