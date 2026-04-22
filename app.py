@@ -1349,28 +1349,46 @@ def fetch_data(ticker: str) -> dict:
 
         # דלג על בקשות נוספות כשה-info ריק, או כשמגיע מFMP/Supabase (Yahoo חסום)
         if not _info_ok:
-            out["rate_limited"] = True
-            _ann_income = _q_income = _cf_stmt = None
-            # שמור fast_info data ל-Supabase כ-minimal cache — הבקשה הבאה תמצא נתונים
+            # אם fast_info chart meta זמין — בנה minimal info ממנו
+            # chart API (query1) נפרד מ-quoteSummary (query2) ולרוב לא נחסם
+            _min_info = {}
             if _fi_data:
                 _min_info = {k: v for k, v in {
                     "trailingPE":              _fi_data.get("trailingPE"),
+                    "trailingEps":             _fi_data.get("epsTrailingTwelveMonths"),
                     "epsTrailingTwelveMonths": _fi_data.get("epsTrailingTwelveMonths"),
-                    "epsForward":              _fi_data.get("epsForward"),
+                    "forwardEps":              _fi_data.get("epsForward"),
                     "forwardPE":               _fi_data.get("forwardPE"),
                     "marketCap":               _fi_data.get("marketCap"),
                     "currentPrice":            _fi_data.get("regularMarketPrice"),
+                    "regularMarketPrice":      _fi_data.get("regularMarketPrice"),
                     "previousClose":           _fi_data.get("regularMarketPreviousClose"),
                     "fiftyTwoWeekHigh":        _fi_data.get("fiftyTwoWeekHigh"),
                     "fiftyTwoWeekLow":         _fi_data.get("fiftyTwoWeekLow"),
                     "longName":                _fi_data.get("longName") or _fi_data.get("shortName"),
+                    "shortName":               _fi_data.get("shortName"),
                     "sharesOutstanding":       _fi_data.get("sharesOutstanding"),
                     "quoteType":               _fi_data.get("quoteType") or "EQUITY",
                     "dividendYield":           _fi_data.get("trailingAnnualDividendYield"),
+                    "currency":                _fi_data.get("currency"),
                     "_from_fast_info":         True,
                 }.items() if v is not None}
-                if len(_min_info) > 3:
-                    _supabase_set(ticker, _min_info)
+
+            if len(_min_info) > 4:
+                # fast_info נתן מספיק נתונים — השתמש בהם, אין צורך בהתראה
+                info = _min_info
+                out["info"] = info
+                _info_ok = True
+                out["rate_limited"] = False
+                # עדכן שדות שחושבו מוקדם מ-info ריק
+                out["pe_ratio"]   = float(_safe(info.get("trailingPE"),  out["pe_ratio"]))
+                out["forward_pe"] = float(_safe(info.get("forwardPE"),   out["forward_pe"]))
+                out["mkt_cap"]    = float(_safe(info.get("marketCap"),   out["mkt_cap"]))
+                out["company_name"] = info.get("longName") or info.get("shortName") or out["company_name"]
+                _supabase_set(ticker, _min_info)  # cache for next time
+            else:
+                out["rate_limited"] = True
+            _ann_income = _q_income = _cf_stmt = None
         elif _info_from_yahoo:
             # Yahoo עבד — אפשר למשוך גם דוחות כספיים
             out["rate_limited"] = False
