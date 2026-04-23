@@ -415,6 +415,32 @@ DEMO_PORTFOLIO = [
 ]
 
 
+# ── Google Analytics GA4 ──────────────────────────────────────────────────────
+def inject_ga(ga_id: str = "G-XXXXXXXXXX") -> None:
+    """מזריק סקריפט GA4 באופן אסינכרוני — לא מאט את הטעינה."""
+    import streamlit.components.v1 as _comp
+    _comp.html(
+        f"""
+        <script async src="https://www.googletagmanager.com/gtag/js?id={ga_id}"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){{dataLayer.push(arguments);}}
+          gtag('js', new Date());
+          gtag('config', '{ga_id}', {{
+            page_title: 'Sovereign Terminal',
+            page_location: window.location.href,
+            send_page_view: true
+          }});
+          window._sov_track = function(n, p) {{
+            if (typeof gtag !== 'undefined') gtag('event', n, p || {{}});
+          }};
+        </script>
+        """,
+        height=0,
+        scrolling=False,
+    )
+
+
 # ── CSS ───────────────────────────────────────────────────────────────────────
 def inject_css() -> None:
     st.markdown("""
@@ -6408,6 +6434,7 @@ def _render_portfolio_tab(horizon: str):
                     "quantity": _port_qty,
                     "buy_price": _port_buy,
                 })
+                _analytics_event("portfolio_add")
                 if _is_demo:
                     _save_demo_portfolio(st.session_state[_port_key])
                 else:
@@ -6635,6 +6662,73 @@ def _render_portfolio_tab(horizon: str):
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
+# ── Analytics & Session Tracking ──────────────────────────────────────────────
+def _analytics_init() -> None:
+    """מאתחל משתני analytics בתחילת session חדש — נקרא פעם אחת בלבד."""
+    import time as _t
+    if "_an_start" in st.session_state:
+        return
+    st.session_state["_an_start"]       = _t.time()
+    st.session_state["_an_tickers"]     = {}
+    st.session_state["_an_reports"]     = 0
+    st.session_state["_an_port_adds"]   = 0
+    st.session_state["_an_tg_connects"] = 0
+    st.session_state["_an_prev_ticker"] = ""
+    try:
+        import threading as _thr
+        def _bump_sess():
+            _g = _supabase_get("_analytics_global", stale_ok=True) or {}
+            _g["total_sessions"] = _g.get("total_sessions", 0) + 1
+            _supabase_set("_analytics_global", _g)
+        _thr.Thread(target=_bump_sess, daemon=True, name="eden-an-sess").start()
+    except Exception:
+        pass
+
+
+def _analytics_track_ticker(ticker: str) -> None:
+    """עדכן counter חיפוש ticker — מדלג על אותו ticker ברצף."""
+    if not ticker:
+        return
+    if ticker == st.session_state.get("_an_prev_ticker", ""):
+        return
+    st.session_state["_an_prev_ticker"] = ticker
+    _d = st.session_state.get("_an_tickers", {})
+    _d[ticker] = _d.get(ticker, 0) + 1
+    st.session_state["_an_tickers"] = _d
+    try:
+        import threading as _thr
+        def _bump_t(_tk=ticker):
+            _g = _supabase_get("_analytics_global", stale_ok=True) or {}
+            _tt = _g.get("top_tickers", {})
+            _tt[_tk] = _tt.get(_tk, 0) + 1
+            _g["top_tickers"] = _tt
+            _supabase_set("_analytics_global", _g)
+        _thr.Thread(target=_bump_t, daemon=True, name="eden-an-ticker").start()
+    except Exception:
+        pass
+
+
+def _analytics_event(event: str) -> None:
+    """רישום event: 'report', 'portfolio_add', 'telegram_connect'."""
+    _key_map = {
+        "report":           "_an_reports",
+        "portfolio_add":    "_an_port_adds",
+        "telegram_connect": "_an_tg_connects",
+    }
+    _k = _key_map.get(event)
+    if _k:
+        st.session_state[_k] = st.session_state.get(_k, 0) + 1
+    try:
+        import threading as _thr
+        def _bump_ev(_ev=event):
+            _g = _supabase_get("_analytics_global", stale_ok=True) or {}
+            _g[f"total_{_ev}s"] = _g.get(f"total_{_ev}s", 0) + 1
+            _supabase_set("_analytics_global", _g)
+        _thr.Thread(target=_bump_ev, daemon=True, name="eden-an-event").start()
+    except Exception:
+        pass
+
+
 def main() -> None:
     # ── Google Login (graceful fallback) ───────────────────────────────────
     try:
@@ -6648,6 +6742,14 @@ def main() -> None:
 
     inject_css()
 
+    # GA4 — קרא Measurement ID מ-Streamlit secrets (החלף "G-XXXXXXXXXX" ב-ID האמיתי שלך)
+    _ga_id = "G-XXXXXXXXXX"
+    try:
+        _ga_id = st.secrets.get("GA4_MEASUREMENT_ID", _ga_id)
+    except Exception:
+        pass
+    inject_ga(_ga_id)
+
     # ── session_state defaults ─────────────────────────────────────────────
     st.session_state.setdefault("active_ticker", "AAPL")
     st.session_state.setdefault("run_best_pick", False)
@@ -6656,6 +6758,7 @@ def main() -> None:
     st.session_state.setdefault("tg_phone", "")
     st.session_state.setdefault("current_user_phone", "")
     st.session_state.setdefault("_tg_verified_phone", "")  # cache — מונע קריאת Supabase בכל render
+    _analytics_init()
 
     # Auto-login: שחזר phone מה-URL (ה-URL הוגדר על-ידי הקוד שלנו עם אימות מוצלח — אמין)
     if not st.session_state.get("tg_phone"):
@@ -6753,6 +6856,7 @@ def main() -> None:
             placeholder="Type to search (e.g. NVD → NVDA)",
             key="ticker_selectbox")
         st.session_state["active_ticker"] = ticker
+        _analytics_track_ticker(ticker)
 
         st.markdown("---")
         st.markdown("**Analysis Horizon**")
@@ -6965,6 +7069,9 @@ def main() -> None:
                         _poll_telegram_registrations()
                     if _is_phone_registered(_tg_phone):
                         st.session_state["_tg_verified_phone"] = _tg_phone
+                        if not st.session_state.get("_an_tg_tracked"):
+                            st.session_state["_an_tg_tracked"] = True
+                            _analytics_event("telegram_connect")
                         st.rerun()
 
                 # ── לא רשום — Deep Link אוטומטי ───────────────────────────
@@ -7046,6 +7153,9 @@ def main() -> None:
                         st.session_state["_tg_verified_phone"] = _tg_phone
                         st.session_state["current_user_phone"] = _tg_phone
                         st.session_state[f"_ap_tries_{_norm}"] = 0
+                        if not st.session_state.get("_an_tg_tracked"):
+                            st.session_state["_an_tg_tracked"] = True
+                            _analytics_event("telegram_connect")
                         try:
                             st.query_params["u"] = _tg_phone
                         except Exception:
@@ -7055,6 +7165,55 @@ def main() -> None:
                         st.rerun()
                     else:
                         st.warning("עדיין לא נמצא. לחץ 📲 הירשם דרך טלגרם → לחץ START → חזור ולחץ שוב.")
+
+        # ── Admin Analytics Dashboard (hidden — גלוי רק עם ?admin=1) ──────────
+        try:
+            _is_admin = st.query_params.get("admin", "") == "1"
+        except Exception:
+            _is_admin = False
+        if _is_admin:
+            import time as _t_adm
+            import pandas as _pd_adm
+            with st.expander("📊 Analytics Dashboard", expanded=True):
+                # ── Session נוכחי ──────────────────────────
+                _elapsed = _t_adm.time() - st.session_state.get("_an_start", _t_adm.time())
+                _mins, _secs = divmod(int(_elapsed), 60)
+                st.caption("**⏱ Session נוכחי**")
+                _ac1, _ac2, _ac3 = st.columns(3)
+                _ac1.metric("זמן שהות", f"{_mins}m {_secs}s")
+                _ac2.metric("Reports", st.session_state.get("_an_reports", 0))
+                _ac3.metric("Port. Adds", st.session_state.get("_an_port_adds", 0))
+                _top_sess = sorted(
+                    st.session_state.get("_an_tickers", {}).items(),
+                    key=lambda x: x[1], reverse=True
+                )[:5]
+                if _top_sess:
+                    st.caption("**🔍 Top Tickers (Session)**")
+                    _max_sess = max(v for _, v in _top_sess)
+                    for _tn, _cnt in _top_sess:
+                        st.progress(min(_cnt / max(_max_sess, 1), 1.0),
+                                    text=f"{_tn} — {_cnt}")
+                st.divider()
+                # ── All-Time (Supabase) ────────────────────
+                st.caption("**🌐 All-Time (Supabase)**")
+                _glob = _supabase_get("_analytics_global", stale_ok=True) or {}
+                if _glob:
+                    _ga1, _ga2 = st.columns(2)
+                    _ga1.metric("Sessions", f"{_glob.get('total_sessions', 0):,}")
+                    _ga2.metric("TG Connects", f"{_glob.get('total_telegram_connects', 0):,}")
+                    _gb1, _gb2 = st.columns(2)
+                    _gb1.metric("Reports", f"{_glob.get('total_reports', 0):,}")
+                    _gb2.metric("Port. Adds", f"{_glob.get('total_portfolio_adds', 0):,}")
+                    _top_all = sorted(
+                        _glob.get("top_tickers", {}).items(),
+                        key=lambda x: x[1], reverse=True
+                    )[:10]
+                    if _top_all:
+                        st.caption("**📈 Top Tickers (All-Time)**")
+                        _df_top = _pd_adm.DataFrame(_top_all, columns=["Ticker", "Searches"])
+                        st.bar_chart(_df_top.set_index("Ticker"))
+                else:
+                    st.info("אין עדיין נתוני Supabase.")
 
         st.markdown("---")
         st.caption("⚠️ For educational purposes only. Not financial advice.")
@@ -7200,6 +7359,7 @@ def main() -> None:
             st.plotly_chart(fig, config={"displayModeBar": False, "scrollZoom": False}, use_container_width=True)
 
     with tab_rep:
+        _analytics_event("report")
         if is_etf:
             info = data["info"]
             _td = lambda v: "N/A" if v is None else v
