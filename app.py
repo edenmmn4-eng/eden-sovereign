@@ -1960,12 +1960,12 @@ def _get_macro_overlay(ticker: str, sector: str, pulse_data: dict,
     if _vix is not None:
         if _vix < 18:
             bonus += 3.0
-            notes_he.append(f"Stability Bonus +3: VIX נמוך ({_vix:.1f} < 18) — שוק יציב, סיכון נמוך")
+            notes_he.append(f"Stability Bonus +3: VIX low ({_vix:.1f} < 18) — stable market, low risk")
         elif _vix > 30 and float(mkt_cap or 0) > _50B:
             bonus += 10.0
             notes_he.append(
-                f"Panic Opportunity +10: VIX={_vix:.1f} > 30 עם מכסה שוק >{_50B/1e9:.0f}B — "
-                f"בוסט קונטראריאן אסטרטגי בשל פחד קיצוני")
+                f"Panic Opportunity +10: VIX={_vix:.1f} > 30 with market cap >{_50B/1e9:.0f}B — "
+                f"strategic contrarian boost due to extreme fear")
 
     # ── 2. Sector rules (tiered) ──────────────────────────────────────────────
     _is_tech      = ("technology" in s or "software" in s or
@@ -1985,23 +1985,23 @@ def _get_macro_overlay(ticker: str, sector: str, pulse_data: dict,
                 bonus += _dxy_pts
                 notes_he.append(
                     f"Tech/AI +{_dxy_pts:.0f} ({_dxy_lbl} boost): "
-                    f"Dollar fell {abs(_dxy_t):.2f}% — מאיץ הוצאות טק גלובלי")
+                    f"Dollar fell {abs(_dxy_t):.2f}% — accelerates global tech spending")
             else:
                 bonus -= _dxy_pts
                 notes_he.append(
                     f"Tech/AI −{_dxy_pts:.0f} ({_dxy_lbl} penalty): "
-                    f"Dollar rose {_dxy_t:+.2f}% — לחץ על הכנסות מחו\"ל")
+                    f"Dollar rose {_dxy_t:+.2f}% — pressure on overseas revenues")
         if _yld_pts > 0 and _yld_t is not None:
             if _yld_t < 0:
                 bonus += _yld_pts
                 notes_he.append(
                     f"Tech/AI +{_yld_pts:.0f} ({_yld_lbl} boost): "
-                    f"10Y Yield fell {abs(_yld_t):.2f}% — מרחיב מכפילי צמיחה")
+                    f"10Y Yield fell {abs(_yld_t):.2f}% — expanding growth multiples")
             else:
                 bonus -= _yld_pts
                 notes_he.append(
                     f"Tech/AI −{_yld_pts:.0f} ({_yld_lbl} penalty): "
-                    f"10Y Yield rose {_yld_t:+.2f}% — לחץ על מכפילים")
+                    f"10Y Yield rose {_yld_t:+.2f}% — pressure on valuation multiples")
 
     # Energy — tiered oil impact
     if _is_energy:
@@ -2011,12 +2011,12 @@ def _get_macro_overlay(ticker: str, sector: str, pulse_data: dict,
                 bonus += _oil_pts
                 notes_he.append(
                     f"Energy +{_oil_pts:.0f} ({_oil_lbl} boost): "
-                    f"Oil moved {_oil_t:+.2f}% up — הכנסות עולות")
+                    f"Oil moved {_oil_t:+.2f}% up — revenues rising")
             else:
                 bonus -= _oil_pts
                 notes_he.append(
                     f"Energy −{_oil_pts:.0f} ({_oil_lbl} penalty): "
-                    f"Oil moved {_oil_t:+.2f}% down — לחץ על ההכנסות")
+                    f"Oil moved {_oil_t:+.2f}% down — pressure on revenues")
 
     # Airlines — tiered oil impact (inverted)
     if _is_airline:
@@ -2026,17 +2026,17 @@ def _get_macro_overlay(ticker: str, sector: str, pulse_data: dict,
                 bonus -= _oil_pts
                 notes_he.append(
                     f"Airlines −{_oil_pts:.0f} ({_oil_lbl} penalty): "
-                    f"Oil moved {_oil_t:+.2f}% up — עלויות דלק עולות, לחץ על שולי הרווח")
+                    f"Oil moved {_oil_t:+.2f}% up — rising fuel costs, margin pressure")
             else:
                 bonus += _oil_pts
                 notes_he.append(
                     f"Airlines +{_oil_pts:.0f} ({_oil_lbl} boost): "
-                    f"Oil moved {_oil_t:+.2f}% down — הוזלת עלויות דלק")
+                    f"Oil moved {_oil_t:+.2f}% down — lower fuel costs")
 
     # Healthcare — defensive bonus when VIX elevated (20–30)
     if _is_health and _vix is not None and 20 < _vix <= 30:
         bonus += 4.0
-        notes_he.append(f"Healthcare +4: בונוס מגן — VIX מוגבר ({_vix:.1f}), ביקוש דפנסיבי")
+        notes_he.append(f"Healthcare +4: defensive bonus — VIX elevated ({_vix:.1f}), defensive demand")
 
     # Financials — tiered yield impact
     if _is_financial:
@@ -2046,12 +2046,12 @@ def _get_macro_overlay(ticker: str, sector: str, pulse_data: dict,
                 bonus += _yld_pts
                 notes_he.append(
                     f"Financials +{_yld_pts:.0f} ({_yld_lbl} boost): "
-                    f"10Y Yield rose {_yld_t:+.2f}% — מרווח ריבית מתרחב")
+                    f"10Y Yield rose {_yld_t:+.2f}% — expanding net interest margin")
             else:
                 bonus -= _yld_pts
                 notes_he.append(
                     f"Financials −{_yld_pts:.0f} ({_yld_lbl} penalty): "
-                    f"10Y Yield fell {_yld_t:+.2f}% — לחץ על מרווח ריבית")
+                    f"10Y Yield fell {_yld_t:+.2f}% — pressure on net interest margin")
 
     # Consumer Discretionary — tiered DXY boost (falling dollar only)
     if _is_cons_disc:
@@ -2060,7 +2060,7 @@ def _get_macro_overlay(ticker: str, sector: str, pulse_data: dict,
             bonus += _dxy_pts
             notes_he.append(
                 f"Consumer Disc +{_dxy_pts:.0f} ({_dxy_lbl} boost): "
-                f"Dollar fell {abs(_dxy_t):.2f}% — תמיכה במכירות גלובליות")
+                f"Dollar fell {abs(_dxy_t):.2f}% — supporting global sales")
 
     # ── 3. Global cap ±15 ────────────────────────────────────────────────────
     bonus = max(-15.0, min(15.0, bonus))
@@ -2229,7 +2229,7 @@ def _save_portfolio(portfolio: list) -> None:
             ok = _save_user_portfolio(_cu, portfolio)
             if not ok:
                 try:
-                    st.toast("⚠️ שגיאת שמירה — הנתונים לא נשמרו לשרת. בדוק חיבור.", icon="⚠️")
+                    st.toast("⚠️ Save error — data was not saved to server. Check connection.", icon="⚠️")
                 except Exception:
                     pass
             return
@@ -2825,14 +2825,14 @@ def _check_and_fire_score_alerts(scores: list, horizon: str = "1Y Strategic",
             if notify_all:
                 # סריקה ידנית — התרע על כל המניות מעל הסף
                 notify_tickers = qualifying_tickers
-                header = f"🏆 *Eden Sovereign — סריקת שוק*\nמניות עם ציון ≥{min_s} ({horizon}):\n"
+                header = f"🏆 *Eden Sovereign — Market Scan*\nStocks with score ≥{min_s} ({horizon}):\n"
             else:
                 # אוטומטי — רק מניות חדשות שלא נשלחו קודם
                 prev_tickers = set(alert.get("last_notified_tickers", []))
                 notify_tickers = [t for t in qualifying_tickers if t not in prev_tickers]
                 if not notify_tickers:
                     continue
-                header = f"🏆 *Eden Sovereign — התראת ציון*\nמניות חדשות שהגיעו לציון ≥{min_s} ({horizon}):\n"
+                header = f"🏆 *Eden Sovereign — Score Alert*\nNew stocks reaching score ≥{min_s} ({horizon}):\n"
             # שלח בחבילות של עד 20 מניות (מגבלת Telegram ~4096 תווים)
             _chunk_size = 20
             _sent_ok = False
@@ -2845,7 +2845,7 @@ def _check_and_fire_score_alerts(scores: list, horizon: str = "1Y Strategic",
                 for t in _chunk:
                     s = next((sc for tk, sc in qualifying if tk == t), 0)
                     label = "STRONG BUY" if s >= 80 else "BUY" if s >= 65 else "HOLD"
-                    lines.append(f"• *{t}* — ציון {s} ({label})")
+                    lines.append(f"• *{t}* — Score {s} ({label})")
                 body = "\n".join(lines)
                 ok = _send_telegram_msg(alert["phone"], body)
                 if ok:
@@ -2881,12 +2881,12 @@ def _check_and_fire_tg_alerts(current_prices: dict) -> int:
                 (alert["condition"] == "equals" and abs(price - target) / target <= 0.005)
             )
             if hit:
-                direction = "עלה מעל" if alert["condition"] == "above" else ("הגיע ל" if alert["condition"] == "equals" else "ירד מתחת")
+                direction = "rose above" if alert["condition"] == "above" else ("reached" if alert["condition"] == "equals" else "fell below")
                 body = (
-                    f"🔔 *Eden Sovereign — התראת מחיר*\n\n"
-                    f"מניה: *{alert['ticker']}*\n"
-                    f"{direction} יעד ${target:,.2f}\n"
-                    f"מחיר נוכחי: *${price:,.2f}*"
+                    f"🔔 *Eden Sovereign — Price Alert*\n\n"
+                    f"Stock: *{alert['ticker']}*\n"
+                    f"{direction} target ${target:,.2f}\n"
+                    f"Current price: *${price:,.2f}*"
                 )
                 ok = _send_telegram_msg(alert["phone"], body)
                 if ok:
@@ -3467,10 +3467,10 @@ def fetch_portfolio_prices(tickers: tuple) -> dict:
 
 def portfolio_ai_analysis(holdings: list, usd_ils: float) -> str:
     if not holdings:
-        return "התיק ריק."
+        return "Portfolio is empty."
     total_val = sum(h["value_usd"] for h in holdings)
     if total_val <= 0:
-        return "לא ניתן לחשב ניתוח — ערך התיק הוא אפס."
+        return "Cannot compute analysis — portfolio value is zero."
     sector_vals: dict = {}
     for h in holdings:
         sec = h.get("sector", "Unknown")
@@ -3498,10 +3498,10 @@ def portfolio_ai_analysis(holdings: list, usd_ils: float) -> str:
     _sign = "+" if daily_usd >= 0 else ""
     _arrow = "📈" if daily_usd >= 0 else "📉"
     daily_line = (
-        f"{_arrow} **שינוי יומי:** {_sign}{daily_pct:.2f}% "
+        f"{_arrow} **Daily Change:** {_sign}{daily_pct:.2f}% "
         f"| {_sign}${daily_usd:,.0f} | {_sign}₪{daily_ils:,.0f}"
         if has_daily else
-        "**שינוי יומי:** N/A"
+        "**Daily Change:** N/A"
     )
 
     total_cost = sum(h.get("buy_price", 0) * h.get("qty", 0) for h in holdings)
@@ -3512,32 +3512,32 @@ def portfolio_ai_analysis(holdings: list, usd_ils: float) -> str:
     _pl_emoji = "📈" if total_pl_usd >= 0 else "📉"
 
     lines = [
-        f"**שווי תיק כולל:** ${total_val:,.0f} | ₪{total_ils:,.0f}",
+        f"**Total Portfolio Value:** ${total_val:,.0f} | ₪{total_ils:,.0f}",
     ]
     if total_cost > 0:
         lines.append(
-            f"**עלות השקעה:** ${total_cost:,.0f} | ₪{total_cost * usd_ils:,.0f}"
+            f"**Total Cost Basis:** ${total_cost:,.0f} | ₪{total_cost * usd_ils:,.0f}"
         )
         lines.append(
-            f"{_pl_emoji} **רווח/הפסד כולל:** {_pl_sign}{total_pl_pct:.1f}% "
+            f"{_pl_emoji} **Total P&L:** {_pl_sign}{total_pl_pct:.1f}% "
             f"| {_pl_sign}${total_pl_usd:,.0f} | {_pl_sign}₪{total_pl_ils:,.0f}"
         )
     lines += [
-        f"**ציון ממוצע:** {avg_score:.0f}/100",
+        f"**Average Score:** {avg_score:.0f}/100",
     ]
     if top_pct > 50:
-        lines.append(f"⚠️ **ריכוז גבוה בסקטור {top_sector}** ({top_pct:.0f}%) — שקול גיוון.")
+        lines.append(f"⚠️ **High concentration in {top_sector}** ({top_pct:.0f}%) — consider diversifying.")
     else:
-        lines.append(f"✅ **פיזור סקטורי סביר** — {top_sector} מהווה {top_pct:.0f}% מהתיק.")
+        lines.append(f"✅ **Reasonable sector diversification** — {top_sector} represents {top_pct:.0f}% of the portfolio.")
     if avg_score >= 70:
-        lines.append("✅ **ציון ממוצע גבוה** — התיק מאוזן היטב.")
+        lines.append("✅ **High average score** — portfolio is well-balanced.")
     elif avg_score >= 50:
-        lines.append("⚠️ **ציון ממוצע בינוני** — ישנן הזדמנויות לשיפור.")
+        lines.append("⚠️ **Moderate average score** — there is room for improvement.")
     else:
-        lines.append("🔴 **ציון ממוצע נמוך** — כדאי לבחון מחדש את ההרכב.")
+        lines.append("🔴 **Low average score** — consider reviewing your holdings.")
     if low_score_stocks:
         _low_str = ", ".join(f"{t} ({s}/100)" for t, s in low_score_stocks)
-        lines.append(f"🔴 **מניות בדירוג SELL:** {_low_str} — שקול לבחון מחדש.")
+        lines.append(f"🔴 **SELL-rated stocks:** {_low_str} — consider reviewing.")
     return "\n\n".join(lines)
 
 
@@ -4009,7 +4009,7 @@ def _build_macro_overlay_section(ticker: str) -> str:
         f'<div class="report-section">'
         f'<div class="report-section-title">6 — Tiered Macro Overlay'
         f'<span style="font-size:10px;font-weight:400;color:#6b7280;margin-right:8px">'
-        f' · DXY/תשואות: 0.5%=3נק׳ · 1.5%=5נק׳ · נפט: 2%=4נק׳ · 5%=7נק׳ · תקרה ±15</span></div>'
+        f' · DXY/Yields: 0.5%=3pts · 1.5%=5pts · Oil: 2%=4pts · 5%=7pts · Cap ±15</span></div>'
         f'{rows}'
         f'</div>'
     )
@@ -4559,66 +4559,66 @@ def _rule_based_market_analysis(data: dict) -> dict:
     # VIX
     if _vix is not None:
         if _vix < 20:
-            _parts.append(f"מדד הפחד (VIX) עומד על {_vix:.1f} — רמה נמוכה המעידה על שוק רגוע יחסית.")
+            _parts.append(f"VIX at {_vix:.1f} — low volatility indicating a relatively calm market.")
         elif _vix < 30:
-            _parts.append(f"מדד הפחד (VIX) עומד על {_vix:.1f} — תנודתיות מוגברת, כדאי להיות זהיר.")
+            _parts.append(f"VIX at {_vix:.1f} — elevated volatility, caution advised.")
         else:
-            _parts.append(f"מדד הפחד (VIX) גבוה ({_vix:.1f}) — השוק בפאניקה, סביבת סיכון גבוהה.")
+            _parts.append(f"VIX elevated ({_vix:.1f}) — market in panic mode, high-risk environment.")
 
     # SPY + QQQ
     if _spy is not None:
-        _spy_txt = f"ה-S&P 500 עלה {_spy:.1f}%" if _spy >= 0 else f"ה-S&P 500 ירד {abs(_spy):.1f}%"
+        _spy_txt = f"S&P 500 up {_spy:.1f}%" if _spy >= 0 else f"S&P 500 down {abs(_spy):.1f}%"
         _qqq_txt = ""
         if _qqq is not None:
-            _qqq_txt = f" והנאסד\"ק {'+' if _qqq >= 0 else ''}{_qqq:.1f}%"
-        _parts.append(f"{_spy_txt}{_qqq_txt} ב-10 הימים האחרונים.")
+            _qqq_txt = f" and Nasdaq {'+' if _qqq >= 0 else ''}{_qqq:.1f}%"
+        _parts.append(f"{_spy_txt}{_qqq_txt} over the past 10 days.")
 
     # Yield
     if _yld is not None:
         if _yld > 4.5:
-            _parts.append(f"תשואת האג\"ח ל-10 שנים גבוהה ({_yld:.2f}%) — לחץ על מניות צמיחה.")
+            _parts.append(f"10Y Treasury yield elevated ({_yld:.2f}%) — headwind for growth stocks.")
         elif _yld < 3.5:
-            _parts.append(f"תשואת האג\"ח נמוכה ({_yld:.2f}%) — סביבה תומכת למניות.")
+            _parts.append(f"10Y Treasury yield low ({_yld:.2f}%) — supportive environment for equities.")
 
     # Gold
     if _gld is not None and abs(_gld) > 1:
         if _gld > 1:
-            _parts.append(f"הזהב עלה {_gld:.1f}% — סימן ל-Risk-Off ומקלט בטוח בביקוש.")
+            _parts.append(f"Gold up {_gld:.1f}% — Risk-Off signal, safe haven demand rising.")
         else:
-            _parts.append(f"הזהב ירד {abs(_gld):.1f}% — ירידה בביקוש למקלטים בטוחים, סימן חיובי.")
+            _parts.append(f"Gold down {abs(_gld):.1f}% — declining safe haven demand, positive signal.")
 
     # Fear & Greed (contrarian insight)
     if _fg is not None:
         if _fg < 30:
-            _parts.append(f"Fear & Greed עומד על {_fg} (פחד קיצוני) — היסטורית, זמן כזה מאופיין בהזדמנויות קנייה.")
+            _parts.append(f"Fear & Greed at {_fg} (Extreme Fear) — historically, periods like this present buying opportunities.")
         elif _fg > 70:
-            _parts.append(f"Fear & Greed עומד על {_fg} (חמדנות גבוהה) — שוק מחומם, כדאי להיזהר מכניסה בפסגה.")
+            _parts.append(f"Fear & Greed at {_fg} (Extreme Greed) — overheated market, caution near the top.")
 
-    _analysis = " ".join(_parts[:3]) if _parts else "הנתונים אינם מספיקים לניתוח מלא."
+    _analysis = " ".join(_parts[:3]) if _parts else "Insufficient data for full analysis."
 
     # ── Geo Risk: סריקת כותרות RSS בלבד — reactive לחלוטין ──────────────
     _geo_keywords = {
-        "israel": "עימות ישראל-איראן ומתיחות אזורית",
-        "iran": "מתיחות ישראל/ארה\"ב מול איראן — איום גרעיני",
-        "ukraine": "מלחמת רוסיה-אוקראינה — השפעה על אנרגיה",
-        "russia": "מלחמת רוסיה-אוקראינה — השפעה על אנרגיה",
-        "hezbollah": "חיזבאללה ומתיחות בצפון לבנון",
-        "hamas": "עימות גזה — אי-יציבות אזורית",
-        "nuclear": "איום גרעיני — איראן/קוריאה הצפונית",
-        "taiwan": "מתיחות סין-טייוואן",
-        "china": "מתיחות סין-ארה\"ב — מכסים ושרשרת אספקה",
-        "tariff": "מלחמת סחר ומכסים — השפעה גלובלית",
-        "sanctions": "סנקציות כלכליות בינלאומיות",
-        "war": "עימות מזוין פעיל",
-        "conflict": "קונפליקט גיאופוליטי",
-        "oil": "תנודות במחירי הנפט — אי-יציבות אנרגטית",
-        "recession": "חשש ממיתון גלובלי",
-        "inflation": "לחץ אינפלציוני מתמשך",
-        "fed": "אי-ודאות בריבית הפד",
-        "debt": "משבר חוב ממשלתי",
-        "ceasefire": "הפסקת אש — הפחתת מתיחות",
-        "peace": "תהליך שלום — הפחתת סיכון",
-        "deal": "הסכם — יציבות פוטנציאלית",
+        "israel": "Israel-Iran conflict & regional tension",
+        "iran": "Israel/US vs Iran tensions — nuclear threat",
+        "ukraine": "Russia-Ukraine war — energy impact",
+        "russia": "Russia-Ukraine war — energy impact",
+        "hezbollah": "Hezbollah & northern Lebanon tensions",
+        "hamas": "Gaza conflict — regional instability",
+        "nuclear": "Nuclear threat — Iran/North Korea",
+        "taiwan": "China-Taiwan tensions",
+        "china": "China-US tensions — tariffs & supply chain",
+        "tariff": "Trade war & tariffs — global impact",
+        "sanctions": "International economic sanctions",
+        "war": "Active armed conflict",
+        "conflict": "Geopolitical conflict",
+        "oil": "Oil price volatility — energy instability",
+        "recession": "Global recession fears",
+        "inflation": "Persistent inflationary pressure",
+        "fed": "Fed rate uncertainty",
+        "debt": "Government debt crisis",
+        "ceasefire": "Ceasefire — tension de-escalation",
+        "peace": "Peace process — risk reduction",
+        "deal": "Agreement — potential stability",
     }
     _all_heads_lower = " ".join(_heads).lower()
     _found_risks = []
@@ -4631,83 +4631,83 @@ def _rule_based_market_analysis(data: dict) -> dict:
     if _found_risks:
         _geo_risk = " | ".join(_found_risks)
     else:
-        _geo_risk = "אין אירוע גיאופוליטי בולט בכותרות הנוכחיות"
+        _geo_risk = "No prominent geopolitical event in current headlines"
 
     # ── פירוט שוק ספציפי לפי מה שזוהה בכותרות ──────────────────────────
     _geo_details_pool = []
     _risks_lower = " ".join(_found_risks).lower() + " " + _all_heads_lower
 
     # זיהוי הפסקת אש / הסכם — גובר על תרחישי עימות
-    _has_ceasefire = any(k in _risks_lower for k in ("ceasefire", "peace deal", "truce", "הפסקת אש", "הסכם שלום"))
-    _has_israel_iran = any(k in _risks_lower for k in ("iran", "israel", "hezbollah", "hamas", "איראן", "ישראל"))
-    _has_ukraine = any(k in _risks_lower for k in ("ukraine", "russia", "אוקראינה", "רוסיה"))
-    _has_china = any(k in _risks_lower for k in ("china", "tariff", "taiwan", "סין", "מכסים"))
+    _has_ceasefire = any(k in _risks_lower for k in ("ceasefire", "peace deal", "truce"))
+    _has_israel_iran = any(k in _risks_lower for k in ("iran", "israel", "hezbollah", "hamas"))
+    _has_ukraine = any(k in _risks_lower for k in ("ukraine", "russia"))
+    _has_china = any(k in _risks_lower for k in ("china", "tariff", "taiwan"))
 
     if _has_ceasefire and (_has_israel_iran or _has_ukraine):
         # הפסקת אש מזוהה → מציג הפחתת סיכון, לא הסלמה
         _geo_details_pool.append(
-            "הפסקת אש / הסכם מזוהה בכותרות — פרמיית הסיכון הגיאופוליטי יורדת. "
-            "תרחיש זה מוביל לירידה במחירי הזהב והנפט ולעלייה בתיאבון הסיכון (Risk-On). "
-            "מניות ביטחון (RTX, LMT) עלולות להיחלש; שווקים מתעוררים, טכנולוגיה ואנרגיה מתחדשת יכולים להרוויח."
+            "Ceasefire/agreement detected in headlines — geopolitical risk premium declining. "
+            "This scenario leads to lower gold and oil prices and rising risk appetite (Risk-On). "
+            "Defense stocks (RTX, LMT) may weaken; emerging markets, tech, and clean energy stand to benefit."
         )
     else:
         if _has_ukraine:
             _geo_details_pool.append(
-                "מלחמת רוסיה-אוקראינה לוחצת על מחירי האנרגיה באירופה ועל שרשרת האספקה של חיטה ודשנים — "
-                "מה שמוסיף לאינפלציה הגלובלית. מניות ביטחון (Lockheed, RTX, Rheinmetall) נהנות מגידול בתקציבי הגנה. "
-                "הנפט מושפע מהסנקציות על הייצוא הרוסי."
+                "Russia-Ukraine war is pressuring European energy prices and wheat/fertilizer supply chains — "
+                "adding to global inflation. Defense stocks (Lockheed, RTX, Rheinmetall) benefit from rising defense budgets. "
+                "Oil prices affected by sanctions on Russian exports."
             )
         if _has_israel_iran:
             _geo_details_pool.append(
-                "המתיחות בין ישראל/ארה\"ב לאיראן מציבה סיכון למיצר הורמוז — דרכו עובר כ-20% מסחר הנפט הגלובלי. "
-                "סגירה חלקית עלולה לשגר את מחיר הנפט מעל $120 לחבית ולגרום לשוק ל-Risk-Off חריף. "
-                "הזהב והדולר מתחזקים בתרחיש זה; מניות טכנולוגיה וצמיחה הן הפגיעות ביותר."
+                "Israel/US-Iran tensions pose a risk to the Strait of Hormuz — through which ~20% of global oil trade flows. "
+                "Partial closure could push oil above $120/barrel and trigger a sharp Risk-Off market move. "
+                "Gold and the dollar strengthen in this scenario; tech and growth stocks are most vulnerable."
             )
 
     if _has_china:
         _geo_details_pool.append(
-            "מלחמת הסחר סין-ארה\"ב פוגעת בשרשרת האספקה של מוליכים למחצה. "
-            "חברות כמו Apple, NVIDIA ו-TSMC חשופות לסיכון שיבוש ייצור. "
-            "יצרנים אמריקאים עשויים להרוויח מהעברת ייצור חזרה לארה\"ב (Reshoring)."
+            "US-China trade war is disrupting semiconductor supply chains. "
+            "Companies like Apple, NVIDIA, and TSMC face production disruption risk. "
+            "US manufacturers may benefit from production reshoring back to the US."
         )
 
     if _geo_details_pool:
         _geo_risk_detail = " ".join(_geo_details_pool[:2])
     else:
         _geo_risk_detail = (
-            "לא זוהו אירועים גיאופוליטיים בולטים בכותרות הנוכחיות. "
-            "השוק פועל בסביבה רגועה יחסית — מה שמקטין את פרמיית הסיכון ותומך בנכסי סיכון. "
-            "עם זאת, יש לעקוב אחר מדד ה-VIX ומחירי הזהב כאינדיקטורים מוקדמים לשינוי."
+            "No prominent geopolitical events detected in current headlines. "
+            "Market operating in a relatively calm environment — reducing risk premiums and supporting risk assets. "
+            "However, monitor VIX and gold prices as early indicators of regime change."
         )
 
     # ── Opportunity ──────────────────────────────────────────────────────
     if _verdict == "BULLISH":
-        _opp = "מניות צמיחה ואיכות בתיקון מציעות נקודת כניסה אטרקטיבית"
+        _opp = "Quality growth stocks in correction offer attractive entry points"
     elif _fg is not None and _fg < 35:
-        _opp = "פחד קיצוני יוצר הזדמנות DCA — כניסה הדרגתית נחשבת חכמה"
+        _opp = "Extreme fear creates a DCA opportunity — gradual entry is the smart play"
     elif _yld is not None and _yld > 4.5:
-        _opp = "אג\"ח ממשלתי מציע תשואה אטרקטיבית — גיוון הגיוני"
+        _opp = "Government bonds offer attractive yield — diversification makes sense"
     else:
-        _opp = "מניות דיבידנד וסקטור הגנתי כחלופה יציבה"
+        _opp = "Dividend stocks and defensive sectors as a stable alternative"
 
     # ── Macro Watch — מתבסס על לוח שנה FMP בלבד (ללא hardcode) ──────────
     if _evts:
         _macro_watch = _evts[0].split(" — ")[-1] if " — " in _evts[0] else _evts[0]
         _evt_date = _evts[0].split(" — ")[0] if " — " in _evts[0] else ""
         _macro_watch_detail = (
-            f"האירוע הקרוב ביותר הוא *{_macro_watch}*"
-            + (f" בתאריך {_evt_date}" if _evt_date else "")
-            + ". אירועים בעלי השפעה גבוהה (High Impact) נוטים לגרום לתנודתיות מוגברת סביב מועד פרסומם. "
-            "מומלץ לעקוב אחר תגובת שוק האג\"ח כמדד מוביל ולהפחית חשיפה ממונפת לפני הפרסום."
+            f"The nearest event is *{_macro_watch}*"
+            + (f" on {_evt_date}" if _evt_date else "")
+            + ". High-impact events tend to cause elevated volatility around their release date. "
+            "Monitor bond market reaction as a leading indicator and reduce leveraged exposure before the release."
         )
         if len(_evts) > 1:
-            _macro_watch_detail += f" אירועים נוספים השבוע: {', '.join(e.split(' — ')[-1] for e in _evts[1:3])}."
+            _macro_watch_detail += f" Additional events this week: {', '.join(e.split(' — ')[-1] for e in _evts[1:3])}."
     else:
-        _macro_watch = "אין אירועי מאקרו גבוהי-השפעה ב-7 הימים הקרובים"
+        _macro_watch = "No high-impact macro events in the next 7 days"
         _macro_watch_detail = (
-            "לא זוהו פרסומים כלכליים גבוהי-השפעה בשבוע הקרוב. "
-            "זהו חלון זמן נוח יחסית לבצע שינויים בתיק ללא לחץ אירועים. "
-            "מומלץ לעקוב אחר נאומי פד ונתוני תעסוקה בהמשך."
+            "No high-impact economic releases detected in the coming week. "
+            "This is a relatively favorable window to rebalance positions without event-driven pressure. "
+            "Continue monitoring Fed speeches and employment data going forward."
         )
 
     return {
@@ -4735,37 +4735,37 @@ def _call_claude_market_analysis(data: dict) -> dict:
             f"Gold 5d: {d.get('gold_trend', 'N/A')}%"
         )
         _fg = d.get("fear_greed")
-        _fg_str = f"{_fg} ({d.get('fear_greed_label', '')})" if _fg else "לא זמין"
-        _events_str = "\n".join(d.get("macro_events") or []) or "אין אירועים קרובים"
+        _fg_str = f"{_fg} ({d.get('fear_greed_label', '')})" if _fg else "N/A"
+        _events_str = "\n".join(d.get("macro_events") or []) or "No upcoming events"
         _headlines_list = d.get("headlines") or []
         _headlines_str = (
-            "\n".join(f"- {h}" for h in _headlines_list) or "אין כותרות זמינות"
+            "\n".join(f"- {h}" for h in _headlines_list) or "No headlines available"
         )
         return (
-            "אתה אנליסט מאקרו-גיאופוליטי בכיר ברמת Goldman Sachs עם 20 שנות ניסיון. "
-            "עליך לספק ניתוח שוק מוסדי מבוסס על ארבעה ממדים:\n\n"
-            f"📊 נתוני שוק real-time:\n{_quant}\n"
-            f"מדד פחד/חמדנות (Fear & Greed): {_fg_str}\n\n"
-            f"📅 אירועי מאקרו קרובים (7 ימים):\n{_events_str}\n\n"
-            f"📰 כותרות אקטואליות (גיאופוליטיות וכלכליות):\n{_headlines_str}\n\n"
-            "כללי ניתוח מוסדי — חובה לעמוד בכולם:\n"
-            "1. גיאופוליטיקה: השתמש בידע הרחב שלך על הסביבה הגיאופוליטית הנוכחית בעולם — קונפליקטים, מתיחות ומשברים פעילים\n"
-            "2. הצלבה: האם עליית הזהב/VIX מאששת את הסיכון הגיאופוליטי, או שמדובר ב-Noise?\n"
-            "3. Priced-in test: האם הסיכונים כבר מגולמים במחירים או מוערכים בחסר?\n"
-            "4. המלצה מעשית: למשקיע פרטי ישראלי עם אופק 6-12 חודשים\n"
-            "5. אם יש כותרות ספציפיות — צטט אותן; אם לא — הסתמך על ידיעתך הכללית ועל נתוני השוק\n\n"
-            "החזר JSON בלבד — ללא markdown, ללא טקסט נוסף, ללא הסברים לפני/אחרי:\n"
+            "You are a senior macro-geopolitical analyst at Goldman Sachs level with 20 years of experience. "
+            "Provide institutional-grade market analysis across four dimensions:\n\n"
+            f"📊 Real-time market data:\n{_quant}\n"
+            f"Fear & Greed Index: {_fg_str}\n\n"
+            f"📅 Upcoming macro events (7 days):\n{_events_str}\n\n"
+            f"📰 Current headlines (geopolitical & economic):\n{_headlines_str}\n\n"
+            "Institutional analysis rules — must comply with all:\n"
+            "1. Geopolitics: Use your broad knowledge of the current global geopolitical environment — active conflicts, tensions, and crises\n"
+            "2. Cross-validation: Does the rise in Gold/VIX confirm geopolitical risk, or is it Noise?\n"
+            "3. Priced-in test: Are the risks already priced in or underpriced?\n"
+            "4. Practical recommendation: For a retail investor with a 6-12 month horizon\n"
+            "5. If specific headlines exist — cite them; if not — rely on your general knowledge and market data\n\n"
+            "Return JSON only — no markdown, no extra text, no explanations before/after:\n"
             '{"verdict":"BULLISH","pulse_score":70,'
-            '"analysis":"2-3 משפטים — ציטוט ספציפי של כותרות + קישור לנתוני שוק",'
-            '"geo_risk":"שם הסיכון הגיאופוליטי — קצר (עד 8 מילים)",'
-            '"geo_risk_detail":"3-4 משפטים ספציפיים: (1) אילו סקטורים/מניות/סחורות מושפעים ישירות '
-            'ומדוע (ציין שמות — נפט, זהב, ביטחון, טכנולוגיה), '
-            '(2) מה התרחיש הגרוע ביותר ומה ההסתברות שלו, '
-            '(3) מה המשקיע צריך לעשות בתיק שלו בפועל",'
-            '"opportunity":"הזדמנות ספציפית שהשוק מתעלם ממנה כרגע",'
-            '"macro_watch":"שם האירוע הקריטי ביותר — קצר (עד 10 מילים)",'
-            '"macro_watch_detail":"3-4 משפטים: למה האירוע חשוב, מה להצפות, '
-            'איך להגיב — עם ייחוס לנתוני השוק הנוכחיים (VIX/תשואות)"}'
+            '"analysis":"2-3 sentences — specific headline citations + link to market data",'
+            '"geo_risk":"geopolitical risk name — short (up to 8 words)",'
+            '"geo_risk_detail":"3-4 specific sentences: (1) which sectors/stocks/commodities are directly impacted '
+            'and why (name them — oil, gold, defense, tech), '
+            '(2) worst-case scenario and its probability, '
+            '(3) what the investor should actually do in their portfolio",'
+            '"opportunity":"specific opportunity the market is overlooking right now",'
+            '"macro_watch":"name of most critical event — short (up to 10 words)",'
+            '"macro_watch_detail":"3-4 sentences: why the event matters, what to expect, '
+            'how to react — with reference to current market data (VIX/yields)"}'
         )
 
     def _parse_json_response(text: str) -> dict:
@@ -4839,29 +4839,29 @@ def render_market_pulse_banner() -> None:
     _ts   = st.session_state.get(f"{_CACHE}_ts", 0)
     _stale = (_now - _ts) > 3600
 
-    with st.expander("🌍 דופק השוק — ניתוח מאקרו-גיאופוליטי", expanded=True):
+    with st.expander("🌍 Market Pulse — Macro-Geopolitical Analysis", expanded=True):
         _hdr_col, _btn_col = st.columns([10, 1])
         with _hdr_col:
             st.markdown(
                 '<p style="margin:0;font-size:10px;color:#64748b;letter-spacing:1.8px;'
                 'text-transform:uppercase;font-weight:600;font-family:\'JetBrains Mono\',monospace">'
-                'SOVEREIGN MARKET INTELLIGENCE · עדכון שעתי אוטומטי</p>',
+                'SOVEREIGN MARKET INTELLIGENCE · Auto-updated hourly</p>',
                 unsafe_allow_html=True,
             )
-        _do_refresh = _btn_col.button("🔄", key="mkt_pulse_refresh", help="רענן נתונים")
+        _do_refresh = _btn_col.button("🔄", key="mkt_pulse_refresh", help="Refresh data")
 
         if _do_refresh or _stale or not _data:
-            with st.spinner("טוען נתוני שוק..."):
+            with st.spinner("Loading market data..."):
                 fetch_market_pulse_data.clear()
                 _data = fetch_market_pulse_data()
             if not _data:
-                st.warning("לא ניתן לטעון נתוני שוק כרגע. נסה שוב מאוחר יותר.")
+                st.warning("Unable to load market data at this time. Please try again later.")
                 return
             st.session_state[_CACHE] = _data
             st.session_state[f"{_CACHE}_ts"] = _now
 
         if not _data:
-            st.info("לחץ 🔄 לטעינת נתוני שוק.")
+            st.info("Click 🔄 to load market data.")
             return
 
         # ── Metrics ─────────────────────────────────────────────────────
@@ -4879,8 +4879,8 @@ def render_market_pulse_banner() -> None:
         _btc_trend = _data.get("btc_trend")
 
         _fg_he = {
-            "Extreme Fear": "פחד קיצוני", "Fear": "פחד",
-            "Neutral": "ניטרלי", "Greed": "חמדנות", "Extreme Greed": "חמדנות קיצונית",
+            "Extreme Fear": "Extreme Fear", "Fear": "Fear",
+            "Neutral": "Neutral", "Greed": "Greed", "Extreme Greed": "Extreme Greed",
         }.get(_fg_label_en, _fg_label_en)
 
         def _tc(v, up_good=True):
@@ -4890,110 +4890,110 @@ def render_market_pulse_banner() -> None:
             else:         return "mpt-red" if v > 0 else ("mpt-green" if v < 0 else "mpt-gray")
 
         def _arrow(v):
-            if v is None or v == 0: return "יציב"
+            if v is None or v == 0: return "Stable"
             return f"{'↑' if v > 0 else '↓'} {abs(v):.1f}%"
 
         _vix_cls = "mpt-green" if _vix and _vix < 20 else ("mpt-yellow" if _vix and _vix < 30 else "mpt-red")
-        _vix_sub = "נמוך ✓" if _vix and _vix < 20 else ("מוגבר" if _vix and _vix < 30 else "גבוה ✗")
+        _vix_sub = "Low ✓" if _vix and _vix < 20 else ("Elevated" if _vix and _vix < 30 else "High ✗")
         _yld_cls = "mpt-red" if _yld and _yld > 4.5 else ("mpt-yellow" if _yld and _yld > 4.0 else "mpt-green")
-        _yld_sub = "גבוה — לחץ" if _yld and _yld > 4.5 else ("מוגבר" if _yld and _yld > 4.0 else "מתון ✓")
+        _yld_sub = "High — Pressure" if _yld and _yld > 4.5 else ("Elevated" if _yld and _yld > 4.0 else "Moderate ✓")
         _gld_cls = "mpt-yellow" if _gld and _gld > 1 else ("mpt-green" if _gld and _gld is not None and _gld < -1 else "mpt-gray")
-        _gld_sub = "מקלט בטוח 🛡" if _gld and _gld > 1 else ("ירידה — risk-on" if _gld is not None and _gld < -1 else "יציב")
+        _gld_sub = "Safe Haven 🛡" if _gld and _gld > 1 else ("Falling — risk-on" if _gld is not None and _gld < -1 else "Stable")
         _fg_cls  = "mpt-green" if _fg and _fg < 30 else ("mpt-red" if _fg and _fg > 70 else "mpt-yellow")
         # DXY — דולר חלש = חיובי למניות
         _dxy_cls = _tc(_dxy_trend, up_good=False)
-        _dxy_sub = ("חלש — חיובי ✓" if _dxy_trend and _dxy_trend < -0.5
-                    else ("חזק — לחץ" if _dxy_trend and _dxy_trend > 0.5 else "יציב"))
+        _dxy_sub = ("Weak — Positive ✓" if _dxy_trend and _dxy_trend < -0.5
+                    else ("Strong — Pressure" if _dxy_trend and _dxy_trend > 0.5 else "Stable"))
         # נפט — יציבות = טוב, קיצוניות = לחץ
         _oil_cls = ("mpt-yellow" if _oil_trend and abs(_oil_trend) > 5
                     else ("mpt-green" if _oil_trend is not None and abs(_oil_trend) <= 3 else "mpt-gray"))
-        _oil_sub = ("קפיצה — לחץ אינפלציוני" if _oil_trend and _oil_trend > 5
-                    else ("צניחה — חשש מיתון" if _oil_trend and _oil_trend < -5
-                    else ("יציב ✓" if _oil_trend is not None else "—")))
+        _oil_sub = ("Surge — Inflationary Pressure" if _oil_trend and _oil_trend > 5
+                    else ("Plunge — Recession Concern" if _oil_trend and _oil_trend < -5
+                    else ("Stable ✓" if _oil_trend is not None else "—")))
         # BTC — עולה = risk-on
         _btc_cls = _tc(_btc_trend, up_good=True)
         _btc_sub = ("risk-on ↑" if _btc_trend and _btc_trend > 3
-                    else ("risk-off ↓" if _btc_trend and _btc_trend < -3 else "ניטרלי"))
+                    else ("risk-off ↓" if _btc_trend and _btc_trend < -3 else "Neutral"))
 
         # ── Pulse Score ──────────────────────────────────────────────────
         _pulse = _compute_pulse_score(_data)
         _p_color  = "#4ade80" if _pulse >= 65 else ("#fbbf24" if _pulse >= 40 else "#f87171")
-        _p_label  = "סביבת השקעה חיובית" if _pulse >= 65 else ("זהירות — הישאר סלקטיבי" if _pulse >= 40 else "סביבה מאתגרת")
+        _p_label  = "Positive Investment Environment" if _pulse >= 65 else ("Caution — Stay Selective" if _pulse >= 40 else "Challenging Environment")
         _p_vclass = "mkt-pulse-bullish" if _pulse >= 65 else ("mkt-pulse-cautious" if _pulse >= 40 else "mkt-pulse-avoid")
 
         # ── הסברים לכל מדד ──────────────────────────────────────────────
         _vix_exp = (
-            "שאננות קיצונית — שוק לא מתמחר סיכון, היזהר" if _vix and _vix < 12 else
-            "שאננות — שוק רץ, מעט פחד, הזדמנויות מוגבלות" if _vix and _vix < 16 else
-            "סביבה תקינה — תנודתיות מאוזנת" if _vix and _vix < 20 else
-            "חשש מוגבר — שוק עצבני, תנודות חדות אפשריות" if _vix and _vix < 28 else
-            "פחד — הזדמנות כניסה למשקיע ארוך טווח" if _vix and _vix < 35 else
-            "פאניקה קיצונית — הזדמנות נדירה לקנייה במניות איכות" if _vix else "—"
+            "Extreme complacency — market not pricing risk, be cautious" if _vix and _vix < 12 else
+            "Complacency — market running, little fear, limited opportunities" if _vix and _vix < 16 else
+            "Normal environment — balanced volatility" if _vix and _vix < 20 else
+            "Elevated concern — nervous market, sharp swings possible" if _vix and _vix < 28 else
+            "Fear — entry opportunity for long-term investors" if _vix and _vix < 35 else
+            "Extreme panic — rare buying opportunity in quality stocks" if _vix else "—"
         )
         _spy_exp = (
-            "קריסה — זהירות, ייתכן המשך ירידה" if _spy is not None and _spy < -8 else
-            "תיקון בריא — נקודת כניסה פוטנציאלית טובה" if _spy is not None and _spy < -3 else
-            "אזור צבירה — עדיף להגדיל פוזיציות בהדרגה" if _spy is not None and _spy <= 2 else
-            "עלייה מהירה — שוק מתחמם, כניסה בזהירות" if _spy is not None and _spy <= 5 else
-            "over-extended — סיכון לתיקון טכני קרוב" if _spy is not None and _spy <= 8 else
-            "עלייה חדה מאוד — סיכון גבוה, המתן לתיקון לפני כניסה" if _spy is not None else "—"
+            "Crash — caution, further decline possible" if _spy is not None and _spy < -8 else
+            "Healthy pullback — potential good entry point" if _spy is not None and _spy < -3 else
+            "Accumulation zone — prefer adding positions gradually" if _spy is not None and _spy <= 2 else
+            "Fast rally — market heating up, enter cautiously" if _spy is not None and _spy <= 5 else
+            "Over-extended — risk of near-term technical correction" if _spy is not None and _spy <= 8 else
+            "Very sharp rally — high risk, wait for pullback before entry" if _spy is not None else "—"
         )
         _qqq_exp = (
-            "קריסה בנאסדק — זהירות מיוחדת במניות טק" if _qqq is not None and _qqq < -8 else
-            "תיקון בריא — נקודת כניסה למניות צמיחה" if _qqq is not None and _qqq < -3 else
-            "אזור צבירה — עדיף להיכנס לטק בהדרגה" if _qqq is not None and _qqq <= 2 else
-            "נאסדק מתחמם — כניסה בסלקטיביות" if _qqq is not None and _qqq <= 5 else
-            "over-extended — זהירות בקניית מניות טק" if _qqq is not None and _qqq <= 8 else
-            "עלייה חדה מאוד בנאסדק — סיכון לתיקון חד" if _qqq is not None else "—"
+            "Nasdaq crash — extra caution in tech stocks" if _qqq is not None and _qqq < -8 else
+            "Healthy pullback — entry point for growth stocks" if _qqq is not None and _qqq < -3 else
+            "Accumulation zone — prefer entering tech gradually" if _qqq is not None and _qqq <= 2 else
+            "Nasdaq heating up — enter selectively" if _qqq is not None and _qqq <= 5 else
+            "Over-extended — caution buying tech stocks" if _qqq is not None and _qqq <= 8 else
+            "Very sharp Nasdaq rally — risk of sharp correction" if _qqq is not None else "—"
         )
         _yld_exp = (
-            "תשואה נמוכה — סביבה מצוינת למניות צמיחה" if _yld and _yld < 3.5 else
-            "תשואה מאוזנת — לחץ מתון על הערכות שווי" if _yld and _yld < 4.0 else
-            "תשואה מוגבהת — לחץ על מניות צמיחה עתידניות" if _yld and _yld < 4.5 else
-            "תשואה גבוהה — אג\"ח מתחרה במניות, מכפילים בלחץ" if _yld and _yld < 5.0 else
-            "תשואה גבוהה מאוד — לחץ כבד על שוק המניות" if _yld else "—"
+            "Low yield — excellent environment for growth stocks" if _yld and _yld < 3.5 else
+            "Balanced yield — moderate pressure on valuations" if _yld and _yld < 4.0 else
+            "Elevated yield — pressure on high-growth stocks" if _yld and _yld < 4.5 else
+            "High yield — bonds competing with equities, multiples under pressure" if _yld and _yld < 5.0 else
+            "Very high yield — heavy pressure on equity markets" if _yld else "—"
         )
         _gld_exp = (
-            "זהב יורד חזק — כסף זורם למניות (risk-on)" if _gld is not None and _gld < -1 else
-            "זהב יציב — שוק מאוזן, אין פאניקה" if _gld is not None and _gld <= 1 else
-            "זהב עולה — משקיעים מחפשים מקלט בטוח, חשש בשוק" if _gld is not None else "—"
+            "Gold falling sharply — money flowing into equities (risk-on)" if _gld is not None and _gld < -1 else
+            "Gold stable — balanced market, no panic" if _gld is not None and _gld <= 1 else
+            "Gold rising — investors seeking safe haven, market concern" if _gld is not None else "—"
         )
         _fg_exp = (
-            "פחד קיצוני — היסטורית: זמן מצוין לקנייה (Buffett Rule)" if _fg and _fg < 20 else
-            "פחד — שוק לחוץ, סנטימנט שלילי = הזדמנות" if _fg and _fg < 40 else
-            "ניטרלי — אין קיצוניות בסנטימנט השוק" if _fg and _fg < 60 else
-            "חמדנות — שוק אופטימי מדי, זהירות בכניסות חדשות" if _fg and _fg < 80 else
-            "חמדנות קיצונית — שוק מנופח, סיכון גבוה לתיקון" if _fg else "—"
+            "Extreme Fear — historically: excellent buying opportunity (Buffett Rule)" if _fg and _fg < 20 else
+            "Fear — market stressed, negative sentiment = opportunity" if _fg and _fg < 40 else
+            "Neutral — no sentiment extremes in the market" if _fg and _fg < 60 else
+            "Greed — market overly optimistic, caution on new entries" if _fg and _fg < 80 else
+            "Extreme Greed — inflated market, high correction risk" if _fg else "—"
         )
         _dxy_exp = (
-            "דולר חלש מאוד — חיובי מאוד לסחורות ומניות גלובליות" if _dxy_trend and _dxy_trend < -1 else
-            "דולר נחלש — חיובי למניות ולחברות יצואניות" if _dxy_trend and _dxy_trend < -0.5 else
-            "דולר יציב — ניטרלי לשוק המניות" if _dxy_trend is not None and abs(_dxy_trend) <= 0.5 else
-            "דולר מתחזק — לחץ על חברות רב-לאומיות" if _dxy_trend is not None and _dxy_trend <= 1 else
-            "דולר חזק מאוד — לחץ על שווקים מתעוררים ורווחי חברות" if _dxy_trend is not None else "—"
+            "Very weak dollar — highly positive for commodities and global equities" if _dxy_trend and _dxy_trend < -1 else
+            "Dollar weakening — positive for stocks and export-driven companies" if _dxy_trend and _dxy_trend < -0.5 else
+            "Dollar stable — neutral for equity markets" if _dxy_trend is not None and abs(_dxy_trend) <= 0.5 else
+            "Dollar strengthening — pressure on multinationals" if _dxy_trend is not None and _dxy_trend <= 1 else
+            "Very strong dollar — pressure on emerging markets and corporate earnings" if _dxy_trend is not None else "—"
         )
         _oil_exp = (
-            "צניחה חדה — אינפלציה יורדת, Fed יכול להוריד ריבית — חיובי מאוד לשוק" if _oil_trend is not None and _oil_trend < -5 else
-            "ירידה — לחץ אינפלציוני מוקל, חיובי לצרכנים ולמניות" if _oil_trend is not None and _oil_trend < -2 else
-            "יציב — סביבת מאקרו מאוזנת ומאפשרת" if _oil_trend is not None and _oil_trend <= 3 else
-            "עלייה — לחץ אינפלציוני קל, עלות עסקים עולה" if _oil_trend is not None and _oil_trend <= 8 else
-            "קפיצה חדה — לחץ אינפלציוני גבוה, יפגע ברווחיות" if _oil_trend is not None else "—"
+            "Sharp plunge — inflation falling, Fed can cut rates — very positive for markets" if _oil_trend is not None and _oil_trend < -5 else
+            "Declining — inflationary pressure easing, positive for consumers and equities" if _oil_trend is not None and _oil_trend < -2 else
+            "Stable — balanced and permissive macro environment" if _oil_trend is not None and _oil_trend <= 3 else
+            "Rising — mild inflationary pressure, rising business costs" if _oil_trend is not None and _oil_trend <= 8 else
+            "Sharp surge — high inflationary pressure, will hurt profitability" if _oil_trend is not None else "—"
         )
         _btc_exp = (
-            "ירידה חדה בביטקוין — risk-off, שנאת סיכון גבוהה" if _btc_trend is not None and _btc_trend < -5 else
-            "ירידה — סנטימנט שלילי בנכסי סיכון" if _btc_trend is not None and _btc_trend < -2 else
-            "יציב — סנטימנט ניטרלי בשוק הקריפטו" if _btc_trend is not None and _btc_trend <= 2 else
-            "עלייה — risk-on, תיאבון סיכון חיובי בשווקים" if _btc_trend is not None and _btc_trend <= 8 else
-            "עלייה חדה — risk-on קיצוני, סנטימנט חיובי מאוד" if _btc_trend is not None else "—"
+            "Sharp Bitcoin drop — risk-off, high risk aversion" if _btc_trend is not None and _btc_trend < -5 else
+            "Declining — negative sentiment in risk assets" if _btc_trend is not None and _btc_trend < -2 else
+            "Stable — neutral sentiment in crypto markets" if _btc_trend is not None and _btc_trend <= 2 else
+            "Rising — risk-on, positive risk appetite in markets" if _btc_trend is not None and _btc_trend <= 8 else
+            "Sharp rally — extreme risk-on, very positive sentiment" if _btc_trend is not None else "—"
         )
 
         # ── סיכום ציון כללי ─────────────────────────────────────────────
         _score_summary = (
-            f"ציון {_pulse} — שוק בפאניקה: הזדמנות נדירה לרכישת מניות איכות בהנחה גדולה. VIX גבוה = פחד = קנה בהדרגה." if _pulse >= 80 else
-            f"ציון {_pulse} — סביבת השקעה טובה: יחס סיכון/תשואה נוח. מומלץ להגדיל חשיפה למניות צמיחה." if _pulse >= 65 else
-            f"ציון {_pulse} — שוק מאוזן: בחר מניות סלקטיבית עם שולי בטחון. לא הזמן לקנות הכל." if _pulse >= 50 else
-            f"ציון {_pulse} — שוק מתחמם ו-over-extended: הימנע מכניסות חדשות, שמור מזומן להזדמנות הבאה." if _pulse >= 40 else
-            f"ציון {_pulse} — שוק נסחר גבוה מאוד: שקול מימוש רווחים חלקי והמתן לתיקון לפני כניסה."
+            f"Score {_pulse} — Market in panic: rare opportunity to buy quality stocks at a deep discount. High VIX = fear = buy gradually." if _pulse >= 80 else
+            f"Score {_pulse} — Favorable investment environment: comfortable risk/reward ratio. Consider increasing exposure to growth stocks." if _pulse >= 65 else
+            f"Score {_pulse} — Balanced market: pick stocks selectively with margin of safety. Not the time to buy everything." if _pulse >= 50 else
+            f"Score {_pulse} — Market heating up and over-extended: avoid new entries, preserve cash for the next opportunity." if _pulse >= 40 else
+            f"Score {_pulse} — Market trading at very high levels: consider partial profit-taking and wait for a pullback before entry."
         )
 
         _metrics_html = f"""
@@ -5004,63 +5004,63 @@ def render_market_pulse_banner() -> None:
                         font-family:'JetBrains Mono',monospace;line-height:1">{_pulse}</div>
             <div>
               <div style="font-size:10px;color:#94a3b8;letter-spacing:1.5px;
-                          text-transform:uppercase;font-weight:600">ציון שוק</div>
+                          text-transform:uppercase;font-weight:600">Market Score</div>
               <div style="font-size:13px;color:{_p_color};font-weight:600">{_p_label}</div>
             </div>
           </div>
-          <div style="font-size:10px;color:#64748b;letter-spacing:.8px;font-family:'JetBrains Mono',monospace">📊 ניתוח אלגוריתמי · 9 מדדים טכניים</div>
+          <div style="font-size:10px;color:#64748b;letter-spacing:.8px;font-family:'JetBrains Mono',monospace">📊 Algorithmic Analysis · 9 Technical Indicators</div>
         </div>
         <div class="mkt-pulse-metrics">
           <div class="mkt-pulse-metric">
-            <div class="mkt-pulse-metric-label">VIX — פחד שוק</div>
+            <div class="mkt-pulse-metric-label">VIX — Market Fear</div>
             <div class="mkt-pulse-metric-value {_vix_cls}">{f"{_vix:.1f}" if _vix else "—"}</div>
             <div class="mkt-pulse-metric-sub {_vix_cls}">{_vix_sub if _vix else "—"}</div>
             <div class="mkt-pulse-metric-exp">{_vix_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
-            <div class="mkt-pulse-metric-label">S&amp;P 500 — 10 ימים</div>
+            <div class="mkt-pulse-metric-label">S&amp;P 500 — 10 Days</div>
             <div class="mkt-pulse-metric-value {_tc(_spy)}">{f"{_spy:+.2f}%" if _spy is not None else "—"}</div>
             <div class="mkt-pulse-metric-sub {_tc(_spy)}">{_arrow(_spy) if _spy is not None else "—"}</div>
             <div class="mkt-pulse-metric-exp">{_spy_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
-            <div class="mkt-pulse-metric-label">נאסד"ק — 10 ימים</div>
+            <div class="mkt-pulse-metric-label">Nasdaq — 10 Days</div>
             <div class="mkt-pulse-metric-value {_tc(_qqq)}">{f"{_qqq:+.2f}%" if _qqq is not None else "—"}</div>
             <div class="mkt-pulse-metric-sub {_tc(_qqq)}">{_arrow(_qqq) if _qqq is not None else "—"}</div>
             <div class="mkt-pulse-metric-exp">{_qqq_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
-            <div class="mkt-pulse-metric-label">תשואת אג"ח 10Y</div>
+            <div class="mkt-pulse-metric-label">10Y Treasury Yield</div>
             <div class="mkt-pulse-metric-value {_yld_cls}">{f"{_yld:.2f}%" if _yld else "—"}</div>
             <div class="mkt-pulse-metric-sub {_yld_cls}">{_yld_sub if _yld else "—"}</div>
             <div class="mkt-pulse-metric-exp">{_yld_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
-            <div class="mkt-pulse-metric-label">זהב — 5 ימים</div>
+            <div class="mkt-pulse-metric-label">Gold — 5 Days</div>
             <div class="mkt-pulse-metric-value {_gld_cls}">{f"{_gld:+.2f}%" if _gld is not None else "—"}</div>
             <div class="mkt-pulse-metric-sub {_gld_cls}">{_gld_sub if _gld is not None else "—"}</div>
             <div class="mkt-pulse-metric-exp">{_gld_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
-            <div class="mkt-pulse-metric-label">פחד וחמדנות</div>
+            <div class="mkt-pulse-metric-label">Fear &amp; Greed</div>
             <div class="mkt-pulse-metric-value {_fg_cls}">{str(_fg) if _fg else "—"}</div>
             <div class="mkt-pulse-metric-sub {_fg_cls}">{_fg_he if _fg else "—"}</div>
             <div class="mkt-pulse-metric-exp">{_fg_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
-            <div class="mkt-pulse-metric-label">דולר (DXY) — 5 ימים</div>
+            <div class="mkt-pulse-metric-label">Dollar (DXY) — 5 Days</div>
             <div class="mkt-pulse-metric-value {_dxy_cls}">{f"{_dxy_val:.1f}" if _dxy_val else "—"}</div>
             <div class="mkt-pulse-metric-sub {_dxy_cls}">{f"{_dxy_trend:+.2f}% " if _dxy_trend is not None else ""}{_dxy_sub if _dxy_val else "—"}</div>
             <div class="mkt-pulse-metric-exp">{_dxy_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
-            <div class="mkt-pulse-metric-label">נפט גולמי — 5 ימים</div>
+            <div class="mkt-pulse-metric-label">Crude Oil — 5 Days</div>
             <div class="mkt-pulse-metric-value {_oil_cls}">{f"${_oil_val:.1f}" if _oil_val else "—"}</div>
             <div class="mkt-pulse-metric-sub {_oil_cls}">{f"{_oil_trend:+.2f}% " if _oil_trend is not None else ""}{_oil_sub if _oil_val else "—"}</div>
             <div class="mkt-pulse-metric-exp">{_oil_exp}</div>
           </div>
           <div class="mkt-pulse-metric">
-            <div class="mkt-pulse-metric-label">Bitcoin — 5 ימים</div>
+            <div class="mkt-pulse-metric-label">Bitcoin — 5 Days</div>
             <div class="mkt-pulse-metric-value {_btc_cls}">{f"{_btc_trend:+.2f}%" if _btc_trend is not None else "—"}</div>
             <div class="mkt-pulse-metric-sub {_btc_cls}">{_btc_sub if _btc_trend is not None else "—"}</div>
             <div class="mkt-pulse-metric-exp">{_btc_exp}</div>
@@ -5074,8 +5074,8 @@ def render_market_pulse_banner() -> None:
         <div class="mkt-pulse-wrap {_p_vclass}">
           {_metrics_html}
           <div class="mkt-pulse-footer">
-            <span>⚠️ לא ייעוץ פיננסי — לצורכי מידע בלבד</span>
-            <span>⏱ עודכן: {_fetched} UTC</span>
+            <span>⚠️ Not financial advice — for informational purposes only</span>
+            <span>⏱ Updated: {_fetched} UTC</span>
           </div>
         </div>
         """, unsafe_allow_html=True)
@@ -6344,7 +6344,7 @@ def _render_monte_carlo_section(ticker: str, horizon: str, hist, data: dict):
         '1,000 Geometric Brownian Motion paths · Calibrated to 1-year historical volatility</div>',
         unsafe_allow_html=True,
     )
-    with st.spinner("מריץ סימולציה..."):
+    with st.spinner("Running simulation..."):
         _mc = run_monte_carlo(hist, data.get("current_price", 0))
 
     if _mc:
@@ -6392,10 +6392,10 @@ def _render_monte_carlo_section(ticker: str, horizon: str, hist, data: dict):
         st.plotly_chart(_mc["fig"], config={"displayModeBar": False},
                         use_container_width=True)
         st.caption(
-            "⚠️ סימולציה זו מבוססת על תנועת מחיר היסטורית בלבד ואינה מהווה המלצת השקעה."
+            "⚠️ This simulation is based solely on historical price movement and does not constitute investment advice."
         )
     else:
-        st.info("אין מספיק נתוני מחיר לסימולציה.")
+        st.info("Insufficient price data for simulation.")
 
 
 @st.fragment
@@ -6404,29 +6404,29 @@ def _render_portfolio_tab(horizon: str):
     usd_ils = get_usd_ils()
 
     # ── Demo / My Portfolio toggle ────────────────────────────────────────
-    _port_mode = st.radio("מצב תיק", ["התיק שלי", "🎯 דמו"],
+    _port_mode = st.radio("Portfolio Mode", ["My Portfolio", "🎯 Demo"],
                           horizontal=True, key="port_mode_radio",
                           label_visibility="collapsed")
-    _is_demo = (_port_mode == "🎯 דמו")
+    _is_demo = (_port_mode == "🎯 Demo")
 
     _port_key = "demo_portfolio" if _is_demo else "portfolio"
 
     _pc1, _pc2, _pc3, _pc4 = st.columns([2, 1, 1.5, 1])
     with _pc1:
-        _port_ticker = st.selectbox("מניה", options=TICKER_LIST,
+        _port_ticker = st.selectbox("Stock", options=TICKER_LIST,
                                     label_visibility="collapsed",
                                     key=f"port_ticker_sel_{_port_key}",
-                                    placeholder="בחר מניה...")
+                                    placeholder="Select stock...")
     with _pc2:
-        _port_qty = st.number_input("כמות", min_value=0.01, value=1.0,
+        _port_qty = st.number_input("Quantity", min_value=0.01, value=1.0,
                                     step=1.0, label_visibility="collapsed",
                                     key=f"port_qty_{_port_key}")
     with _pc3:
-        _port_buy = st.number_input("מחיר קנייה $", min_value=0.01, value=100.0,
+        _port_buy = st.number_input("Buy Price $", min_value=0.01, value=100.0,
                                     step=1.0, label_visibility="collapsed",
                                     key=f"port_buy_{_port_key}")
     with _pc4:
-        if st.button("+ הוסף", use_container_width=True, key=f"port_add_{_port_key}"):
+        if st.button("+ Add", use_container_width=True, key=f"port_add_{_port_key}"):
             _existing = [h["ticker"] for h in st.session_state[_port_key]]
             if _port_ticker not in _existing:
                 st.session_state[_port_key].append({
@@ -6441,7 +6441,7 @@ def _render_portfolio_tab(horizon: str):
                     _save_portfolio(st.session_state[_port_key])
                 st.rerun()
             else:
-                st.warning(f"{_port_ticker} כבר בתיק.")
+                st.warning(f"{_port_ticker} is already in the portfolio.")
 
     if st.button("&#9851; Reset Portfolio", use_container_width=False, key=f"port_reset_{_port_key}"):
         if _is_demo:
@@ -6455,10 +6455,10 @@ def _render_portfolio_tab(horizon: str):
     _portfolio = st.session_state[_port_key]
 
     if not _portfolio:
-        st.info("התיק ריק — הוסף מניות למעלה.")
+        st.info("Portfolio is empty — add stocks above.")
     else:
         _tickers_tuple = tuple(h["ticker"] for h in _portfolio)
-        with st.spinner("מעדכן מחירים..."):
+        with st.spinner("Updating prices..."):
             _prices = fetch_portfolio_prices(_tickers_tuple)
 
         _rows = []
@@ -6579,12 +6579,12 @@ def _render_portfolio_tab(horizon: str):
             st.markdown(f"""
 <div style="margin-bottom:18px">
   <div style="font-size:13px;font-weight:700;color:#6366f1;margin-bottom:8px;
-              letter-spacing:.04em">📊 שינוי יומי</div>
+              letter-spacing:.04em">📊 Daily Change</div>
   <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:'Inter',sans-serif">
     <thead>
       <tr style="border-bottom:2px solid #e2e8f0">
-        <th style="text-align:left;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">מניה</th>
-        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">שינוי %</th>
+        <th style="text-align:left;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">Stock</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">Change %</th>
         <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">USD</th>
         <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">ILS</th>
       </tr>
@@ -6594,7 +6594,7 @@ def _render_portfolio_tab(horizon: str):
     </tbody>
     <tfoot>
       <tr style="border-top:2px solid #e2e8f0">
-        <td style="padding:8px 10px;font-weight:700;color:#1e293b">סה״כ תיק</td>
+        <td style="padding:8px 10px;font-weight:700;color:#1e293b">Total Portfolio</td>
         <td style="text-align:right;padding:8px 10px;font-weight:700;font-size:14px;color:{_tot_color}">{_tot_sign}{_tot_pct:.2f}%</td>
         <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_color}">{_tot_sign}${_total_daily_usd:,.0f}</td>
         <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_color}">{_tot_sign}₪{_tot_ils:,.0f}</td>
@@ -6632,14 +6632,14 @@ def _render_portfolio_tab(horizon: str):
             st.markdown(f"""
 <div style="margin-bottom:18px">
   <div style="font-size:13px;font-weight:700;color:#6366f1;margin-bottom:8px;
-              letter-spacing:.04em">💰 רווח/הפסד כולל (מאז קנייה)</div>
+              letter-spacing:.04em">💰 Total P&amp;L (Since Purchase)</div>
   <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:'Inter',sans-serif">
     <thead>
       <tr style="border-bottom:2px solid #e2e8f0">
-        <th style="text-align:left;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">מניה</th>
-        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">שער קנייה</th>
-        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">מחיר נוכחי</th>
-        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">רווח %</th>
+        <th style="text-align:left;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">Stock</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">Buy Price</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">Current Price</th>
+        <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">P&amp;L %</th>
         <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">USD</th>
         <th style="text-align:right;padding:6px 10px;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase">ILS</th>
       </tr>
@@ -6647,7 +6647,7 @@ def _render_portfolio_tab(horizon: str):
     <tbody>{_pl_html_rows}</tbody>
     <tfoot>
       <tr style="border-top:2px solid #e2e8f0">
-        <td colspan="3" style="padding:8px 10px;font-weight:700;color:#1e293b">סה״כ תיק</td>
+        <td colspan="3" style="padding:8px 10px;font-weight:700;color:#1e293b">Total Portfolio</td>
         <td style="text-align:right;padding:8px 10px;font-weight:700;font-size:14px;color:{_tot_pl_color}">{_tot_pl_sign}{_total_pl_pct:.2f}%</td>
         <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_pl_color}">{_tot_pl_sign}${_total_pl_usd:,.0f}</td>
         <td style="text-align:right;padding:8px 10px;font-weight:700;color:{_tot_pl_color}">{_tot_pl_sign}₪{_total_pl_ils:,.0f}</td>
@@ -6657,7 +6657,7 @@ def _render_portfolio_tab(horizon: str):
 </div>
 """, unsafe_allow_html=True)
 
-        st.markdown("#### &#129302; ניתוח תיק")
+        st.markdown("#### &#129302; Portfolio Analysis")
         st.markdown(portfolio_ai_analysis(_ai_holdings, usd_ils))
 
 
@@ -6892,7 +6892,7 @@ def main() -> None:
         compare_tickers = st.multiselect(
             "Compare with", options=TICKER_LIST,
             key="compare_tickers_sel", label_visibility="collapsed",
-            placeholder="הוסף מניה/מדד...", max_selections=3)
+            placeholder="Add stock/index...", max_selections=3)
 
         st.markdown("**Time Range**")
         compare_period = st.selectbox("Time Range", ["1M", "3M", "6M", "1Y", "5Y"],
@@ -6900,7 +6900,7 @@ def main() -> None:
                                       label_visibility="collapsed")
 
         st.markdown("**Candle Size**")
-        candle_tf = st.radio("Candle Size", ["יומי", "שבועי", "חודשי"],
+        candle_tf = st.radio("Candle Size", ["Daily", "Weekly", "Monthly"],
                              horizontal=True, key="candle_tf_radio",
                              label_visibility="collapsed")
 
@@ -6915,7 +6915,7 @@ def main() -> None:
             with _uc1:
                 st.markdown(f"**👤 {_disp}**")
             with _uc2:
-                if st.button("יציאה", key="logout_btn", use_container_width=True):
+                if st.button("Logout", key="logout_btn", use_container_width=True):
                     st.session_state["tg_phone"] = ""
                     st.session_state["current_user_phone"] = ""
                     st.session_state["_tg_verified_phone"] = ""
@@ -6925,12 +6925,12 @@ def main() -> None:
                     except Exception:
                         pass
                     st.rerun()
-            st.markdown("**🔔 התראות מחיר**")
+            st.markdown("**🔔 Price Alerts**")
         else:
-            st.markdown("**🔔 התחברות / התראות מחיר**")
+            st.markdown("**🔔 Connect / Price Alerts**")
 
         _tg_phone = st.text_input(
-            "מספר טלפון",
+            "Phone Number",
             value=st.session_state["tg_phone"],
             placeholder="Enter phone number",
             key="tg_phone_input",
@@ -6948,17 +6948,17 @@ def main() -> None:
 
         if not _tg_configured:
             st.markdown(
-                "**הגדרה נדרשת (פעם אחת):**\n\n"
-                "1. פתח טלגרם → `@BotFather`\n"
-                "2. שלח `/newbot` → קבל token\n"
-                "3. הכנס ב-`.streamlit/secrets.toml`:\n\n"
+                "**Setup required (one-time):**\n\n"
+                "1. Open Telegram → `@BotFather`\n"
+                "2. Send `/newbot` → get token\n"
+                "3. Add to `.streamlit/secrets.toml`:\n\n"
                 "```\nTELEGRAM_BOT_TOKEN = \"...\"\n```\n\n"
-                "4. הפעל מחדש את Streamlit"
+                "4. Restart Streamlit"
             )
         elif _tg_phone and len(_normalize_phone(_tg_phone)) >= 7:
             _norm = _normalize_phone(_tg_phone)
             if st.session_state.get("current_user_phone") == _tg_phone or _expected_user:
-                st.success(f"✅ {_tg_phone} — מחובר לטלגרם")
+                st.success(f"✅ {_tg_phone} — Connected to Telegram")
                 # ── בדוק אם יש הודעות רישום חדשות ─────────────────────────
                 _poll_telegram_registrations()
 
@@ -6966,35 +6966,35 @@ def main() -> None:
                 _ac1, _ac2 = st.columns(2)
                 with _ac1:
                     _alert_ticker = st.text_input(
-                        "טיקר", placeholder="הזן טיקר",
+                        "Ticker", placeholder="Enter ticker",
                         key="alert_ticker_input",
                         label_visibility="visible",
                     ).strip().upper()
                 with _ac2:
                     _alert_cond = st.selectbox(
-                        "תנאי", ["מעל", "מתחת", "שווה ל"],
+                        "Condition", ["Above", "Below", "Equals"],
                         key="alert_cond_select",
                         label_visibility="visible",
                     )
                 _alert_price = st.number_input(
-                    "מחיר יעד ($)", min_value=0.01, value=100.0,
+                    "Target Price ($)", min_value=0.01, value=100.0,
                     step=1.0, key="alert_price_input",
                 )
-                if st.button("➕ הוסף התראה", use_container_width=True, key="add_alert_btn"):
+                if st.button("➕ Add Alert", use_container_width=True, key="add_alert_btn"):
                     if _alert_ticker:
-                        _cond_en = "above" if _alert_cond == "מעל" else ("equals" if _alert_cond == "שווה ל" else "below")
+                        _cond_en = "above" if _alert_cond == "Above" else ("equals" if _alert_cond == "Equals" else "below")
                         if _add_tg_alert(_tg_phone, _alert_ticker, _cond_en, _alert_price):
-                            st.toast(f"✅ התראה נוספה: {_alert_ticker} {_alert_cond} ${_alert_price:,.2f}")
+                            st.toast(f"✅ Alert added: {_alert_ticker} {_alert_cond} ${_alert_price:,.2f}")
                             st.rerun()
                         else:
-                            st.toast("שגיאה בהוספת התראה")
+                            st.toast("Error adding alert")
 
                 # ── רשימת התראות פעילות ───────────────────────────────────
                 _active = [a for a in _list_tg_alerts(_tg_phone) if not a.get("triggered")]
                 if _active:
-                    st.markdown("**התראות פעילות:**")
+                    st.markdown("**Active Alerts:**")
                     for _ai, _al in enumerate(_active):
-                        _dir = "מעל" if _al["condition"] == "above" else ("שווה ל" if _al["condition"] == "equals" else "מתחת")
+                        _dir = "Above" if _al["condition"] == "above" else ("Equals" if _al["condition"] == "equals" else "Below")
                         _col_a, _col_b = st.columns([4, 1])
                         with _col_a:
                             st.caption(f"• {_al['ticker']} {_dir} ${_al['target_price']:,.2f}")
@@ -7005,30 +7005,30 @@ def main() -> None:
 
                 # ── התראות ציון ───────────────────────────────────────────
                 st.markdown("---")
-                st.markdown("**🏆 התראות ציון**")
-                st.caption("קבל הודעה כאשר מניה חדשה מגיעה לציון מינימלי")
+                st.markdown("**🏆 Score Alerts**")
+                st.caption("Get notified when a new stock reaches a minimum score")
                 _sc1, _sc2 = st.columns([3, 2])
                 with _sc1:
                     _score_threshold = st.number_input(
-                        "ציון מינימלי", min_value=1, max_value=100, value=80,
+                        "Minimum Score", min_value=1, max_value=100, value=80,
                         step=1, key="score_alert_threshold",
                         label_visibility="visible",
                     )
                 with _sc2:
                     st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
-                    if st.button("➕ הוסף", use_container_width=True, key="add_score_alert_btn"):
+                    if st.button("➕ Add", use_container_width=True, key="add_score_alert_btn"):
                         if _add_score_alert(_tg_phone, int(_score_threshold)):
-                            st.toast(f"✅ התראה נוספה: ציון ≥{_score_threshold}")
+                            st.toast(f"✅ Alert added: Score ≥{_score_threshold}")
                             st.rerun()
                         else:
-                            st.toast("שגיאה בהוספת התראת ציון")
+                            st.toast("Error adding score alert")
 
                 _active_score = _list_score_alerts(_tg_phone)
                 if _active_score:
                     for _si, _sa in enumerate(_active_score):
                         _sc_a, _sc_b = st.columns([4, 1])
                         with _sc_a:
-                            st.caption(f"• ציון ≥{_sa['min_score']}")
+                            st.caption(f"• Score ≥{_sa['min_score']}")
                         with _sc_b:
                             if st.button("🗑", key=f"del_score_alert_{_si}"):
                                 _delete_score_alert(_tg_phone, _si)
@@ -7043,12 +7043,12 @@ def main() -> None:
                     if _scan_running:
                         st.progress(
                             _scan_prog / max(_scan_total, 1),
-                            text=f"🔍 סריקה פעילה... {_scan_prog}/{_scan_total} מניות"
+                            text=f"🔍 Scan in progress... {_scan_prog}/{_scan_total} stocks"
                         )
                     else:
-                        _btn_label = "🔍 סרוק שוק עכשיו"
+                        _btn_label = "🔍 Scan Market Now"
                         if _last_results:
-                            _btn_label = "🔍 סרוק שוק מחדש"
+                            _btn_label = "🔍 Rescan Market"
                         if st.button(_btn_label, use_container_width=True, key="manual_bp_scan_btn"):
                             threading.Thread(
                                 target=_run_bp_scan,
@@ -7056,7 +7056,7 @@ def main() -> None:
                                 daemon=True,
                                 name="bp-manual-scan",
                             ).start()
-                            st.toast("🔍 סריקה החלה — תקבל הודעת טלגרם אם נמצאו מניות מתאימות")
+                            st.toast("🔍 Scan started — you will receive a Telegram notification if qualifying stocks are found")
                             st.rerun()
 
             else:
@@ -7065,7 +7065,7 @@ def main() -> None:
                 _ap_tries = st.session_state.get(_ap_key, 0)
                 if _ap_tries < 3:
                     st.session_state[_ap_key] = _ap_tries + 1
-                    with st.spinner("מחפש רישום..."):
+                    with st.spinner("Looking up registration..."):
                         _poll_telegram_registrations()
                     if _is_phone_registered(_tg_phone):
                         st.session_state["_tg_verified_phone"] = _tg_phone
@@ -7082,15 +7082,15 @@ def main() -> None:
                     f'display:block;text-align:center;background:#229ED9;color:#fff;'
                     f'padding:10px;border-radius:8px;font-weight:600;font-size:14px;'
                     f'text-decoration:none;margin-bottom:8px;">'
-                    f'📲 הירשם דרך טלגרם</a>',
+                    f'📲 Register via Telegram</a>',
                     unsafe_allow_html=True,
                 )
-                st.caption("לחץ → טלגרם נפתח → לחץ START → חזור לכאן")
-                if st.button("✅ בדוק רישום", use_container_width=True, key="check_reg_btn"):
+                st.caption("Click → Telegram opens → Press START → Return here")
+                if st.button("✅ Check Registration", use_container_width=True, key="check_reg_btn"):
                     import time as _t_reg
                     _found = False
                     _found_db = None  # ה-DB שמצא את הרישום — לעדכון session cache
-                    with st.spinner("מחפש רישום — עשוי לקחת עד 30 שניות..."):
+                    with st.spinner("Looking up registration — may take up to 30 seconds..."):
                         # שלב א: סרוק הודעות טלגרם (/start) — מאפשר רישום ראשוני וחוזר
                         try:
                             _poll_telegram_registrations(force=True)
@@ -7161,10 +7161,10 @@ def main() -> None:
                         except Exception:
                             pass
                         st.session_state["portfolio"] = _load_user_portfolio(_tg_phone)
-                        st.toast("✅ נרשמת בהצלחה!")
+                        st.toast("✅ Successfully registered!")
                         st.rerun()
                     else:
-                        st.warning("עדיין לא נמצא. לחץ 📲 הירשם דרך טלגרם → לחץ START → חזור ולחץ שוב.")
+                        st.warning("Not found yet. Click 📲 Register via Telegram → press START → return here and try again.")
 
         # ── Admin Analytics Dashboard (hidden — גלוי רק עם ?admin=1) ──────────
         try:
@@ -7178,9 +7178,9 @@ def main() -> None:
                 # ── Session נוכחי ──────────────────────────
                 _elapsed = _t_adm.time() - st.session_state.get("_an_start", _t_adm.time())
                 _mins, _secs = divmod(int(_elapsed), 60)
-                st.caption("**⏱ Session נוכחי**")
+                st.caption("**⏱ Current Session**")
                 _ac1, _ac2, _ac3 = st.columns(3)
-                _ac1.metric("זמן שהות", f"{_mins}m {_secs}s")
+                _ac1.metric("Session Duration", f"{_mins}m {_secs}s")
                 _ac2.metric("Reports", st.session_state.get("_an_reports", 0))
                 _ac3.metric("Port. Adds", st.session_state.get("_an_port_adds", 0))
                 _top_sess = sorted(
@@ -7213,7 +7213,7 @@ def main() -> None:
                         _df_top = _pd_adm.DataFrame(_top_all, columns=["Ticker", "Searches"])
                         st.bar_chart(_df_top.set_index("Ticker"))
                 else:
-                    st.info("אין עדיין נתוני Supabase.")
+                    st.info("No Supabase data yet.")
 
         st.markdown("---")
         st.caption("⚠️ For educational purposes only. Not financial advice.")
@@ -7223,7 +7223,7 @@ def main() -> None:
         with st.spinner(f"Analyzing {ticker}..."):
             data = fetch_data(ticker)
     except RuntimeError:
-        st.warning(f"⚠️ Yahoo Finance חוסם זמנית בקשות. נסה שוב בעוד מספר דקות.")
+        st.warning(f"⚠️ Yahoo Finance is temporarily blocking requests. Please try again in a few minutes.")
         return
 
     hist = data["hist"]
@@ -7233,7 +7233,7 @@ def main() -> None:
         return
 
     if data.get("rate_limited"):
-        st.warning(f"⚠️ נתוני פונדמנטלים זמנית חסרים ({ticker}) — Yahoo Finance rate limit. הגרף מוצג.")
+        st.warning(f"⚠️ Fundamental data temporarily unavailable ({ticker}) — Yahoo Finance rate limit. Chart displayed.")
 
     if hist.empty:
         st.warning(f"No price history for **{ticker}**. The ticker may be invalid or delisted.")
@@ -7343,7 +7343,7 @@ def main() -> None:
                     f'{_ret_sign}{_ret:.1f}% ({compare_period})</span></div>',
                     unsafe_allow_html=True)
             # ── Candle timeframe resample ─────────────────────────────────
-            _tf_map = {"שבועי": "W-FRI", "חודשי": "ME"}
+            _tf_map = {"Weekly": "W-FRI", "Monthly": "ME"}
             if candle_tf in _tf_map:
                 _rs = _hist_slice.resample(_tf_map[candle_tf]).agg(
                     {"Open": "first", "High": "max", "Low": "min",
@@ -7415,17 +7415,17 @@ def main() -> None:
 
         # ── Add stock to comparison ────────────────────────────────────
         st.markdown("---")
-        st.markdown("**&#43; הוסף מניה להשוואה**")
+        st.markdown("**&#43; Add Stock for Comparison**")
         _col1, _col2, _col3 = st.columns([3, 1, 1])
         with _col1:
             _add_input = st.text_input(
-                "ticker_add", placeholder="הקלד טיקר (לדוג. MSFT, TSLA...)",
+                "ticker_add", placeholder="Type ticker (e.g. MSFT, TSLA...)",
                 label_visibility="collapsed", key=f"add_input_{ticker}",
             )
         with _col2:
-            _add_btn = st.button("+ הוסף", use_container_width=True, key=f"add_btn_{ticker}")
+            _add_btn = st.button("+ Add", use_container_width=True, key=f"add_btn_{ticker}")
         with _col3:
-            _clear_btn = st.button("נקה הכל", use_container_width=True, key=f"clear_btn_{ticker}")
+            _clear_btn = st.button("Clear All", use_container_width=True, key=f"clear_btn_{ticker}")
 
         if _add_btn and _add_input:
             sym = _add_input.strip().upper()
@@ -7444,7 +7444,7 @@ def main() -> None:
                 f'{s}</span>'
                 for s in st.session_state[_extra_key]
             )
-            st.markdown(f'<div style="margin-top:6px">נוספו: {added_html}</div>',
+            st.markdown(f'<div style="margin-top:6px">Added: {added_html}</div>',
                         unsafe_allow_html=True)
 
     with tab_news:
