@@ -7145,11 +7145,41 @@ def main() -> None:
                                 pass
 
                     if _found:
-                        # עדכן session cache אם יש DB מלא
+                        # Update session cache if full DB available
                         if _found_db:
                             st.session_state["_tg_db_ss_cache"] = _found_db
                             st.session_state["_tg_db_ss_ts"] = _t_reg.time()
-                        # הגדר חיבור מלא ישירות — לא לסמוך על rerender chain
+                        # Reload alerts from _ualerts_{norm} backup and merge into session cache
+                        # This ensures price alerts + score alerts survive re-verification
+                        try:
+                            _ua = _supabase_load_user_alerts(_norm)
+                            if _ua:
+                                _db_merge = st.session_state.get("_tg_db_ss_cache")
+                                if not isinstance(_db_merge, dict):
+                                    _db_merge = {"registrations": {}, "alerts": [], "score_alerts": []}
+                                # Merge price alerts (avoid duplicates)
+                                _pal = _ua.get("price_alerts") or []
+                                _exist_pa = {
+                                    (a.get("phone"), a.get("ticker"), str(a.get("target_price")))
+                                    for a in _db_merge.get("alerts", [])
+                                }
+                                for _a in _pal:
+                                    _k = (_a.get("phone"), _a.get("ticker"), str(_a.get("target_price")))
+                                    if _k not in _exist_pa:
+                                        _db_merge.setdefault("alerts", []).append(_a)
+                                        _exist_pa.add(_k)
+                                # Merge score alerts (one per phone)
+                                _sal = _ua.get("score_alerts") or []
+                                _exist_sa = {a.get("phone") for a in _db_merge.get("score_alerts", [])}
+                                for _a in _sal:
+                                    if _a.get("phone") not in _exist_sa:
+                                        _db_merge.setdefault("score_alerts", []).append(_a)
+                                        _exist_sa.add(_a.get("phone"))
+                                st.session_state["_tg_db_ss_cache"] = _db_merge
+                                st.session_state["_tg_db_ss_ts"] = _t_reg.time()
+                        except Exception:
+                            pass
+                        # Set full connection directly
                         st.session_state["_tg_verified_phone"] = _tg_phone
                         st.session_state["current_user_phone"] = _tg_phone
                         st.session_state[f"_ap_tries_{_norm}"] = 0
