@@ -1,5 +1,5 @@
 """
-Eden Sovereign Intelligence Terminal V2.0
+Stock Sovereign Intelligence Terminal V2.0
 Institutional-grade equity research terminal.
 """
 
@@ -35,8 +35,8 @@ except ImportError:
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Eden Sovereign | V2.0",
-    page_icon="E",
+    page_title="Stock Sovereign | V2.0",
+    page_icon="S",
     layout="wide",
     initial_sidebar_state="expanded")
 
@@ -427,7 +427,7 @@ def inject_ga(ga_id: str = "G-XXXXXXXXXX") -> None:
           function gtag(){{dataLayer.push(arguments);}}
           gtag('js', new Date());
           gtag('config', '{ga_id}', {{
-            page_title: 'Sovereign Terminal',
+            page_title: 'Stock Sovereign',
             page_location: window.location.href,
             send_page_view: true
           }});
@@ -883,7 +883,7 @@ def inject_css() -> None:
       </label>
       <div class="eden-panel-sep"></div>
       <div class="eden-panel-item" style="color:#6b7280;font-size:11px;cursor:default">
-        <span>Eden Sovereign V2.0</span>
+        <span>Stock Sovereign V2.0</span>
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -2825,14 +2825,14 @@ def _check_and_fire_score_alerts(scores: list, horizon: str = "1Y Strategic",
             if notify_all:
                 # סריקה ידנית — התרע על כל המניות מעל הסף
                 notify_tickers = qualifying_tickers
-                header = f"🏆 *Eden Sovereign — Market Scan*\nStocks with score ≥{min_s} ({horizon}):\n"
+                header = f"🏆 *Stock Sovereign — Market Scan*\nStocks with score ≥{min_s} ({horizon}):\n"
             else:
                 # אוטומטי — רק מניות חדשות שלא נשלחו קודם
                 prev_tickers = set(alert.get("last_notified_tickers", []))
                 notify_tickers = [t for t in qualifying_tickers if t not in prev_tickers]
                 if not notify_tickers:
                     continue
-                header = f"🏆 *Eden Sovereign — Score Alert*\nNew stocks reaching score ≥{min_s} ({horizon}):\n"
+                header = f"🏆 *Stock Sovereign — Score Alert*\nNew stocks reaching score ≥{min_s} ({horizon}):\n"
             # שלח בחבילות של עד 20 מניות (מגבלת Telegram ~4096 תווים)
             _chunk_size = 20
             _sent_ok = False
@@ -2883,7 +2883,7 @@ def _check_and_fire_tg_alerts(current_prices: dict) -> int:
             if hit:
                 direction = "rose above" if alert["condition"] == "above" else ("reached" if alert["condition"] == "equals" else "fell below")
                 body = (
-                    f"🔔 *Eden Sovereign — Price Alert*\n\n"
+                    f"🔔 *Stock Sovereign — Price Alert*\n\n"
                     f"Stock: *{alert['ticker']}*\n"
                     f"{direction} target ${target:,.2f}\n"
                     f"Current price: *${price:,.2f}*"
@@ -5220,7 +5220,7 @@ def score_badge_html(score: int, is_etf: bool = False) -> str:
 EDEN_LOGO = """
 <div class="eden-logo">
   <div class="eden-icon">E</div>
-  <div><div class="eden-brand">Eden Sovereign</div>
+  <div><div class="eden-brand">Stock Sovereign</div>
        <div class="eden-sub">Intelligence Terminal</div></div>
 </div>"""
 
@@ -5691,7 +5691,7 @@ def build_presentation_html(
                 box-shadow:0 0 28px rgba(99,102,241,.55),0 4px 16px rgba(0,0,0,.5)">E</div>
     <div>
       <div style="font-size:10px;font-weight:700;color:#6366f1;letter-spacing:3.5px;
-                  text-transform:uppercase">Eden Sovereign</div>
+                  text-transform:uppercase">Stock Sovereign</div>
       <div style="font-size:9px;color:#1e293b;letter-spacing:2px;text-transform:uppercase">Intelligence Terminal</div>
     </div>
   </div>
@@ -5979,7 +5979,7 @@ def build_presentation_html(
     {ceo_s}
   </div>
   <div style="font-size:10px;color:#0f172a;margin-top:6px">
-    Eden Sovereign Intelligence Terminal &nbsp;&middot;&nbsp; {date_str}
+    Stock Sovereign Intelligence Terminal &nbsp;&middot;&nbsp; {date_str}
   </div>
 </div>
 </section>"""
@@ -5992,7 +5992,7 @@ def build_presentation_html(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>{ticker} — Eden Sovereign</title>
+<title>{ticker} — Stock Sovereign</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/reveal.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/theme/black.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
