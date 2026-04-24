@@ -5219,7 +5219,7 @@ def score_badge_html(score: int, is_etf: bool = False) -> str:
 
 EDEN_LOGO = """
 <div class="eden-logo">
-  <div class="eden-icon">E</div>
+  <div class="eden-icon">S</div>
   <div><div class="eden-brand">Stock Sovereign</div>
        <div class="eden-sub">Intelligence Terminal</div></div>
 </div>"""
@@ -5688,7 +5688,7 @@ def build_presentation_html(
     <div style="width:42px;height:42px;background:linear-gradient(135deg,#6366f1,#8b5cf6);
                 border-radius:11px;display:flex;align-items:center;justify-content:center;
                 font-size:21px;font-weight:900;color:#fff;
-                box-shadow:0 0 28px rgba(99,102,241,.55),0 4px 16px rgba(0,0,0,.5)">E</div>
+                box-shadow:0 0 28px rgba(99,102,241,.55),0 4px 16px rgba(0,0,0,.5)">S</div>
     <div>
       <div style="font-size:10px;font-weight:700;color:#6366f1;letter-spacing:3.5px;
                   text-transform:uppercase">Stock Sovereign</div>
