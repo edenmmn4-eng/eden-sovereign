@@ -2354,7 +2354,31 @@ def _supabase_save_tg_db(db: dict) -> bool:
                             _to_save["registrations"][_p] = _p_curr
                             print(f"[INFO] _supabase_save_tg_db: שוחזר רישום חסר עבור {_p}")
         except Exception as _pe:
-            print(f"[WARNING] _supabase_save_tg_db: קריאת הגנה נכשלה: {_pe}")
+            print(f"[WARNING] _supabase_save_tg_db: protective read failed: {_pe}")
+            # CRITICAL safety: if protective read failed and we have nothing to save,
+            # abort entirely — do NOT overwrite valid Supabase data with an empty dict.
+            _has_anything = (
+                _to_save.get("registrations") or
+                _to_save.get("alerts") or
+                _to_save.get("score_alerts")
+            )
+            if not _has_anything:
+                print("[WARNING] _supabase_save_tg_db: aborting — protective read failed and no local data")
+                return False
+
+        # Always restore missing alerts/score_alerts from Supabase current state
+        # (not only when registrations are empty — alerts can be lost independently)
+        try:
+            if not isinstance(_to_save.get("registrations"), dict):
+                _to_save["registrations"] = {}
+            _curr_check = locals().get("_curr")
+            if isinstance(_curr_check, dict):
+                if not _to_save.get("alerts") and _curr_check.get("alerts"):
+                    _to_save["alerts"] = _curr_check["alerts"]
+                if not _to_save.get("score_alerts") and _curr_check.get("score_alerts"):
+                    _to_save["score_alerts"] = _curr_check["score_alerts"]
+        except Exception:
+            pass
 
         _payload = {"ticker": "_tg_db", "data": _to_save,
                     "cached_at": datetime.utcnow().isoformat()}
@@ -2447,7 +2471,9 @@ def _load_alerts_db() -> dict:
     for _rnorm, _rreg in list(data.get("registrations", {}).items()):
         try:
             # א. שחזור פורטפוליו חסר — user_portfolios → _portfolio_{norm}
-            if not _rreg.get("portfolio"):
+            # Use "portfolio" not in _rreg (key missing) — NOT "not _rreg.get("portfolio")"
+            # An empty list [] means user intentionally cleared portfolio — do NOT overwrite it
+            if "portfolio" not in _rreg:
                 _port_bk = (
                     _supabase_load_portfolio(_rnorm)
                     or _supabase_load_portfolio_cache(_rnorm)
@@ -3132,8 +3158,8 @@ def _supabase_load_user_alerts(norm: str) -> dict | None:
 
 def _supabase_save_portfolio_cache(norm: str, portfolio: list) -> bool:
     """גיבוי שלישי לפורטפוליו ב-ticker_cache תחת מפתח _portfolio_{norm}."""
-    if not portfolio:
-        return False  # לא שומר פורטפוליו ריק כגיבוי
+    if portfolio is None:
+        return False  # None = invalid; [] = legitimately empty — save it to prevent stale recovery
     try:
         url, key = _sb_creds()
         if not url or not key:
@@ -3198,28 +3224,30 @@ def _supabase_save_portfolio(phone: str, portfolio: list) -> bool:
 def _load_user_portfolio(phone: str) -> list:
     """טוען את ה-Portfolio — _tg_db → user_portfolios → ticker_cache (_portfolio_)."""
     norm = _normalize_phone(phone)
-    # 1. PRIMARY: _tg_db — אותה טבלה כמו ההרשמות
+    _reg_portfolio_key_exists = False
+    # 1. PRIMARY: _tg_db — same table as registrations
     try:
         db = _load_alerts_db()
         reg = db.get("registrations", {}).get(norm, {})
-        p = reg.get("portfolio")
-        if isinstance(p, list) and p:  # החזר רק אם לא ריק
-            return p
+        if "portfolio" in reg:
+            _reg_portfolio_key_exists = True
+            p = reg["portfolio"]
+            if isinstance(p, list):
+                # Return even empty [] — user intentionally cleared portfolio
+                # Do NOT skip empty list and fall through to stale backup data
+                if p or _reg_portfolio_key_exists:
+                    return p
     except Exception:
         pass
-    # 2. SECONDARY: user_portfolios
+    # 2. SECONDARY: user_portfolios table
     sb = _supabase_load_portfolio(norm)
-    if sb:  # לא ריק
+    if sb is not None:  # None = failed/timeout; [] = legitimately empty
         return sb
-    # 3. TERTIARY: ticker_cache — גיבוי שלישי (לא תלוי בשתי הטבלאות הקודמות)
+    # 3. TERTIARY: ticker_cache backup
     tc = _supabase_load_portfolio_cache(norm)
-    if tc:
+    if tc is not None:
         return tc
-    # 4. אם הכל נכשל — החזר ריק (אולי פורטפוליו ריק לגיטימי)
-    if sb is not None:  # user_portfolios ענה אבל ריק — זה לגיטימי
-        return sb
-    if isinstance(reg.get("portfolio"), list):  # _tg_db ענה אבל ריק
-        return reg["portfolio"]
+    # 4. All sources failed — return empty
     return []
 
 
