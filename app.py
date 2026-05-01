@@ -3284,7 +3284,7 @@ def _save_user_portfolio(phone: str, portfolio: list) -> bool:
             _t2.start()
         except Exception:
             pass
-    return sb_ok
+    return sb_ok or _sp_ok or _spc_ok
 
 
 # ── Monte Carlo Price Simulation ──────────────────────────────────────────────
@@ -6426,6 +6426,116 @@ def _render_monte_carlo_section(ticker: str, horizon: str, hist, data: dict):
         st.info("Insufficient price data for simulation.")
 
 
+def render_tax_calculator(portfolio: list = None) -> None:
+    """Tax-Aware Re-entry Calculator — compare Hold vs Sell & Re-buy after capital gains tax."""
+    st.markdown("#### 🧮 Tax-Aware Re-entry Calculator")
+    st.caption(
+        "Should you sell your profitable position, pay capital gains tax, "
+        "and re-buy cheaper after a dip? This tool answers that mathematically."
+    )
+
+    # Build portfolio map for auto-fill
+    _port_map = {}
+    _port_tickers = []
+    if portfolio:
+        for _item in portfolio:
+            _t = _item.get("ticker", "")
+            if _t:
+                _port_tickers.append(_t)
+                _port_map[_t] = _item
+
+    # Stock selector
+    _options = ["— Enter manually —"] + _port_tickers
+    _sel = st.selectbox(
+        "Pre-fill from portfolio",
+        _options,
+        key="tax_calc_stock_sel",
+        help="Select a stock from your portfolio to auto-fill buy price and quantity",
+    )
+    _auto_buy = float(_port_map[_sel].get("buy_price", 1.0)) if _sel in _port_map else 1.0
+    _auto_qty = float(_port_map[_sel].get("quantity", 1.0)) if _sel in _port_map else 1.0
+
+    # Inputs — 3 columns
+    _c1, _c2, _c3 = st.columns(3)
+    with _c1:
+        _buy_price = st.number_input(
+            "Purchase Price ($)", min_value=0.01, value=round(_auto_buy, 2),
+            step=0.01, format="%.2f", key="tax_calc_buy_price",
+        )
+        _cur_price = st.number_input(
+            "Current Market Price ($)", min_value=0.01,
+            value=round(max(_auto_buy * 1.1, _auto_buy + 0.01), 2),
+            step=0.01, format="%.2f", key="tax_calc_cur_price",
+            help="Check the current price in the Chart tab",
+        )
+    with _c2:
+        _quantity = st.number_input(
+            "Quantity (Shares)", min_value=0.01, value=round(_auto_qty, 2),
+            step=1.0, format="%.2f", key="tax_calc_qty",
+        )
+        _dip_pct = st.slider(
+            "Expected Dip %", min_value=1, max_value=50, value=10,
+            step=1, key="tax_calc_dip",
+            help="How far do you expect the price to drop?",
+        )
+    with _c3:
+        _tax_rate = st.slider(
+            "Capital Gains Tax Rate %", min_value=0, max_value=50, value=25,
+            step=1, key="tax_calc_tax_rate",
+            help="Default is 25%. Adjust for your jurisdiction.",
+        )
+
+    # ── Math ────────────────────────────────────────────────────────────────
+    _profit    = (_cur_price - _buy_price) * _quantity
+    _tax       = _profit * (_tax_rate / 100.0) if _profit > 0 else 0.0
+    _cash      = (_cur_price * _quantity) - _tax
+    _target    = _cur_price * (1.0 - _dip_pct / 100.0)
+    _new_qty   = _cash / _target if _target > 0 else 0.0
+    _extra     = _new_qty - _quantity
+    _breakeven = ((_cur_price - _buy_price) * (_tax_rate / 100.0)) / _cur_price if _cur_price > 0 else 0.0
+
+    st.divider()
+
+    # ── Verdict ─────────────────────────────────────────────────────────────
+    if _profit <= 0:
+        st.info(
+            "ℹ️ **No capital gain** — selling incurs zero tax. "
+            "The Sell & Re-buy decision depends only on your dip conviction."
+        )
+    elif (_dip_pct / 100.0) <= _breakeven:
+        st.warning(
+            f"⚠️ **Dip too small to cover the tax.** "
+            f"You need at least a **{_breakeven * 100:.1f}% dip** to break even. "
+            f"At {_dip_pct}% you would **lose {abs(_extra):.2f} shares**."
+        )
+    elif _extra > 0:
+        st.success(
+            f"✅ **Sell & Re-buy is better** — you'd end up with "
+            f"**{_extra:+.2f} extra shares** ({_new_qty:.2f} vs {_quantity:.2f}) "
+            f"after paying ${_tax:,.2f} in tax."
+        )
+    else:
+        st.warning(
+            f"⚠️ **Holding is better** — selling & re-buying at {_dip_pct}% dip "
+            f"would cost you **{abs(_extra):.2f} shares** after the {_tax_rate}% tax hit."
+        )
+
+    # ── Metrics row 1 ───────────────────────────────────────────────────────
+    _m1, _m2, _m3, _m4 = st.columns(4)
+    _m1.metric("Current Profit", f"${_profit:,.2f}")
+    _m2.metric(f"Tax ({_tax_rate}%)", f"${_tax:,.2f}", delta=f"-${_tax:,.2f}" if _tax > 0 else None)
+    _m3.metric("Available Cash", f"${_cash:,.2f}")
+    _m4.metric("Breakeven Dip", f"{_breakeven * 100:.1f}%",
+               help="Minimum dip needed to justify the tax cost")
+
+    # ── Metrics row 2 ───────────────────────────────────────────────────────
+    _m5, _m6, _m7, _m8 = st.columns(4)
+    _m5.metric("Target Re-entry Price", f"${_target:,.2f}")
+    _m6.metric("New Shares After Re-buy", f"{_new_qty:.2f}")
+    _m7.metric("Net Share Change", f"{_extra:+.2f}")
+    _m8.metric("Current Shares (Hold)", f"{_quantity:.2f}")
+
+
 @st.fragment
 def _render_portfolio_tab(horizon: str):
     st.markdown("### 💼 Portfolio Builder")
@@ -6687,6 +6797,11 @@ def _render_portfolio_tab(horizon: str):
 
         st.markdown("#### &#129302; Portfolio Analysis")
         st.markdown(portfolio_ai_analysis(_ai_holdings, usd_ils))
+
+    # ── Tax-Aware Re-entry Calculator ────────────────────────────────────────
+    st.divider()
+    _active_port = st.session_state.get(_port_key, [])
+    render_tax_calculator(_active_port)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
