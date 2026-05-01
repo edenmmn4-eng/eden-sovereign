@@ -6426,13 +6426,15 @@ def _render_monte_carlo_section(ticker: str, horizon: str, hist, data: dict):
         st.info("Insufficient price data for simulation.")
 
 
-def render_tax_calculator(portfolio: list = None) -> None:
+def render_tax_calculator(portfolio: list = None, prices: dict = None) -> None:
     """Tax-Aware Re-entry Calculator — compare Hold vs Sell & Re-buy after capital gains tax."""
     st.markdown("#### 🧮 Tax-Aware Re-entry Calculator")
     st.caption(
         "Should you sell your profitable position, pay capital gains tax, "
         "and re-buy cheaper after a dip? This tool answers that mathematically."
     )
+
+    _prices = prices or {}
 
     # Build portfolio map for auto-fill
     _port_map = {}
@@ -6450,27 +6452,38 @@ def render_tax_calculator(portfolio: list = None) -> None:
         "Pre-fill from portfolio",
         _options,
         key="tax_calc_stock_sel",
-        help="Select a stock from your portfolio to auto-fill buy price and quantity",
+        help="Select a stock from your portfolio to auto-fill purchase price, quantity and current price",
     )
-    _auto_buy = float(_port_map[_sel].get("buy_price", 1.0)) if _sel in _port_map else 1.0
-    _auto_qty = float(_port_map[_sel].get("quantity", 1.0)) if _sel in _port_map else 1.0
+
+    # Auto-sync: when selection changes, push portfolio data into widget session state
+    # keys BEFORE the number_input widgets are rendered so they pick up the new values.
+    _prev_sel = st.session_state.get("_tax_calc_prev_sel", "")
+    if _sel != _prev_sel:
+        st.session_state["_tax_calc_prev_sel"] = _sel
+        if _sel in _port_map:
+            _sb = round(float(_port_map[_sel].get("buy_price", 1.0)), 2)
+            _sq = round(float(_port_map[_sel].get("quantity", 1.0)), 2)
+            _sp = _prices.get(_sel)
+            _sc = round(float(_sp), 2) if _sp and _sp > 0 else round(max(_sb * 1.1, _sb + 0.01), 2)
+            st.session_state["tax_calc_buy_price"] = max(_sb, 0.01)
+            st.session_state["tax_calc_qty"]       = max(_sq, 0.01)
+            st.session_state["tax_calc_cur_price"] = max(_sc, 0.01)
 
     # Inputs — 3 columns
     _c1, _c2, _c3 = st.columns(3)
     with _c1:
         _buy_price = st.number_input(
-            "Purchase Price ($)", min_value=0.01, value=round(_auto_buy, 2),
+            "Purchase Price ($)", min_value=0.01, value=1.0,
             step=0.01, format="%.2f", key="tax_calc_buy_price",
         )
         _cur_price = st.number_input(
-            "Current Market Price ($)", min_value=0.01,
-            value=round(max(_auto_buy * 1.1, _auto_buy + 0.01), 2),
+            "Current Market Price ($)", min_value=0.01, value=1.10,
             step=0.01, format="%.2f", key="tax_calc_cur_price",
-            help="Check the current price in the Chart tab",
+            help="Auto-filled from live prices when you select a stock above",
         )
     with _c2:
         _quantity = st.number_input(
-            "Quantity (Shares)", min_value=0.01, value=round(_auto_qty, 2),
+            "Quantity (Shares)", min_value=0.01, value=1.0,
             step=1.0, format="%.2f", key="tax_calc_qty",
         )
         _dip_pct = st.slider(
@@ -6801,7 +6814,8 @@ def _render_portfolio_tab(horizon: str):
     # ── Tax-Aware Re-entry Calculator ────────────────────────────────────────
     st.divider()
     _active_port = st.session_state.get(_port_key, [])
-    render_tax_calculator(_active_port)
+    _calc_prices = fetch_portfolio_prices(tuple(h["ticker"] for h in _active_port)) if _active_port else {}
+    render_tax_calculator(_active_port, _calc_prices)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
