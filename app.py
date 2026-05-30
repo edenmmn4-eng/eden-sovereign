@@ -7111,17 +7111,10 @@ def main() -> None:
         try:
             _bot_name = st.secrets.get("TELEGRAM_BOT_NAME", "") or os.environ.get("TELEGRAM_BOT_NAME", "@Eden_sovereign_bot")
         except Exception:
-            _bot_name = "@eden_alerts_bot"
+            _bot_name = "@Eden_sovereign_bot"
 
         if not _tg_configured:
-            st.markdown(
-                "**Setup required (one-time):**\n\n"
-                "1. Open Telegram → `@BotFather`\n"
-                "2. Send `/newbot` → get token\n"
-                "3. Add to `.streamlit/secrets.toml`:\n\n"
-                "```\nTELEGRAM_BOT_TOKEN = \"...\"\n```\n\n"
-                "4. Restart Streamlit"
-            )
+            st.info("🔔 Enter your phone number to connect Telegram and receive price alerts.")
         elif _tg_phone and len(_normalize_phone(_tg_phone)) >= 7:
             _norm = _normalize_phone(_tg_phone)
             if st.session_state.get("current_user_phone") == _tg_phone or _expected_user:
