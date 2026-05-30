@@ -445,7 +445,7 @@ def inject_ga(ga_id: str = "G-XXXXXXXXXX") -> None:
 def inject_css() -> None:
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
 
     #MainMenu,footer,.stDeployButton,[data-testid="stToolbar"]{visibility:hidden;display:none}
     /* header — שקוף ומחוץ לתצוגה, pointer-events נשמרים לצורך JS */
@@ -462,11 +462,12 @@ def inject_css() -> None:
         user-select:none;transition:box-shadow .18s;padding:0;line-height:1}
     #eden-sb-btn:hover{box-shadow:0 5px 18px rgba(99,102,241,.28)}
 
-    html,body,[class*="css"]{font-family:'Inter',-apple-system,sans-serif;background-color:#fcfcfc}
+    html,body,[class*="css"]{font-family:'Inter',-apple-system,sans-serif;background-color:#f5f6fe}
 
     [data-testid="stSidebar"]{
-        background:linear-gradient(180deg,#f8f9ff 0%,#f0f1ff 100%);
-        border-right:1px solid rgba(99,102,241,.12);
+        background:linear-gradient(180deg,#f4f5ff 0%,#eceeff 60%,#e8eaff 100%);
+        border-right:1px solid rgba(99,102,241,.18);
+        box-shadow:2px 0 20px rgba(99,102,241,.06);
     }
 
     .eden-logo{display:flex;align-items:center;gap:12px;padding:8px 4px 20px;
@@ -474,25 +475,26 @@ def inject_css() -> None:
     .eden-icon{width:44px;height:44px;background:linear-gradient(135deg,#6366f1,#8b5cf6);
                border-radius:12px;display:flex;align-items:center;justify-content:center;
                color:#fff;font-weight:700;font-size:22px;box-shadow:0 4px 12px rgba(99,102,241,.35);flex-shrink:0}
-    .eden-brand{font-size:14px;font-weight:700;color:#1a1a2e;letter-spacing:-.3px}
-    .eden-sub{font-size:10px;color:#6366f1;letter-spacing:1.5px;text-transform:uppercase}
+    .eden-brand{font-family:'Plus Jakarta Sans','Inter',sans-serif;font-size:15px;font-weight:800;color:#1a1a2e;letter-spacing:-.4px}
+    .eden-sub{font-size:11px;color:#6366f1;letter-spacing:1.5px;text-transform:uppercase;font-weight:600}
 
     .metric-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin:20px 0 16px}
-    .metric-card{background:rgba(255,255,255,.75);backdrop-filter:blur(10px);
-                 border:1px solid rgba(99,102,241,.18);border-radius:16px;padding:18px 16px;
-                 box-shadow:0 4px 24px rgba(99,102,241,.07);transition:transform .2s,box-shadow .2s}
-    .metric-card:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(99,102,241,.13)}
-    .metric-label{font-size:10px;font-weight:600;color:#6366f1;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px}
-    .metric-value{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:600;color:#1a1a2e;line-height:1.2}
+    .metric-card{background:rgba(255,255,255,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+                 border:1px solid rgba(99,102,241,.2);border-radius:18px;padding:18px 16px;
+                 box-shadow:0 4px 16px rgba(99,102,241,.08),0 1px 4px rgba(0,0,0,.04);
+                 transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s ease}
+    .metric-card:hover{transform:translateY(-3px);box-shadow:0 12px 36px rgba(99,102,241,.18),0 2px 8px rgba(0,0,0,.06)}
+    .metric-label{font-size:11px;font-weight:700;color:#6366f1;letter-spacing:1.1px;text-transform:uppercase;margin-bottom:6px}
+    .metric-value{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:#0f0f1e;line-height:1.2}
     .metric-sub{font-size:11px;font-weight:500;margin-top:4px}
     .positive{color:#10b981} .negative{color:#ef4444} .neutral{color:#6b7280}
 
-    .analyst-card{background:rgba(255,255,255,.75);backdrop-filter:blur(10px);
-                  border:1px solid rgba(99,102,241,.18);border-radius:16px;padding:20px 24px;
-                  margin:0 0 20px;box-shadow:0 4px 24px rgba(99,102,241,.07);
+    .analyst-card{background:rgba(255,255,255,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+                  border:1px solid rgba(99,102,241,.2);border-radius:18px;padding:20px 24px;
+                  margin:0 0 20px;box-shadow:0 4px 20px rgba(99,102,241,.09),0 1px 4px rgba(0,0,0,.04);
                   display:flex;gap:40px;align-items:center;flex-wrap:wrap}
     .analyst-block{display:flex;flex-direction:column;gap:4px}
-    .analyst-lbl{font-size:10px;font-weight:600;color:#6366f1;letter-spacing:1.2px;text-transform:uppercase}
+    .analyst-lbl{font-size:11px;font-weight:700;color:#6366f1;letter-spacing:1.1px;text-transform:uppercase}
     .analyst-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600;color:#1a1a2e}
     .analyst-sub{font-size:11px;color:#6b7280}
     .price-bar-track{height:6px;background:#e5e7eb;border-radius:3px;margin:8px 0}
@@ -504,11 +506,11 @@ def inject_css() -> None:
                  font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;margin-left:16px}
 
     .ticker-header{display:flex;align-items:baseline;gap:12px;margin-bottom:4px}
-    .ticker-symbol{font-size:32px;font-weight:700;color:#1a1a2e;letter-spacing:-1px}
+    .ticker-symbol{font-family:'Plus Jakarta Sans','Inter',sans-serif;font-size:32px;font-weight:800;color:#0f0f1e;letter-spacing:-1px}
     .company-full{font-size:14px;color:#6b7280;font-weight:400}
 
-    .exec-card{background:#fff;border-radius:20px;padding:36px 40px;
-               border:1px solid rgba(99,102,241,.12);box-shadow:0 2px 20px rgba(0,0,0,.04);margin-top:8px}
+    .exec-card{background:#fff;border-radius:22px;padding:36px 40px;
+               border:1px solid rgba(99,102,241,.15);box-shadow:0 4px 28px rgba(99,102,241,.08),0 1px 6px rgba(0,0,0,.04);margin-top:8px}
 
     .ceo-summary{border-left:4px solid #6366f1;padding:16px 20px;
                  background:linear-gradient(90deg,rgba(99,102,241,.04),transparent);
@@ -540,23 +542,26 @@ def inject_css() -> None:
     .thesis-icon{flex-shrink:0;font-size:14px;margin-top:1px}
     .thesis-title{font-weight:600;color:#1a1a2e}
 
-    .verdict-box{background:linear-gradient(135deg,#f0f1ff,#faf0ff);border-radius:14px;
-                 padding:22px 28px;border:1px solid rgba(99,102,241,.2);margin-top:28px;
-                 display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+    .verdict-box{background:linear-gradient(135deg,#eef0ff,#f5eeff);border-radius:18px;
+                 padding:22px 28px;border:1px solid rgba(99,102,241,.22);margin-top:28px;
+                 display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+                 box-shadow:0 4px 20px rgba(99,102,241,.1)}
     .verdict-label{font-size:1.5rem;font-weight:800}
     .verdict-meta{font-family:'JetBrains Mono',monospace;font-size:12px;color:#6b7280;line-height:1.8}
 
     .hero{text-align:center;padding:80px 20px;color:#9ca3af}
-    .hero h1{font-size:2rem;font-weight:700;color:#1a1a2e;margin-bottom:8px}
+    .hero h1{font-family:'Plus Jakarta Sans','Inter',sans-serif;font-size:2.2rem;font-weight:800;color:#0f0f1e;margin-bottom:8px;letter-spacing:-.5px}
 
     [data-testid="stTabs"] [role="tab"]{font-family:'Inter',sans-serif;font-size:13px;font-weight:600;color:#6b7280}
     [data-testid="stTabs"] [role="tab"][aria-selected="true"]{color:#6366f1}
 
     .news-card{padding:14px 0;border-bottom:1px solid #f3f4f6}
     .news-card:last-child{border-bottom:none}
-    .news-title a{font-size:14px;font-weight:600;color:#1a1a2e;text-decoration:none;line-height:1.5}
+    .news-title a{font-size:14px;font-weight:600;color:#0f0f1e;text-decoration:none;line-height:1.5;transition:color .15s}
     .news-title a:hover{color:#6366f1}
     .news-meta{font-size:11px;color:#9ca3af;margin-top:4px}
+    .news-card{transition:background .15s}
+    .news-card:hover{background:rgba(99,102,241,.04);border-radius:10px}
     .earn-next{background:linear-gradient(90deg,rgba(99,102,241,.06),transparent);
                border-left:4px solid #6366f1;border-radius:0 10px 10px 0;
                padding:12px 18px;margin-bottom:20px;font-size:14px;color:#1a1a2e;font-weight:500}
@@ -616,10 +621,10 @@ def inject_css() -> None:
     html:has(#eden-dark-chk:checked) .stApp,
     html:has(#eden-dark-chk:checked) .block-container,
     html:has(#eden-dark-chk:checked) .stMainBlockContainer,
-    html:has(#eden-dark-chk:checked) [class*="css"]{background-color:#0f0f1a!important;color:#e2e2f0!important}
-    html:has(#eden-dark-chk:checked) [data-testid="stSidebar"]{background:linear-gradient(180deg,#1a1a2e 0%,#16162a 100%)!important;border-right-color:rgba(99,102,241,.25)!important}
+    html:has(#eden-dark-chk:checked) [class*="css"]{background-color:#07071a!important;color:#e4e4f0!important}
+    html:has(#eden-dark-chk:checked) [data-testid="stSidebar"]{background:linear-gradient(180deg,#12122a 0%,#0e0e24 60%,#0b0b20 100%)!important;border-right-color:rgba(99,102,241,.28)!important;box-shadow:2px 0 24px rgba(0,0,0,.4)!important}
     html:has(#eden-dark-chk:checked) .metric-card,
-    html:has(#eden-dark-chk:checked) .analyst-card{background:rgba(26,26,46,.85)!important;border-color:rgba(99,102,241,.3)!important}
+    html:has(#eden-dark-chk:checked) .analyst-card{background:rgba(18,18,38,.92)!important;border-color:rgba(99,102,241,.32)!important;box-shadow:0 4px 20px rgba(0,0,0,.5),0 0 0 1px rgba(99,102,241,.08)!important}
     html:has(#eden-dark-chk:checked) .metric-value,
     html:has(#eden-dark-chk:checked) .ticker-symbol,
     html:has(#eden-dark-chk:checked) .eden-brand,
@@ -633,11 +638,11 @@ def inject_css() -> None:
     html:has(#eden-dark-chk:checked) .thesis-item{color:#e2e2f0!important}
     html:has(#eden-dark-chk:checked) .metric-label,
     html:has(#eden-dark-chk:checked) .analyst-lbl{color:#a78bfa!important}
-    html:has(#eden-dark-chk:checked) .exec-card{background:#1a1a2e!important;border-color:rgba(99,102,241,.25)!important}
+    html:has(#eden-dark-chk:checked) .exec-card{background:#12122a!important;border-color:rgba(99,102,241,.28)!important;box-shadow:0 6px 32px rgba(0,0,0,.5)!important}
     html:has(#eden-dark-chk:checked) .ceo-summary{background:linear-gradient(90deg,rgba(99,102,241,.1),transparent)!important}
     html:has(#eden-dark-chk:checked) .report-section-title{border-bottom-color:rgba(99,102,241,.2)!important}
     html:has(#eden-dark-chk:checked) .rpt-row{border-bottom-color:rgba(255,255,255,.06)!important}
-    html:has(#eden-dark-chk:checked) .verdict-box{background:linear-gradient(135deg,#1e1e3a,#1a1a2e)!important;border-color:rgba(99,102,241,.3)!important}
+    html:has(#eden-dark-chk:checked) .verdict-box{background:linear-gradient(135deg,#181830,#130f28)!important;border-color:rgba(99,102,241,.35)!important;box-shadow:0 4px 24px rgba(99,102,241,.12)!important}
     html:has(#eden-dark-chk:checked) .price-bar-track{background:#2d2d4e!important}
     html:has(#eden-dark-chk:checked) .company-full,
     html:has(#eden-dark-chk:checked) .analyst-sub,
@@ -646,7 +651,9 @@ def inject_css() -> None:
     html:has(#eden-dark-chk:checked) [data-testid="stTabs"] [role="tab"]{color:#9ca3af!important}
     html:has(#eden-dark-chk:checked) [data-testid="stTabs"] [role="tab"][aria-selected="true"]{color:#a78bfa!important}
     html:has(#eden-dark-chk:checked) .peers-add{background:rgba(99,102,241,.08)!important;border-color:rgba(99,102,241,.35)!important}
-    html:has(#eden-dark-chk:checked) #eden-panel{background:#1a1a2e!important;border-color:rgba(99,102,241,.3)!important}
+    html:has(#eden-dark-chk:checked) .eden-brand{color:#e4e4f4!important}
+    html:has(#eden-dark-chk:checked) .eden-sub{color:#a78bfa!important}
+    html:has(#eden-dark-chk:checked) #eden-panel{background:#12122a!important;border-color:rgba(99,102,241,.32)!important;box-shadow:0 12px 40px rgba(0,0,0,.6)!important}
     html:has(#eden-dark-chk:checked) .eden-panel-item{color:#e2e2f0!important}
     html:has(#eden-dark-chk:checked) #eden-dots-btn{background:rgba(26,26,46,.92)!important;border-color:rgba(167,139,250,.5)!important}
 
@@ -686,19 +693,19 @@ def inject_css() -> None:
 
     /* ── Score Badge: pulse glow for STRONG BUY ──────────────────── */
     @keyframes eden-score-pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
-      50%       { box-shadow: 0 0 0 8px rgba(16,185,129,0); }
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.5), 0 2px 12px rgba(16,185,129,.25); }
+      50%       { box-shadow: 0 0 0 10px rgba(16,185,129,0), 0 2px 20px rgba(16,185,129,.15); }
     }
     .score-badge-strong-buy {
-      animation: eden-score-pulse 2s ease-in-out infinite;
+      animation: eden-score-pulse 2.2s ease-in-out infinite;
     }
 
     /* ── Metric Cards: stronger hover ────────────────────────────── */
     .metric-card:hover {
-      transform: translateY(-4px) scale(1.02);
-      box-shadow: 0 12px 40px rgba(99,102,241,0.25);
-      border-color: rgba(99,102,241,0.4);
-      transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+      transform: translateY(-5px) scale(1.02);
+      box-shadow: 0 16px 48px rgba(99,102,241,0.28), 0 4px 16px rgba(0,0,0,.08);
+      border-color: rgba(99,102,241,0.45);
+      transition: all 0.28s cubic-bezier(0.34,1.56,0.64,1);
     }
 
     /* ── Active Tab: gradient text ───────────────────────────────── */
@@ -2585,9 +2592,12 @@ def _save_alerts_db(db: dict) -> bool:
 
 def _tg_token() -> str:
     try:
-        return st.secrets.get("TELEGRAM_BOT_TOKEN", "")
+        v = st.secrets.get("TELEGRAM_BOT_TOKEN", "")
+        if v:
+            return v
     except Exception:
-        return ""
+        pass
+    return os.environ.get("TELEGRAM_BOT_TOKEN", "")
 
 
 def _poll_telegram_registrations(force: bool = False) -> int:
@@ -7099,7 +7109,7 @@ def main() -> None:
 
         _tg_configured = bool(_tg_token())
         try:
-            _bot_name = st.secrets.get("TELEGRAM_BOT_NAME", "@eden_alerts_bot")
+            _bot_name = st.secrets.get("TELEGRAM_BOT_NAME", "") or os.environ.get("TELEGRAM_BOT_NAME", "@Eden_sovereign_bot")
         except Exception:
             _bot_name = "@eden_alerts_bot"
 
