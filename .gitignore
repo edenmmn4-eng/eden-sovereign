@@ -12,3 +12,5 @@ video/public/audio/
 venv/
 price_alerts.json
 portfolio_state.json
+github-key.json
+*-key.json
