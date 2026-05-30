@@ -35,3 +35,5 @@ jobs:
           secrets: |
             TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest
             TELEGRAM_BOT_NAME=TELEGRAM_BOT_NAME:latest
+            SUPABASE_URL=SUPABASE_URL:latest
+            SUPABASE_KEY=SUPABASE_KEY:latest
