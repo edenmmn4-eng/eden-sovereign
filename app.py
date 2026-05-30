@@ -2628,10 +2628,38 @@ def _poll_telegram_registrations(force: bool = False) -> int:
             chat_id = msg.get("chat", {}).get("id")
             if not text or not chat_id:
                 continue
+
+            # plain /start — ask user to send their phone number
+            if _re.match(r"^/start$", text, _re.I):
+                try:
+                    _req.post(
+                        f"https://api.telegram.org/bot{token}/sendMessage",
+                        json={
+                            "chat_id": chat_id,
+                            "text": (
+                                "👋 Welcome to *Sovereign Intelligence Terminal*!\n\n"
+                                "To connect your account, please send your phone number "
+                                "(e.g. `0587008082` or `+972587008082`)."
+                            ),
+                            "parse_mode": "Markdown",
+                        },
+                        timeout=6,
+                    )
+                except Exception:
+                    pass
+                continue
+
+            # /start {phone} deep link OR plain phone number message
             m = _re.match(r"^/start\s+([\d\s\-\+]+)$", text, _re.I)
             if not m:
-                continue
-            norm = _normalize_phone(m.group(1))
+                # check if the message itself looks like a phone number
+                phone_m = _re.match(r"^[\+\d][\d\s\-\+]{5,}$", text)
+                if not phone_m:
+                    continue
+                raw_phone = text
+            else:
+                raw_phone = m.group(1)
+            norm = _normalize_phone(raw_phone)
             if len(norm) >= 7 and norm not in db["registrations"]:
                 # phone לא ב-DB המקומי — Supabase עשוי היה כשל בטעינה.
                 # בדוק Supabase ישירות לפני יצירת רישום ריק, כדי לא למחוק portfolio קיים.
