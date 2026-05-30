@@ -32,3 +32,6 @@ jobs:
           service: sovereign-app
           region: us-central1
           image: docker.io/edendocker467/sovereign-app:${{ github.sha }}
+          secrets: |
+            TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest
+            TELEGRAM_BOT_NAME=TELEGRAM_BOT_NAME:latest
