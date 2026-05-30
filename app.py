@@ -2652,6 +2652,27 @@ def _poll_telegram_registrations(force: bool = False) -> int:
                     }
                 new += 1
 
+                # שלח הודעת אישור למשתמש החדש
+                try:
+                    _req.post(
+                        f"https://api.telegram.org/bot{token}/sendMessage",
+                        json={
+                            "chat_id": chat_id,
+                            "text": (
+                                "✅ *You're connected to Sovereign Intelligence Terminal!*\n\n"
+                                "Return to the app — you're now logged in.\n\n"
+                                "You'll receive:\n"
+                                "• 📊 Price alerts when your targets are hit\n"
+                                "• 🏆 Score alerts for high-scoring stocks\n"
+                                "• 📈 Portfolio briefings from the AI agent"
+                            ),
+                            "parse_mode": "Markdown",
+                        },
+                        timeout=6,
+                    )
+                except Exception:
+                    pass
+
                 # שחזור פורטפוליו: user_portfolios → _portfolio_{norm}
                 # (פועל גם אחרי רישום מחדש כשה-_tg_db נדרס)
                 if not db["registrations"][norm].get("portfolio"):
@@ -7242,11 +7263,16 @@ def main() -> None:
                     f'display:block;text-align:center;background:#229ED9;color:#fff;'
                     f'padding:10px;border-radius:8px;font-weight:600;font-size:14px;'
                     f'text-decoration:none;margin-bottom:8px;">'
-                    f'📲 Register via Telegram</a>',
+                    f'📲 Connect via Telegram</a>',
                     unsafe_allow_html=True,
                 )
-                st.caption("Click → Telegram opens → Press START → Return here")
-                if st.button("✅ Check Registration", use_container_width=True, key="check_reg_btn"):
+                st.markdown(
+                    "**How to connect:**\n"
+                    "1. Click the button above\n"
+                    "2. Press **START** in Telegram\n"
+                    "3. Return here and click **✅ I'm Connected**"
+                )
+                if st.button("✅ I'm Connected", use_container_width=True, key="check_reg_btn"):
                     import time as _t_reg
                     _found = False
                     _found_db = None  # ה-DB שמצא את הרישום — לעדכון session cache
@@ -7354,7 +7380,7 @@ def main() -> None:
                         st.toast("✅ Successfully registered!")
                         st.rerun()
                     else:
-                        st.warning("Not found yet. Click 📲 Register via Telegram → press START → return here and try again.")
+                        st.warning("Not connected yet. Make sure you pressed START in Telegram, then try again.")
 
         # ── Admin Analytics Dashboard (hidden — גלוי רק עם ?admin=1) ──────────
         try:
